@@ -1,0 +1,12 @@
+# Kuruluma özel yapılandırma — asla depoya girmez
+config.php
+
+# Kullanıcı yüklemeleri (koruyucu dosyalar hariç)
+uploads/*
+!uploads/.htaccess
+!uploads/index.html
+
+# Paket ve geçici dosyalar
+*.zip
+tani.php
+error_log

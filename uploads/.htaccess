@@ -1,0 +1,16 @@
+# uploads klasöründe PHP/script çalıştırmayı KESİNLİKLE engelle
+# (yüklenen dosyaların sunucuda kod olarak çalışmasını önler)
+
+<FilesMatch "\.(php|php3|php4|php5|php7|phtml|pht|phps|cgi|pl|py|sh|asp|aspx|jsp|htaccess|html?|svg)$">
+    Require all denied
+</FilesMatch>
+
+# Bu klasörde PHP motorunu kapat
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+Options -ExecCGI -Indexes
+AddType text/plain .php .phtml .phps

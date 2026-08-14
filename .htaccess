@@ -1,0 +1,42 @@
+# SADA Dijital — Kök .htaccess
+
+# Dizin listelemeyi kapat
+Options -Indexes
+
+# Hassas dosyalara erişimi engelle
+<FilesMatch "^(config\.php|\.htaccess)$">
+    Require all denied
+</FilesMatch>
+
+# includes klasörüne doğrudan erişimi engelle
+RedirectMatch 403 ^.*/includes/.*$
+
+# PHP hata gösterimini kapat (üretim) — yalnızca mod_php varsa
+<IfModule mod_php.c>
+    php_flag display_errors off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag display_errors off
+</IfModule>
+<IfModule lsapi_module>
+    php_flag display_errors off
+</IfModule>
+
+# Varsayılan karakter seti
+AddDefaultCharset UTF-8
+
+# Basit güvenlik başlıkları
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Statik dosya önbelleği
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+</IfModule>
