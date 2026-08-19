@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Ekip Panosu
+ * SADA One — Ekip Panosu
  * Kim ne üzerinde çalışıyor, kim boşta — anlık meşguliyet görünümü.
  */
 require __DIR__ . '/includes/init.php';

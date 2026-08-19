@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Kurulum Sihirbazı
+ * SADA One — Kurulum Sihirbazı
  * Sistem gereksinimlerini kontrol eder, veritabanını kurar,
  * yönetici hesabını oluşturur ve config.php dosyasını yazar.
  */
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $adim === 2) {
 /* ---------- Adım 3: Site + yönetici → kurulumu çalıştır ---------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $adim === 3) {
     if (empty($_SESSION['kurulum_db'])) { header('Location: ?adim=2'); exit; }
-    $siteAdi   = trim($_POST['site_adi'] ?? 'SADA Dijital');
+    $siteAdi   = trim($_POST['site_adi'] ?? 'SADA One');
     $adminAd   = trim($_POST['admin_ad'] ?? '');
     $adminMail = trim($_POST['admin_eposta'] ?? '');
     $adminSifre = $_POST['admin_sifre'] ?? '';
@@ -736,6 +736,10 @@ SQL;
         foreach ($f[2] as $i => $alan) $stFa->execute([$fid, $i + 1, $alan[0], $alan[1], $alan[2]]);
     }
 
+    // Merkezi migrasyon: sonradan eklenen tüm şema değişikliklerini uygula
+    require_once dirname(__DIR__) . '/includes/migrasyon.php';
+    migrasyon_calistir($pdo);
+
     // Genel kanal + yöneticiyi üye yap
     $pdo->prepare("INSERT INTO kanallar (ad, tur, created) VALUES ('Genel', 'genel', ?)")->execute([$now]);
     $kanalId = (int)$pdo->lastInsertId();
@@ -749,7 +753,7 @@ $adimBasliklari = [1 => 'Gereksinimler', 2 => 'Veritabanı', 3 => 'Site & Yönet
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SADA Dijital — Kurulum</title>
+<title>SADA One — Kurulum</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -832,7 +836,7 @@ input:focus { outline:none; border-color:var(--lime); box-shadow:0 0 0 3px rgba(
         <p class="aciklama">Sisteme giriş yapacağınız yönetici hesabını oluşturun.</p>
         <form method="post" action="?adim=3">
             <label>Site / Ajans Adı</label>
-            <input type="text" name="site_adi" value="<?= htmlspecialchars($_POST['site_adi'] ?? 'SADA Dijital') ?>" required>
+            <input type="text" name="site_adi" value="<?= htmlspecialchars($_POST['site_adi'] ?? 'SADA One') ?>" required>
             <label>Adınız Soyadınız</label>
             <input type="text" name="admin_ad" value="<?= htmlspecialchars($_POST['admin_ad'] ?? '') ?>" required>
             <label>E-posta Adresi</label>

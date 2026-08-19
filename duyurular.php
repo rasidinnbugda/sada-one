@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Duyuru Panosu
+ * SADA One — Duyuru Panosu
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';

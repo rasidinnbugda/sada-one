@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Opsiyonel gerçek cron ucu
+ * SADA One — Opsiyonel gerçek cron ucu
  * Sistem, tekrarlayan görevleri sayfa yüklenirken otomatik kontrol eder (kurulum gerektirmez).
  * Daha hassas zamanlama isterseniz Hostinger hPanel → Gelişmiş → Cron İşleri bölümünden
  * bu adresi saatlik çağırın:  php /home/uXXXX/public_html/cron.php  veya  curl -s "https://siteniz.com/cron.php?anahtar=SITE_ADINIZ"
@@ -10,7 +10,7 @@ require __DIR__ . '/includes/init.php';
 // Basit koruma: ?anahtar= parametresi site adıyla eşleşmeli (CLI'dan çağrılırsa kontrol yok)
 if (php_sapi_name() !== 'cli') {
     $anahtar = $_GET['anahtar'] ?? '';
-    if ($anahtar !== ayar('site_adi', 'SADA Dijital')) {
+    if ($anahtar !== ayar('site_adi', 'SADA One')) {
         http_response_code(403);
         die('Yetkisiz. ?anahtar=SITE_ADI parametresi gerekli.');
     }

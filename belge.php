@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Teklif / Fatura Belgesi (yazdırılabilir)
+ * SADA One — Teklif / Fatura Belgesi (yazdırılabilir)
  */
 require __DIR__ . '/includes/init.php';
 require_yetki('finans');
@@ -11,7 +11,7 @@ if (!$b) { header('Location: finans.php'); exit; }
 $kalemler = json_decode($b['kalemler'], true) ?: [];
 $araToplam = array_sum(array_map(fn($k) => $k['adet'] * $k['fiyat'], $kalemler));
 $kdv = $araToplam * $b['kdv_oran'] / 100;
-$siteAdi = ayar('site_adi', 'SADA Dijital');
+$siteAdi = ayar('site_adi', 'SADA One');
 $turAd = $b['tur'] === 'fatura' ? 'FATURA' : 'TEKLİF';
 ?>
 <!DOCTYPE html>

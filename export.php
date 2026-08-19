@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — CSV Dışa Aktarım
+ * SADA One — CSV Dışa Aktarım
  * tip=gorevler | finans | zaman
  * Excel'in Türkçe karakterleri doğru açması için UTF-8 BOM + noktalı virgül ayracı kullanılır.
  */

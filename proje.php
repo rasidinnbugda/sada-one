@@ -28,6 +28,15 @@ $ekip = rows("SELECT id, ad, renk FROM users WHERE rol IN ('yonetici','pm','ekip
 $sablonlar = rows("SELECT * FROM akis_sablonlari ORDER BY ad");
 $projeUyeleri = rows("SELECT u.id, u.ad, u.renk, u.avatar, u.unvan FROM proje_uyeleri pu JOIN users u ON u.id=pu.user_id WHERE pu.proje_id=? AND u.aktif=1 ORDER BY u.ad", [$id]);
 
+// İstasyon (SOP) verileri — yalnız ekip görür
+$butceGor = yetki('butce_gor');
+$kontrolListesi = is_staff() ? rows("SELECT k.*, u.ad sorumlu_ad FROM proje_kontrol_listesi k LEFT JOIN users u ON u.id=k.sorumlu_id WHERE k.proje_id=? ORDER BY k.sira", [$id]) : [];
+$ekTalepler = $butceGor ? rows("SELECT t.*, u.ad olusturan_ad FROM proje_ek_talepler t LEFT JOIN users u ON u.id=t.olusturan_id WHERE t.proje_id=? ORDER BY t.id DESC", [$id]) : [];
+$degerlendirmeler = [];
+if (is_staff()) foreach (rows("SELECT * FROM proje_degerlendirme WHERE proje_id=?", [$id]) as $dg) $degerlendirmeler[$dg['tur']] = $dg;
+$revizeSayisi = (int)val("SELECT COUNT(*) FROM onaylar WHERE proje_id=? AND durum='revize'", [$id]);
+$ekipRolleri = json_decode($proje['ekip_rolleri'] ?? '', true) ?: [];
+
 sayfa_basi($proje['ad'], 'projeler');
 ?>
 <div class="satir-esnek mb-3" style="gap:10px">
@@ -60,6 +69,7 @@ sayfa_basi($proje['ad'], 'projeler');
         <?php if ($proje['tur'] === 'aylik'): ?><button class="sekme" data-sekme="donemler">Dönemler</button><?php endif; ?>
         <button class="sekme" data-sekme="onaylar">Onaylar <?php if ($b = count(array_filter($onaylar, fn($o) => $o['durum'] === 'bekliyor'))): ?><span class="rozet r-bekliyor" style="padding:1px 7px"><?= $b ?></span><?php endif; ?></button>
         <button class="sekme" data-sekme="icerik">İçerikler</button>
+        <?php if (is_staff()): ?><button class="sekme" data-sekme="istasyon">İstasyon <?php if ($kontrolListesi && ($eksikK = count(array_filter($kontrolListesi, fn($k) => !$k['tamam'])))): ?><span class="rozet r-bekliyor" style="padding:1px 7px"><?= $eksikK ?></span><?php endif; ?></button><?php endif; ?>
         <button class="sekme" data-sekme="tartisma">Tartışma <?php if ($yorumSayi = (int)val("SELECT COUNT(*) FROM yorumlar WHERE ref_tur='proje' AND ref_id=?", [$id])): ?><span class="rozet" style="padding:1px 7px"><?= $yorumSayi ?></span><?php endif; ?></button>
         <button class="sekme" data-sekme="arsiv">Arşiv</button>
         <button class="sekme" data-sekme="aktivite">Aktivite</button>
@@ -205,6 +215,118 @@ sayfa_basi($proje['ad'], 'projeler');
     </div>
 
     <!-- TARTIŞMA -->
+    <?php if (is_staff()): ?>
+    <!-- İSTASYON: SOP künye + bütçe + teknik kontrol + değerlendirme -->
+    <div class="sekme-icerik" id="sekme-istasyon">
+        <div class="izgara izgara-2" style="align-items:start">
+            <div class="dikey" style="gap:16px">
+                <!-- Künye -->
+                <div class="kart">
+                    <div class="kart-baslik mb-2">Proje Künyesi</div>
+                    <form data-ajax="istasyon_kaydet" data-yenile="hayir">
+                        <input type="hidden" name="proje_id" value="<?= $id ?>">
+                        <input type="hidden" name="ekip_rolleri" id="ist_roller">
+                        <div class="dikey kucuk mb-2" style="gap:7px">
+                            <div class="satir-esnek arasi"><span class="metin-muted">Müşteri / Marka</span><b><?= e($proje['dosya_ad']) ?></b></div>
+                            <div class="satir-esnek arasi"><span class="metin-muted">Proje Tipi</span><b><?= PROJE_TURLERI[$proje['tur']] ?? $proje['tur'] ?></b></div>
+                            <div class="satir-esnek arasi"><span class="metin-muted">Tarih Aralığı</span><b><?= $proje['baslangic'] ? tarih($proje['baslangic']) : '—' ?> → <?= $proje['bitis'] ? tarih($proje['bitis']) : '—' ?></b></div>
+                        </div>
+                        <div class="form-grup"><label class="form-etiket">Devralma Noktası</label><input name="devralma" class="girdi" value="<?= e($proje['devralma'] ?? '') ?>" placeholder="Örn. Etkinliğe 2 hafta kala devralındı / Sıfırdan lansman" <?= yetki('dosya_yonet') ? '' : 'disabled' ?>></div>
+                        <div class="form-grup">
+                            <label class="form-etiket">Ekip ve Rol Dağılımı</label>
+                            <div class="dikey" id="istRolListe" style="gap:7px"></div>
+                            <?php if (yetki('dosya_yonet')): ?><button type="button" class="btn btn-sm btn-hayalet mt-1" onclick="istRolEkle()">+ Rol Ekle</button><?php endif; ?>
+                        </div>
+                        <?php if ($butceGor): ?>
+                        <div class="form-satir">
+                            <div class="form-grup"><label class="form-etiket">Onaylı Ana Bütçe (₺)</label><input name="butce" class="girdi" value="<?= $proje['butce'] > 0 ? number_format((float)$proje['butce'], 2, '.', '') : '' ?>" placeholder="0.00"></div>
+                            <div class="form-grup"><label class="form-etiket">Revize Hakkı</label><input name="revize_limit" type="number" class="girdi" value="<?= (int)($proje['revize_limit'] ?? 2) ?>" min="0" max="20"></div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (yetki('dosya_yonet')): ?><button type="submit" class="btn btn-marka">Künyeyi Kaydet</button><?php endif; ?>
+                    </form>
+                </div>
+
+                <?php if ($butceGor): ?>
+                <!-- Bütçe & Ek Talepler (sadece bütçe izni olanlara) -->
+                <div class="kart" style="border-color:var(--uyari)">
+                    <div class="satir-esnek arasi mb-2">
+                        <div class="kart-baslik">Bütçe & Ek Talepler <span class="rozet r-bekliyor" style="padding:1px 8px">Kısıtlı görünüm</span></div>
+                        <button class="btn btn-sm" data-modal="modalEkTalep">+ Ek Talep</button>
+                    </div>
+                    <div class="dikey kucuk mb-2" style="gap:6px">
+                        <div class="satir-esnek arasi"><span class="metin-muted">Onaylı ana bütçe</span><b><?= number_format((float)$proje['butce'], 2, ',', '.') ?> ₺</b></div>
+                        <div class="satir-esnek arasi"><span class="metin-muted">Onaylanan ek talepler</span><b>+<?= number_format(array_sum(array_map(fn($t) => $t['durum'] === 'onaylandi' ? (float)$t['tutar'] : 0, $ekTalepler)), 2, ',', '.') ?> ₺</b></div>
+                        <div class="satir-esnek arasi"><span class="metin-muted">Kullanılan revize</span><b style="color:<?= $revizeSayisi > (int)$proje['revize_limit'] ? 'var(--tehlike)' : 'inherit' ?>"><?= $revizeSayisi ?> / <?= (int)$proje['revize_limit'] ?></b></div>
+                    </div>
+                    <?php if ($revizeSayisi > (int)$proje['revize_limit']): ?><div class="kucuk mb-2" style="color:var(--tehlike)">⚠️ Revize limiti aşıldı — SOP gereği sonraki majör revizeler ek bütçeye tabidir.</div><?php endif; ?>
+                    <?php if ($ekTalepler): ?>
+                    <div class="dikey" style="gap:6px">
+                        <?php foreach ($ekTalepler as $t): ?>
+                        <div class="satir-esnek arasi kucuk" style="padding:9px 11px;background:var(--surface-2);border-radius:9px;gap:8px">
+                            <div style="min-width:0"><b><?= e($t['baslik']) ?></b><?= $t['kapsam_disi'] ? ' <span class="rozet rozet-tur" style="padding:0 7px">Kapsam dışı</span>' : '' ?><div class="hucre-alt"><?= e($t['olusturan_ad']) ?> · <?= tarih($t['created']) ?><?= $t['aciklama'] ? ' — ' . e($t['aciklama']) : '' ?></div></div>
+                            <div class="satir-esnek" style="gap:7px;flex-shrink:0">
+                                <b><?= number_format((float)$t['tutar'], 2, ',', '.') ?> ₺</b>
+                                <?php if ($t['durum'] === 'bekliyor'): ?>
+                                <button class="mini-btn" style="color:var(--basari)" onclick="ektalepDurum(<?= $t['id'] ?>, 'onaylandi', this)">Onayla</button>
+                                <button class="mini-btn" style="color:var(--tehlike)" onclick="ektalepDurum(<?= $t['id'] ?>, 'reddedildi', this)">Reddet</button>
+                                <?php else: ?><?= rozet($t['durum'], ['onaylandi' => 'Onaylandı', 'reddedildi' => 'Reddedildi', 'bekliyor' => 'Bekliyor']) ?><?php endif; ?>
+                                <button class="ikon-eylem tehlike" style="width:24px;height:24px" data-eylem="ektalep_sil" data-id="<?= $t['id'] ?>" data-onay="Ek talep silinsin mi?"><?= ikon('cop', 12) ?></button>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php else: ?><div class="metin-muted kucuk">Süreç içi ek talep kaydı yok. Müşteriden gelen kapsam dışı istekleri buraya işleyin.</div><?php endif; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="dikey" style="gap:16px">
+                <!-- Teknik Kontrol Listesi -->
+                <div class="kart">
+                    <div class="satir-esnek arasi mb-2">
+                        <div class="kart-baslik">Saha & Teknik Kontrol</div>
+                        <div class="satir-esnek" style="gap:6px">
+                            <?php if (!$kontrolListesi): ?><button class="mini-btn" data-eylem="pkontrol_standart" data-proje_id="<?= $id ?>">SOP standart listesini yükle</button><?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="dikey" style="gap:6px" id="pkListe">
+                        <?php foreach ($kontrolListesi as $k): ?>
+                        <div class="satir-esnek kucuk" style="padding:9px 11px;background:var(--surface-2);border-radius:9px;gap:9px">
+                            <input type="checkbox" <?= $k['tamam'] ? 'checked' : '' ?> onchange="pkToggle(<?= $k['id'] ?>, 'tamam')" title="Kontrol tamam">
+                            <div style="flex:1;min-width:0">
+                                <b <?= $k['tamam'] ? 'style="text-decoration:line-through;opacity:.6"' : '' ?>><?= e($k['kalem']) ?></b>
+                                <?php if ($k['kontrol_notu']): ?><div class="hucre-alt"><?= e($k['kontrol_notu']) ?></div><?php endif; ?>
+                            </div>
+                            <button class="mini-btn" onclick="pkSorumlu(<?= $k['id'] ?>)" title="Sorumlu ata"><?= $k['sorumlu_ad'] ? e(explode(' ', $k['sorumlu_ad'])[0]) : '+ sorumlu' ?></button>
+                            <button class="mini-btn <?= $k['teslim'] ? '' : '' ?>" style="color:<?= $k['teslim'] ? 'var(--basari)' : 'var(--muted)' ?>" onclick="pkToggle(<?= $k['id'] ?>, 'teslim', this)" title="Ekipman teslim edildi mi?"><?= $k['teslim'] ? '✓ Teslim' : 'Teslim?' ?></button>
+                            <button class="ikon-eylem tehlike" style="width:24px;height:24px" onclick="pkSil(<?= $k['id'] ?>, this)"><?= ikon('cop', 12) ?></button>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <form class="satir-esnek mt-2" style="gap:8px" onsubmit="pkEkle(event)">
+                        <input class="girdi" id="pkYeni" placeholder="Yeni kontrol kalemi (ekipman, izin, hazırlık...)" style="flex:1">
+                        <button class="btn btn-sm" type="submit">Ekle</button>
+                    </form>
+                </div>
+
+                <!-- Değerlendirme (Post-Mortem) -->
+                <div class="kart">
+                    <div class="kart-baslik mb-2">Değerlendirme (Post-Mortem)</div>
+                    <?php $degTurler = ['ic' => ['İç Değerlendirme (Ekip)', 'Neleri iyi yaptık? Nerede zaman/bütçe/enerji kaybı yaşandı? Bir sonraki projede neyi farklı yapmalıyız? Yaşanan aksilikler...'], 'dis' => ['Dış Değerlendirme (Kurum)', 'Müşteri memnuniyeti, alınan olumlu/olumsuz geri bildirimler...'], 'case_study' => ['Web Sitesi Case Study İçeriği', 'Projenin amacı, erişim/etkileşim metrikleri, öne çıkan görsel ve videolar...']];
+                    foreach ($degTurler as $dtKod => [$dtBaslik, $dtIpucu]): $dg = $degerlendirmeler[$dtKod] ?? null; ?>
+                    <div class="form-grup">
+                        <label class="form-etiket"><?= $dtBaslik ?><?php if ($dg): ?> <span class="metin-muted" style="font-weight:400">· <?= tarih($dg['updated'], true) ?></span><?php endif; ?></label>
+                        <textarea class="metin-alani" rows="3" id="deg_<?= $dtKod ?>" placeholder="<?= e($dtIpucu) ?>"><?= e($dg['icerik'] ?? '') ?></textarea>
+                        <button class="mini-btn mt-1" onclick="degKaydet('<?= $dtKod ?>')">Kaydet</button>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <div class="sekme-icerik" id="sekme-tartisma">
         <div class="kart">
             <div class="kart-baslik mb-2">Proje Tartışması</div>
@@ -346,6 +468,98 @@ $pmler = rows("SELECT id, ad FROM users WHERE rol IN ('yonetici','pm') AND aktif
 <script>
 function onayNot(id, durum) { document.getElementById('onayNotId').value = id; document.getElementById('onayNotDurum').value = durum; modalAc('modalOnayNot'); }
 </script>
+
+<?php if (is_staff()): ?>
+<!-- Ek talep modalı (bütçe izni) -->
+<?php if ($butceGor): ?>
+<div class="modal-katman" id="modalEkTalep">
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Ek Talep Kaydet</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <form data-ajax="ektalep_kaydet">
+        <input type="hidden" name="proje_id" value="<?= $id ?>">
+        <div class="modal-govde">
+            <div class="form-grup"><label class="form-etiket">Talep <span class="zorunlu">*</span></label><input name="baslik" class="girdi" required placeholder="Örn. Ek drone çekimi istendi"></div>
+            <div class="form-satir">
+                <div class="form-grup"><label class="form-etiket">Tahmini Tutar (₺)</label><input name="tutar" class="girdi" placeholder="0.00"></div>
+                <div class="form-grup" style="display:flex;align-items:flex-end"><label class="satir-esnek" style="gap:8px;cursor:pointer;padding-bottom:10px"><input type="checkbox" name="kapsam_disi" value="1" checked> Kapsam dışı (ek bütçe)</label></div>
+            </div>
+            <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="aciklama" class="metin-alani" placeholder="Talebin detayı, kim istedi..."></textarea></div>
+        </div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+    </form></div>
+</div>
+<?php endif; ?>
+
+<script>
+/* ---- İstasyon: ekip rol dağılımı düzenleyici ---- */
+const istEkip = <?= json_encode(array_map(fn($e2) => ['id' => $e2['id'], 'ad' => $e2['ad']], $ekip), JSON_UNESCAPED_UNICODE) ?>;
+const istRoller = <?= json_encode($ekipRolleri, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
+const istDuzenlenebilir = <?= yetki('dosya_yonet') ? 'true' : 'false' ?>;
+function istRolEkle(rol = '', kisi = '') {
+    const liste = document.getElementById('istRolListe');
+    if (!liste) return;
+    const div = document.createElement('div');
+    div.className = 'satir-esnek ist-rol';
+    div.style.gap = '7px';
+    let ops = '<option value="">Kişi seçin</option>';
+    istEkip.forEach(k => ops += `<option value="${k.ad.replace(/"/g, '&quot;')}" ${k.ad === kisi ? 'selected' : ''}>${k.ad}</option>`);
+    div.innerHTML = `<input class="girdi ist-rol-ad" placeholder="Rol (örn. Art Director)" value="${rol.replace(/"/g, '&quot;')}" style="flex:1" ${istDuzenlenebilir ? '' : 'disabled'}>
+        <select class="secim native-kal ist-rol-kisi" style="flex:1" ${istDuzenlenebilir ? '' : 'disabled'}>${ops}</select>
+        ${istDuzenlenebilir ? '<button type="button" class="ikon-eylem tehlike" onclick="this.parentElement.remove();istRolYaz()">✕</button>' : ''}`;
+    liste.appendChild(div);
+}
+function istRolYaz() {
+    const roller = Array.from(document.querySelectorAll('.ist-rol')).map(s => ({
+        rol: s.querySelector('.ist-rol-ad').value.trim(),
+        kisi: s.querySelector('.ist-rol-kisi').value,
+    })).filter(r => r.rol || r.kisi);
+    const gizli = document.getElementById('ist_roller');
+    if (gizli) gizli.value = JSON.stringify(roller);
+}
+(istRoller.length ? istRoller : (istDuzenlenebilir ? [{rol: '', kisi: ''}] : [])).forEach(r => istRolEkle(r.rol || '', r.kisi || ''));
+istRolYaz();
+document.getElementById('istRolListe')?.closest('form')?.addEventListener('submit', istRolYaz);
+document.getElementById('istRolListe')?.addEventListener('input', istRolYaz);
+document.getElementById('istRolListe')?.addEventListener('change', istRolYaz);
+
+/* ---- İstasyon: kontrol listesi ---- */
+async function pkEkle(e) {
+    e.preventDefault();
+    const girdi = document.getElementById('pkYeni');
+    if (!girdi.value.trim()) return;
+    const j = await api('pkontrol_ekle', { proje_id: <?= $id ?>, kalem: girdi.value.trim() });
+    if (j.ok) location.reload();
+}
+async function pkToggle(id, alan, btn) {
+    const j = await api('pkontrol_toggle', { id, alan });
+    if (j.ok && alan === 'tamam') location.reload();
+    if (j.ok && btn) { const acik = btn.textContent.includes('?'); btn.textContent = acik ? '✓ Teslim' : 'Teslim?'; btn.style.color = acik ? 'var(--basari)' : 'var(--muted)'; }
+}
+async function pkSil(id, btn) {
+    if (!confirm('Kontrol kalemi silinsin mi?')) return;
+    const j = await api('pkontrol_sil', { id });
+    if (j.ok) btn.closest('.satir-esnek').remove();
+}
+async function pkSorumlu(id) {
+    let secenek = 'Sorumlu seçin:\n0 — Sorumsuz bırak\n';
+    istEkip.forEach((k, i) => secenek += (i + 1) + ' — ' + k.ad + '\n');
+    const sec = prompt(secenek);
+    if (sec === null) return;
+    const idx = parseInt(sec);
+    const j = await api('pkontrol_sorumlu', { id, sorumlu_id: idx > 0 && istEkip[idx - 1] ? istEkip[idx - 1].id : 0 });
+    if (j.ok) location.reload();
+}
+
+/* ---- İstasyon: değerlendirme + ek talep ---- */
+async function degKaydet(tur) {
+    const j = await api('degerlendirme_kaydet', { proje_id: <?= $id ?>, tur, icerik: document.getElementById('deg_' + tur).value });
+    if (j.ok) toast(j.mesaj, 'basari');
+}
+async function ektalepDurum(id, durum, btn) {
+    const j = await api('ektalep_durum', { id, durum });
+    if (j.ok) location.reload();
+}
+</script>
+<?php endif; ?>
 
 <?php
 sayfa_sonu();

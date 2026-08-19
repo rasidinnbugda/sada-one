@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — İçerik Takvimi
+ * SADA One — İçerik Takvimi
  * İçerikler dosyaya (markaya) bağlıdır; proje opsiyoneldir. Çoklu platform desteklenir.
  */
 require __DIR__ . '/includes/init.php';

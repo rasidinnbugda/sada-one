@@ -1,12 +1,12 @@
 <?php
 /**
- * SADA Dijital — E-posta gönderimi
+ * SADA One — E-posta gönderimi
  * SMTP (SSL) üzerinden gönderir; SMTP kapalıysa PHP mail() kullanır.
  * Hostinger için: smtp.hostinger.com, port 465 (SSL).
  */
 
 function eposta_gonder(string $alici, string $konu, string $metin): bool {
-    $siteAdi = ayar('site_adi', 'SADA Dijital');
+    $siteAdi = ayar('site_adi', 'SADA One');
     $gonderen = ayar('smtp_gonderen') ?: ayar('smtp_kullanici');
 
     $html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a0f1e;border-radius:16px;overflow:hidden">'

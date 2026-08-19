@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Randevu Talepleri
+ * SADA One — Randevu Talepleri
  * Müşteri: talep oluşturur ve durumunu izler. Ekip: onaylar / alternatif saat önerir / reddeder.
  * Onaylanan randevu otomatik olarak toplantı takvimine düşer.
  */

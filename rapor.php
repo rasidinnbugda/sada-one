@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Müşteri Raporu (yazdırılabilir / PDF)
+ * SADA One — Müşteri Raporu (yazdırılabilir / PDF)
  * Tarayıcının "PDF olarak kaydet" özelliğiyle çıktı alınır.
  */
 require __DIR__ . '/includes/init.php';
@@ -14,7 +14,7 @@ if (!$proje) { header('Location: projeler.php'); exit; }
 
 $ayBas = sprintf('%04d-%02d-01', $yil, $ay);
 $aySon = date('Y-m-t', strtotime($ayBas));
-$siteAdi = ayar('site_adi', 'SADA Dijital');
+$siteAdi = ayar('site_adi', 'SADA One');
 
 $tamamlanan = rows("SELECT g.*, u.ad atanan_ad FROM gorevler g LEFT JOIN users u ON u.id=g.atanan_id WHERE g.proje_id=? AND g.durum='tamamlandi' AND g.tamamlanma BETWEEN ? AND ? ORDER BY g.tamamlanma", [$projeId, $ayBas . ' 00:00:00', $aySon . ' 23:59:59']);
 $devamEden = rows("SELECT g.* FROM gorevler g WHERE g.proje_id=? AND g.arsivlendi=0 AND g.durum!='tamamlandi' ORDER BY g.son_tarih IS NULL, g.son_tarih", [$projeId]);

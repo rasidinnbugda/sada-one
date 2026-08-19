@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Çekim & Prodüksiyon Takvimi
+ * SADA One — Çekim & Prodüksiyon Takvimi
  * Çok günlü etkinlikler hafta üzerinde kesintisiz şerit (bant) olarak gösterilir.
  */
 require __DIR__ . '/includes/init.php';
@@ -186,6 +186,10 @@ sayfa_basi('Çekim & Prodüksiyon Takvimi', 'takvim');
                 <div class="form-grup"><label class="form-etiket">Proje (opsiyonel)</label><select name="proje_id" id="ev_proje" class="secim"><option value="">—</option><?php foreach ($projeler as $p): ?><option value="<?= $p['id'] ?>" data-dosya="<?= $p['dosya_id'] ?>"><?= e($p['ad']) ?></option><?php endforeach; ?></select></div>
             </div>
             <div class="form-grup"><label class="form-etiket">Katılımcılar</label><input name="katilimcilar" class="girdi" placeholder="İsimler, virgülle ayırın"></div>
+            <div class="form-satir">
+                <div class="form-grup"><label class="form-etiket">Alınacaklar</label><textarea name="alinacaklar" class="metin-alani" rows="2" placeholder="- Yedek pil&#10;- Gaffer bandı"></textarea></div>
+                <div class="form-grup"><label class="form-etiket">İhtiyaç Listesi</label><textarea name="ihtiyac_listesi" class="metin-alani" rows="2" placeholder="- Mekan izni&#10;- Prompter metni"></textarea></div>
+            </div>
             <?php if ($musaitEkipman): ?>
             <div class="form-grup">
                 <label class="form-etiket">Ekipman Seç <span class="metin-muted" style="font-weight:400">(stüdyodaki müsait ekipmanlar — seçilenler çekime zimmetlenir)</span></label>
@@ -250,6 +254,8 @@ function etkinlikGoster(id) {
         h += `</div>`;
     }
     if (e.aciklama) h += `<div><div class="hucre-alt mb-2">Not</div><div class="kucuk metin-2">${e.aciklama.replace(/</g, '&lt;')}</div></div>`;
+    if (e.alinacaklar) h += `<div><div class="hucre-alt mb-2">🛒 Alınacaklar</div><div class="kucuk metin-2" style="white-space:pre-wrap">${e.alinacaklar.replace(/</g, '&lt;')}</div></div>`;
+    if (e.ihtiyac_listesi) h += `<div><div class="hucre-alt mb-2">📋 İhtiyaç Listesi</div><div class="kucuk metin-2" style="white-space:pre-wrap">${e.ihtiyac_listesi.replace(/</g, '&lt;')}</div></div>`;
     h += `<div><div class="hucre-alt mb-2">Tarihi Değiştir</div><div class="satir-esnek sarma" style="gap:8px"><input type="datetime-local" class="girdi" id="etTasiBas" value="${e.baslangic.replace(' ', 'T').slice(0,16)}" style="max-width:200px"><input type="datetime-local" class="girdi" id="etTasiBit" value="${e.bitis ? e.bitis.replace(' ', 'T').slice(0,16) : ''}" style="max-width:200px"><button class="btn btn-sm" onclick="etTasi(${id})">Güncelle</button></div></div>`;
     h += `</div>`;
     document.getElementById('edGovde').innerHTML = h;

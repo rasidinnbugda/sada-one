@@ -154,6 +154,37 @@
         }
     });
 
+    /* ---------- Gezinme ilerleme çubuğu: tık anında görünür, sayfa değişince biter ---------- */
+    document.addEventListener('click', e => {
+        const a = e.target.closest('a[href]');
+        if (!a || a.target === '_blank' || a.hasAttribute('download') || e.metaKey || e.ctrlKey) return;
+        const href = a.getAttribute('href') || '';
+        if (href.startsWith('#') || href.startsWith('javascript') || href.startsWith('http') && !href.includes(location.host)) return;
+        const cubuk = document.getElementById('sayfaCubugu');
+        if (!cubuk) return;
+        cubuk.classList.add('aktif');
+        cubuk.style.width = '30%';
+        setTimeout(() => cubuk.style.width = '75%', 180);
+        setTimeout(() => cubuk.style.width = '92%', 700);
+    });
+    window.addEventListener('pageshow', () => {
+        const cubuk = document.getElementById('sayfaCubugu');
+        if (cubuk) { cubuk.style.width = '0'; cubuk.classList.remove('aktif'); }
+    });
+
+    /* ---------- Canlı bildirim sayacı: 45 sn'de bir tazele ---------- */
+    setInterval(async () => {
+        if (document.hidden) return;
+        try {
+            const j = await api('bildirim_sayi', {});
+            if (!j.ok) return;
+            const rozet = document.querySelector('[data-bildirim-rozet]');
+            if (!rozet) return;
+            rozet.textContent = j.sayi > 99 ? '99+' : j.sayi;
+            rozet.style.display = j.sayi > 0 ? '' : 'none';
+        } catch (err) { /* sessiz geç */ }
+    }, 45000);
+
     /* ---------- Katlanabilir bölümler (Adımlarım vb.) ---------- */
     $$('[data-katla]').forEach(kutu => {
         const anahtar = 'katla_' + kutu.dataset.katla;

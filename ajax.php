@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Merkezi AJAX işleyici
+ * SADA One — Merkezi AJAX işleyici
  * Tüm istemci eylemleri buradan geçer. CSRF ve yetki kontrollüdür.
  */
 define('AJAX_ISTEK', true); // yetkisiz erişimde yönlendirme yerine JSON 403 döner
@@ -24,6 +24,198 @@ case 'tema_degistir':
 case 'bildirim_oku':
     guncelle('bildirimler', ['okundu' => 1], 'id=? AND user_id=?', [(int)$g('id'), $u['id']]);
     json_out(['ok' => true]);
+
+case 'surum_kontrol':
+    if ($u['rol'] !== 'yonetici') yetkisiz();
+    require_once __DIR__ . '/includes/guncelleyici.php';
+    $rel = github_json('https://api.github.com/repos/' . GITHUB_DEPO . '/releases/latest');
+    if (!$rel || empty($rel['tag_name'])) json_out(['ok' => false, 'hata' => 'GitHub\'a ulaşılamadı veya yayınlanmış sürüm yok.']);
+    $son = ltrim($rel['tag_name'], 'vV');
+    json_out([
+        'ok' => true, 'mevcut' => SURUM, 'son' => $rel['tag_name'],
+        'yeni_var' => version_compare($son, SURUM, '>'),
+        'notlar' => mb_substr(trim((string)($rel['body'] ?? '')), 0, 300),
+    ]);
+
+/* ==================== v14: SOP MODÜLLERİ ==================== */
+case 'mentorluk_kaydet':
+    if (!is_admin() && $u['rol'] !== 'pm') yetkisiz();
+    $veri = [
+        'uye_id' => (int)$g('uye_id'), 'alan' => trim($g('alan')),
+        'mentor_id' => (int)$g('mentor_id') ?: null, 'proje_id' => (int)$g('proje_id') ?: null,
+        'saha' => trim($g('saha')) ?: null, 'cikti' => trim($g('cikti')) ?: null,
+        'durum' => in_array($g('durum'), ['planlandi', 'devam', 'tamamlandi']) ? $g('durum') : 'planlandi',
+    ];
+    if (!$veri['uye_id'] || $veri['alan'] === '') json_out(['ok' => false, 'hata' => 'Ekip üyesi ve gelişim alanı zorunludur.']);
+    if ($id = (int)$g('id')) { $veri['updated'] = $now; guncelle('mentorluk', $veri, 'id=?', [$id]); }
+    else { $veri['created'] = $now; insert('mentorluk', $veri); }
+    json_out(['ok' => true, 'mesaj' => 'Mentörlük kaydı güncellendi.', 'yenile' => true]);
+
+case 'mentorluk_cikti':
+    // Üye kendi kaydının çıktı notunu güncelleyebilir
+    $kayit = row("SELECT * FROM mentorluk WHERE id=?", [(int)$g('id')]);
+    if (!$kayit || (!is_admin() && $u['rol'] !== 'pm' && $kayit['uye_id'] != $u['id'])) yetkisiz();
+    guncelle('mentorluk', ['cikti' => trim($g('cikti')), 'updated' => $now], 'id=?', [(int)$g('id')]);
+    json_out(['ok' => true, 'mesaj' => 'Çıktı notu kaydedildi.']);
+
+case 'mentorluk_sil':
+    if (!is_admin() && $u['rol'] !== 'pm') yetkisiz();
+    q("DELETE FROM mentorluk WHERE id=?", [(int)$g('id')]);
+    json_out(['ok' => true, 'yenile' => true]);
+
+case 'havuz_kaydet':
+    if (is_stajyer() || is_musteri()) yetkisiz();
+    $veri = [
+        'ad' => trim($g('ad')), 'yetkinlik' => trim($g('yetkinlik')) ?: null,
+        'calisildi' => (int)(bool)$g('calisildi'), 'iletisim' => trim($g('iletisim')) ?: null,
+        'notu' => trim($g('notu')) ?: null,
+    ];
+    if ($veri['ad'] === '') json_out(['ok' => false, 'hata' => 'İsim zorunludur.']);
+    if ($cv = dosya_yukle('cv')) {
+        $veri['cv_arsiv_id'] = insert('arsiv', ['ad' => $cv['ad'], 'dosya_yolu' => $cv['yol'], 'boyut' => $cv['boyut'], 'uzanti' => $cv['uzanti'], 'yukleyen_id' => $u['id'], 'created' => $now]);
+    }
+    if ($id = (int)$g('id')) guncelle('calisan_havuzu', $veri, 'id=?', [$id]);
+    else { $veri['ekleyen_id'] = $u['id']; $veri['created'] = $now; insert('calisan_havuzu', $veri); }
+    json_out(['ok' => true, 'mesaj' => 'Havuz kaydı güncellendi.', 'yenile' => true]);
+
+case 'havuz_sil':
+    if (!is_admin() && $u['rol'] !== 'pm') yetkisiz();
+    q("DELETE FROM calisan_havuzu WHERE id=?", [(int)$g('id')]);
+    json_out(['ok' => true, 'yenile' => true]);
+
+case 'fikir_kaydet':
+    if (is_musteri()) yetkisiz();
+    $fikir = trim($g('fikir'));
+    if ($fikir === '') json_out(['ok' => false, 'hata' => 'Fikir boş olamaz.']);
+    insert('fikirler', ['fikir' => $fikir, 'kurum' => trim($g('kurum')) ?: null, 'aciklama' => trim($g('aciklama')) ?: null, 'oneren_id' => $u['id'], 'created' => $now]);
+    json_out(['ok' => true, 'mesaj' => 'Fikir panoya eklendi.', 'yenile' => true]);
+
+case 'fikir_durum':
+    if (!is_admin() && $u['rol'] !== 'pm') yetkisiz();
+    if (!in_array($g('durum'), ['yeni', 'begenildi', 'uygulandi'])) json_out(['ok' => false, 'hata' => 'Geçersiz durum.']);
+    guncelle('fikirler', ['durum' => $g('durum')], 'id=?', [(int)$g('id')]);
+    json_out(['ok' => true]);
+
+case 'fikir_sil':
+    $f = row("SELECT oneren_id FROM fikirler WHERE id=?", [(int)$g('id')]);
+    if (!$f || (!is_admin() && $f['oneren_id'] != $u['id'])) yetkisiz();
+    q("DELETE FROM fikirler WHERE id=?", [(int)$g('id')]);
+    json_out(['ok' => true, 'yenile' => true]);
+
+case 'aylikrapor_kaydet':
+    if (is_stajyer() || is_musteri()) yetkisiz();
+    $dosyaId = (int)$g('dosya_id'); $donem = $g('donem');
+    if (!$dosyaId || !preg_match('/^\d{4}-\d{2}$/', $donem)) json_out(['ok' => false, 'hata' => 'Dosya ve dönem (YYYY-AA) zorunludur.']);
+    $veri = ['ozet' => trim($g('ozet')), 'yapilanlar' => trim($g('yapilanlar')), 'metrikler' => trim($g('metrikler')), 'plan' => trim($g('plan')),
+        'durum' => $g('durum') === 'tamamlandi' ? 'tamamlandi' : 'taslak', 'updated' => $now];
+    $var = row("SELECT id FROM aylik_raporlar WHERE dosya_id=? AND donem=?", [$dosyaId, $donem]);
+    if ($var) guncelle('aylik_raporlar', $veri, 'id=?', [$var['id']]);
+    else insert('aylik_raporlar', $veri + ['dosya_id' => $dosyaId, 'donem' => $donem, 'yazan_id' => $u['id'], 'created' => $now]);
+    json_out(['ok' => true, 'mesaj' => 'Aylık rapor kaydedildi.', 'yenile' => true]);
+
+case 'ynot_kaydet':
+    if (!is_admin() && $u['rol'] !== 'pm') yetkisiz();
+    $gid = (int)$g('gorev_id');
+    if (!val("SELECT id FROM gorevler WHERE id=?", [$gid])) json_out(['ok' => false, 'hata' => 'Görev bulunamadı.']);
+    q("INSERT INTO gorev_yonetici_notlari (gorev_id, user_id, notu, updated) VALUES (?,?,?,?)
+       ON DUPLICATE KEY UPDATE notu=VALUES(notu), updated=VALUES(updated)", [$gid, $u['id'], trim($g('notu')), $now]);
+    json_out(['ok' => true, 'mesaj' => 'Not kaydedildi.']);
+
+/* ---- Proje istasyonu ---- */
+case 'istasyon_kaydet':
+    if (!yetki('dosya_yonet')) yetkisiz();
+    $pid = (int)$g('proje_id');
+    if (!proje_erisim($pid)) yetkisiz();
+    $veri = ['devralma' => trim($g('devralma')) ?: null, 'ekip_rolleri' => $g('ekip_rolleri') ?: null];
+    if (yetki('butce_gor')) {
+        $veri['butce'] = (float)str_replace(',', '.', $g('butce', '0'));
+        $veri['revize_limit'] = max(0, (int)$g('revize_limit', 2));
+    }
+    guncelle('projeler', $veri, 'id=?', [$pid]);
+    json_out(['ok' => true, 'mesaj' => 'İstasyon bilgileri kaydedildi.', 'yenile' => true]);
+
+case 'ektalep_kaydet':
+    if (!yetki('butce_gor')) yetkisiz();
+    $pid = (int)$g('proje_id');
+    if (!proje_erisim($pid)) yetkisiz();
+    $baslik = trim($g('baslik'));
+    if ($baslik === '') json_out(['ok' => false, 'hata' => 'Talep başlığı zorunludur.']);
+    insert('proje_ek_talepler', ['proje_id' => $pid, 'baslik' => $baslik, 'tutar' => (float)str_replace(',', '.', $g('tutar', '0')),
+        'kapsam_disi' => (int)(bool)$g('kapsam_disi'), 'aciklama' => trim($g('aciklama')) ?: null, 'olusturan_id' => $u['id'], 'created' => $now]);
+    json_out(['ok' => true, 'mesaj' => 'Ek talep kaydedildi.', 'yenile' => true]);
+
+case 'ektalep_durum':
+    if (!yetki('butce_gor')) yetkisiz();
+    if (!in_array($g('durum'), ['bekliyor', 'onaylandi', 'reddedildi'])) json_out(['ok' => false, 'hata' => 'Geçersiz durum.']);
+    guncelle('proje_ek_talepler', ['durum' => $g('durum')], 'id=?', [(int)$g('id')]);
+    json_out(['ok' => true]);
+
+case 'ektalep_sil':
+    if (!yetki('butce_gor')) yetkisiz();
+    q("DELETE FROM proje_ek_talepler WHERE id=?", [(int)$g('id')]);
+    json_out(['ok' => true, 'yenile' => true]);
+
+case 'pkontrol_ekle':
+    if (!is_staff()) yetkisiz();
+    $pid = (int)$g('proje_id');
+    if (!proje_erisim($pid)) yetkisiz();
+    $kalem = trim($g('kalem'));
+    if ($kalem === '') json_out(['ok' => false, 'hata' => 'Kalem adı boş olamaz.']);
+    $id = insert('proje_kontrol_listesi', ['proje_id' => $pid, 'kalem' => $kalem, 'kontrol_notu' => trim($g('kontrol_notu')) ?: null,
+        'sorumlu_id' => (int)$g('sorumlu_id') ?: null, 'sira' => (int)val("SELECT COALESCE(MAX(sira),0)+1 FROM proje_kontrol_listesi WHERE proje_id=?", [$pid])]);
+    json_out(['ok' => true, 'id' => $id, 'yenile' => true]);
+
+case 'pkontrol_standart':
+    // SOP standart teknik kontrol listesi tek tıkla yüklenir
+    if (!is_staff()) yetkisiz();
+    $pid = (int)$g('proje_id');
+    if (!proje_erisim($pid)) yetkisiz();
+    $standart = [
+        ['Kamera ve Lensler', 'Yedek bataryalar, hafıza kartları formatlandı mı, temizlik kitleri hazır mı?'],
+        ['Işık Sistemleri', 'Ana ışık, dolgu ışığı, softbox, uzatma kabloları ve tripodlar hazır mı?'],
+        ['Ses Ekipmanları', 'Yaka mikrofonları, telsiz alıcılar, kayıt cihazları ve yedek piller kontrol edildi mi?'],
+        ['Prompter Hazırlığı', 'Prompter yazılımı güncellendi mi, konuşma metinleri sisteme yüklendi mi?'],
+        ['Lojistik ve İzinler', 'Çekim mekan izinleri alındı mı, ulaşım ve akreditasyonlar sağlandı mı?'],
+    ];
+    $sira = (int)val("SELECT COALESCE(MAX(sira),0) FROM proje_kontrol_listesi WHERE proje_id=?", [$pid]);
+    foreach ($standart as $s) {
+        insert('proje_kontrol_listesi', ['proje_id' => $pid, 'kalem' => $s[0], 'kontrol_notu' => $s[1], 'sira' => ++$sira]);
+    }
+    json_out(['ok' => true, 'mesaj' => 'Standart SOP kontrol listesi yüklendi.', 'yenile' => true]);
+
+case 'pkontrol_toggle':
+    if (!is_staff()) yetkisiz();
+    $alan = $g('alan') === 'teslim' ? 'teslim' : 'tamam';
+    q("UPDATE proje_kontrol_listesi SET $alan = 1 - $alan WHERE id=?", [(int)$g('id')]);
+    json_out(['ok' => true]);
+
+case 'pkontrol_sorumlu':
+    if (!is_staff()) yetkisiz();
+    guncelle('proje_kontrol_listesi', ['sorumlu_id' => (int)$g('sorumlu_id') ?: null], 'id=?', [(int)$g('id')]);
+    json_out(['ok' => true, 'yenile' => true]);
+
+case 'pkontrol_sil':
+    if (!is_staff()) yetkisiz();
+    q("DELETE FROM proje_kontrol_listesi WHERE id=?", [(int)$g('id')]);
+    json_out(['ok' => true]);
+
+case 'degerlendirme_kaydet':
+    if (!is_staff()) yetkisiz();
+    $pid = (int)$g('proje_id');
+    if (!proje_erisim($pid)) yetkisiz();
+    if (!in_array($g('tur'), ['ic', 'dis', 'case_study'])) json_out(['ok' => false, 'hata' => 'Geçersiz değerlendirme türü.']);
+    q("INSERT INTO proje_degerlendirme (proje_id, tur, icerik, guncelleyen_id, updated) VALUES (?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE icerik=VALUES(icerik), guncelleyen_id=VALUES(guncelleyen_id), updated=VALUES(updated)",
+       [$pid, $g('tur'), trim($g('icerik')), $u['id'], $now]);
+    json_out(['ok' => true, 'mesaj' => 'Değerlendirme kaydedildi.']);
+
+case 'cekim_liste_kaydet':
+    if (!yetki('takvim_yonet')) yetkisiz();
+    guncelle('etkinlikler', ['alinacaklar' => trim($g('alinacaklar')) ?: null, 'ihtiyac_listesi' => trim($g('ihtiyac_listesi')) ?: null], 'id=?', [(int)$g('id')]);
+    json_out(['ok' => true, 'mesaj' => 'Çekim listesi güncellendi.', 'yenile' => true]);
+
+case 'bildirim_sayi':
+    json_out(['ok' => true, 'sayi' => (int)val("SELECT COUNT(*) FROM bildirimler WHERE user_id=? AND okundu=0", [$u['id']])]);
 
 case 'bildirim_sil':
     q("DELETE FROM bildirimler WHERE id=? AND user_id=?", [(int)$g('id'), $u['id']]);
@@ -704,6 +896,8 @@ case 'etkinlik_kaydet':
         'baslangic' => $g('baslangic'), 'bitis' => $g('bitis') ?: null,
         'yer' => $g('yer'), 'aciklama' => $g('aciklama'), 'katilimcilar' => $g('katilimcilar'),
         'online_link' => trim($g('online_link')) ?: null,
+        'alinacaklar' => trim($g('alinacaklar')) ?: null,
+        'ihtiyac_listesi' => trim($g('ihtiyac_listesi')) ?: null,
     ];
     if ($veri['baslik'] === '' || !$veri['baslangic']) json_out(['ok' => false, 'hata' => 'Başlık ve tarih gerekli.']);
     // Sistem içi katılımcılar (toplantılar için)

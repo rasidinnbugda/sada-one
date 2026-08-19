@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Çekirdek başlatma dosyası
+ * SADA One — Çekirdek başlatma dosyası
  * Oturum, veritabanı bağlantısı, yetki kontrolü ve yardımcı fonksiyonlar.
  */
 // Oturum güvenliği: çerez sertleştirme (XSS ile çerez çalınması ve CSRF yüzeyini daraltır)
@@ -137,6 +137,7 @@ const IZIN_ANAHTARLARI = [
     'belge_olustur' => 'Teklif/fatura oluşturma',
     'arsiv_sil' => 'Arşivden dosya silme',
     'talep_yonet' => 'Talepleri yönetme',
+    'butce_gor' => 'Proje bütçelerini görme (istasyon)',
 ];
 
 function yetki(string $anahtar): bool {
@@ -293,8 +294,19 @@ const TEKRARLAR = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'aylik' =>
 const GIDER_TURLERI = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Sürüm & güncelleme notları ---------------- */
-const SURUM = '3.3';
+const SURUM = '4.0';
 const SURUM_NOTLARI = [
+    '4.0' => [
+        'Panel artık SADA One — yeni kimlik her yerde',
+        'Panel içi güncelleme sistemi: ZIP yükle veya GitHub\'dan tek tıkla kur (otomatik yedekli)',
+        'Proje İstasyonu: SOP künyesi, bütçe & ek talepler (izinli), teknik kontrol listesi, post-mortem değerlendirme',
+        'Gelişim & Mentörlük programı: üye-mentör eşleşmeleri ve çıktı takibi',
+        'Çalışan Havuzu: yetkinlik + CV arşivi; Fikir Panosu: ekipten içerik fikirleri',
+        'Aylık müşteri raporları panelde dolduruluyor',
+        'Yönetici Takip: tüm görevler + kişiye özel yönetici not kolonları',
+        'Çekim Listesi: kim gidiyor, hangi ekipman, alınacaklar, ihtiyaçlar',
+        'Anlık gezinme (ön-yükleme), gezinme çubuğu ve canlı bildirim sayacı',
+    ],
     '3.3' => [
         'Kanban sürüklemesi yenilendi: eğik süzülen kart, kesikli yuva izi, yumuşak oturma animasyonu',
         'Görsel ağırlık azaltıldı: gölgeler, parıltılar ve modal perdesi hafifledi',
@@ -494,7 +506,7 @@ function tam_url(string $yol): string {
     return $protokol . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/' . ltrim($yol, '/');
 }
 
-function log_aktivite(string $aciklama, string $refTur = null, int $refId = null): void {
+function log_aktivite(string $aciklama, ?string $refTur = null, ?int $refId = null): void {
     insert('aktiviteler', [
         'user_id' => (int)(user()['id'] ?? 0), 'ref_tur' => $refTur, 'ref_id' => $refId,
         'aciklama' => $aciklama, 'created' => date('Y-m-d H:i:s'),

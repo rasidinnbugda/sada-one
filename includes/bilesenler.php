@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Paylaşımlı görsel bileşenler
+ * SADA One — Paylaşımlı görsel bileşenler
  * Birden fazla sayfada kullanılan render fonksiyonları.
  */
 

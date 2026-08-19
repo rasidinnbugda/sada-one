@@ -1,4 +1,4 @@
-# SADA Panel
+# SADA One
 
 Dijital ajanslar için PHP + MySQL tabanlı iş yönetim paneli. Tamamı Türkçe.
 
@@ -28,9 +28,15 @@ Dijital ajanslar için PHP + MySQL tabanlı iş yönetim paneli. Tamamı Türkç
 
 ## Güncelleme
 
-1. Yeni sürüm dosyalarını mevcut kurulumun üzerine yükleyin (`config.php` depoda yoktur, ayarlarınız korunur).
-2. Tarayıcıda `guncelle.php`'yi çalıştırın (şema güncellemeleri idempotenttir, mevcut veriye dokunmaz).
-3. Bittiğinde `guncelle.php`'yi sunucudan silin.
+**Panel içinden (önerilen):** Yönetim → **Güncelleme** sayfasında iki seçenek vardır:
+- **GitHub'dan Güncelle:** son yayınlanan sürüm denetlenir, tek tıkla indirilip kurulur.
+- **ZIP Paketi Yükle:** `sada-one.zip` paketini seçin, sistem açar ve uygular.
+
+Her iki yöntemde de kurulum öncesi `backups/` klasörüne otomatik kod yedeği alınır;
+`config.php`, `uploads/` ve yedekler korunur; veritabanı şeması otomatik güncellenir.
+Aynı ZIP sıfırdan kurulum için de kullanılır (`install/` içerir).
+
+**Elle:** Dosyaları mevcut kurulumun üzerine yükleyip tarayıcıda `guncelle.php` çalıştırmak da mümkündür.
 
 ## E-posta (SMTP)
 

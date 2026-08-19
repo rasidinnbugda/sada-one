@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Proje Şablonları
+ * SADA One — Proje Şablonları
  * Hazır görev setleriyle tek tıkla proje kurulumu.
  */
 require __DIR__ . '/includes/init.php';

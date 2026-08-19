@@ -1,13 +1,13 @@
 <?php
 /**
- * SADA Dijital — Sayfa düzeni (kenar çubuğu + üst bar)
+ * SADA One — Sayfa düzeni (kenar çubuğu + üst bar)
  */
 
 function sayfa_basi(string $baslik, string $aktifSayfa = ''): void {
     $u = user();
     if ($u && is_staff()) { try { tekrar_kontrol(); } catch (Throwable $e) { /* sessiz */ } }
     $tema = isset(TEMALAR[$u['tema'] ?? '']) ? $u['tema'] : ayar('varsayilan_tema', 'lime');
-    $siteAdi = ayar('site_adi', 'SADA Dijital');
+    $siteAdi = ayar('site_adi', 'SADA One');
     $bildirimSayisi = $u ? (int)val("SELECT COUNT(*) FROM bildirimler WHERE user_id=? AND okundu=0", [$u['id']]) : 0;
 
     $nav = [];
@@ -45,6 +45,18 @@ function sayfa_basi(string $baslik, string $aktifSayfa = ''): void {
         if (yetki('finans')) $analizOgeler[] = ['finans.php', 'finans', 'Finans', 'M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8c1.66 0 3.07.5 3.6 1.2M12 8V6m0 12v-2m0 2c-1.66 0-3.07-.5-3.6-1.2M21 12a9 9 0 11-18 0 9 9 0 0118 0z'];
         if (yetki('rapor')) $analizOgeler[] = ['raporlar.php', 'raporlar', 'Raporlar', 'M9 19v-6M15 19v-2M12 19v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z'];
         if ($analizOgeler) $navGruplar[] = ['analiz', 'Analiz', 'M9 19v-6M15 19v-2M12 19v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z', $analizOgeler];
+        // Operasyon: SOP modülleri (v14)
+        $opOgeler = [
+            ['cekim-listesi.php', 'cekimler', 'Çekim Listesi', 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z'],
+            ['gelisim.php', 'gelisim', 'Gelişim & Mentörlük', 'M12 14l9-5-9-5-9 5 9 5zm0 0v6m-6-3.5V12m12 4.5V12'],
+            ['fikirler.php', 'fikirler', 'Fikir Panosu', 'M9.66 18h4.68M10 21h4m-2-18a7 7 0 00-4 12.7c.6.5 1 1.2 1 2v.3h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 3z'],
+        ];
+        if (!is_stajyer()) {
+            $opOgeler[] = ['havuz.php', 'havuz', 'Çalışan Havuzu', 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z'];
+            $opOgeler[] = ['aylik-raporlar.php', 'araporlar', 'Aylık Raporlar', 'M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'];
+        }
+        if (is_admin() || ($u && $u['rol'] === 'pm')) $opOgeler[] = ['yonetici-takip.php', 'ytakip', 'Yönetici Takip', 'M9 12l2 2 4-4M7.8 21L12 17l4.2 4V5a2 2 0 00-2-2H9.8a2 2 0 00-2 2v16z'];
+        $navGruplar[] = ['operasyon', 'Operasyon', 'M4 6h16M4 12h16M4 18h10', $opOgeler];
     } else {
         $nav = [
             ['index.php', 'panel', 'Panel', 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10'],
@@ -66,6 +78,7 @@ function sayfa_basi(string $baslik, string $aktifSayfa = ''): void {
             ['proje-sablonlari.php', 'psablonlar', 'Proje Şablonları', 'M9 12h6m-6 4h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z'],
             ['form-sablonlari.php', 'formlar', 'Form Şablonları', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
             ['ayarlar.php', 'ayarlar', 'Ayarlar', 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z'],
+            ['guncelleme.php', 'guncelleme', 'Güncelleme', 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'],
         ];
     } elseif (is_staff()) {
         $yonetimNav = [['arsiv.php', 'arsiv', 'Dosya Arşivi', 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4']];
@@ -81,9 +94,19 @@ function sayfa_basi(string $baslik, string $aktifSayfa = ''): void {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/app.css?v=<?= SURUM ?>">
+<script type="speculationrules">
+{"prerender": [{"where": {"and": [
+    {"href_matches": "/*"},
+    {"not": {"href_matches": "/*logout*"}},
+    {"not": {"href_matches": "/*export*"}},
+    {"not": {"href_matches": "/*guncelle*"}},
+    {"not": {"href_matches": "/*install*"}}
+]}, "eagerness": "moderate"}]}
+</script>
 <?php if (ayar('site_favicon')): ?><link rel="icon" href="uploads/<?= e(ayar('site_favicon')) ?>"><?php endif; ?>
 </head>
 <body>
+<div class="sayfa-cubugu" id="sayfaCubugu"></div>
 <div class="uygulama">
     <aside class="kenar" id="kenar">
         <div class="kenar-logo">

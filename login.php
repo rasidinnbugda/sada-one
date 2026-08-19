@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 $tema = ayar('varsayilan_tema', 'lime');
-$siteAdi = ayar('site_adi', 'SADA Dijital');
+$siteAdi = ayar('site_adi', 'SADA One');
 ?>
 <!DOCTYPE html>
 <html lang="tr" data-theme="<?= e($tema) ?>">

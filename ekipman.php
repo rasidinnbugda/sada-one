@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Stüdyo Ekipman Envanteri
+ * SADA One — Stüdyo Ekipman Envanteri
  * Demirbaş takibi, zimmet, çekim bağlantısı ve SD kart yaşam döngüsü.
  */
 require __DIR__ . '/includes/init.php';

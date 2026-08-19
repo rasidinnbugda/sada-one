@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Kişisel Çalışma Alanı
+ * SADA One — Kişisel Çalışma Alanı
  * Notlar, kişisel yapılacaklar, yer imleri ve hızlı karalama — yalnızca sahibi görür.
  */
 require __DIR__ . '/includes/init.php';

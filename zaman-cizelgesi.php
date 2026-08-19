@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Zaman Çizelgesi (Gantt görünümü)
+ * SADA One — Zaman Çizelgesi (Gantt görünümü)
  * Projeler ve son tarihli görevler 6 haftalık pencerede yatay çubuklarla gösterilir.
  */
 require __DIR__ . '/includes/init.php';

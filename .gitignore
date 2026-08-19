@@ -6,6 +6,11 @@ uploads/*
 !uploads/.htaccess
 !uploads/index.html
 
+# Yedekler (panel içi güncelleyici üretir)
+backups/*
+!backups/.htaccess
+!backups/index.html
+
 # Paket ve geçici dosyalar
 *.zip
 tani.php

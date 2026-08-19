@@ -1,4 +1,4 @@
-# SADA Dijital — Ajans Yönetim Sistemi
+# SADA One — Ajans Yönetim Sistemi
 ## Hostinger Kurulum Rehberi
 
 Bu rehber, sistemi Hostinger hostinginize sıfırdan kurmanız için hazırlanmıştır. Teknik bilgi gerektirmez; adımları sırayla takip etmeniz yeterli.
@@ -171,7 +171,7 @@ Sistemi daha önce kurduysanız ve yeni sürüm dosyalarını yüklediyseniz:
 
 Tekrarlayan görevler, herhangi bir ekip üyesi paneli açtığında saatte bir otomatik kontrol edilir — **ek kurulum gerekmez**. Daha hassas zamanlama isterseniz:
 - hPanel → **Gelişmiş → Cron İşleri** → saatlik yeni iş ekleyin:
-  `curl -s "https://siteniz.com/cron.php?anahtar=SADA Dijital"`
+  `curl -s "https://siteniz.com/cron.php?anahtar=SADA One"`
   (anahtar parametresi, Ayarlar'daki site adınızla aynı olmalıdır)
 
 ## 📁 Yedekleme

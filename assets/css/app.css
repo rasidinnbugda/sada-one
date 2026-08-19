@@ -1091,6 +1091,16 @@ body { line-height: 1.62; }
 .dock-icerik { padding: 16px; overflow-y: auto; display: none; }
 .dock-icerik.aktif { display: block; }
 
+/* v4.0: gezinme çubuğu + zemin vurgusu */
+.sayfa-cubugu {
+    position: fixed; top: 0; left: 0; height: 2.5px; width: 0; z-index: 999;
+    background: linear-gradient(90deg, var(--marka), var(--marka-2));
+    border-radius: 0 3px 3px 0; opacity: 0; transition: width .25s ease, opacity .2s;
+    box-shadow: 0 0 8px var(--marka);
+}
+.sayfa-cubugu.aktif { opacity: 1; }
+body { background-image: radial-gradient(ellipse 70% 45% at 85% -12%, var(--parlak), transparent); background-repeat: no-repeat; }
+
 /* v3.3: hız ve his — sayfa girişi, seçici pop, onay kutusu, sayfa geçişi */
 .ana { animation: sayfaGir .22s ease-out; }
 @keyframes sayfaGir { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

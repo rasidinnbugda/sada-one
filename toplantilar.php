@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Toplantı Takvimi
+ * SADA One — Toplantı Takvimi
  * Katılımcı seçimi, online toplantı linki ve hatırlatma bildirimli toplantı yönetimi.
  */
 require __DIR__ . '/includes/init.php';

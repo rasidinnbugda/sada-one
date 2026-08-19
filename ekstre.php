@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA Dijital — Cari Hesap Ekstresi (yazdırılabilir)
+ * SADA One — Cari Hesap Ekstresi (yazdırılabilir)
  * Dosya bazlı fatura/tahsilat dökümü + yürüyen bakiye.
  */
 require __DIR__ . '/includes/init.php';
@@ -11,7 +11,7 @@ $dosya = row("SELECT * FROM dosyalar WHERE id=?", [$dosyaId]);
 if (!$dosya) { header('Location: finans.php'); exit; }
 
 $hareketler = rows("SELECT o.*, p.ad proje_ad FROM odemeler o JOIN projeler p ON p.id=o.proje_id WHERE p.dosya_id=? ORDER BY o.tarih, o.id", [$dosyaId]);
-$siteAdi = ayar('site_adi', 'SADA Dijital');
+$siteAdi = ayar('site_adi', 'SADA One');
 ?>
 <!DOCTYPE html>
 <html lang="tr">
