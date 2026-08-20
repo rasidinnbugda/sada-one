@@ -6,7 +6,7 @@ $u = require_admin();
 $forms = rows("SELECT * FROM form_templates ORDER BY name");
 foreach ($forms as &$f) $f['fields'] = rows("SELECT * FROM form_fields WHERE template_id=? ORDER BY sort_order", [$f['id']]);
 unset($f);
-$fieldTipleri = ['metin' => 'Kısa Metin', 'uzun_metin' => 'Uzun Metin', 'secim' => 'Seçim Listesi', 'tarih' => 'Tarih', 'sayi' => 'Sayı', 'dosya' => 'Dosya Yükleme'];
+$fieldTipleri = ['text' => 'Kısa Metin', 'long_text' => 'Uzun Metin', 'select' => 'Seçim Listesi', 'date' => 'Tarih', 'count' => 'Sayı', 'client' => 'Dosya Yükleme'];
 
 page_start('Form Şablonları', 'forms');
 ?>

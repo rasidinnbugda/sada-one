@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Aylık Raporlar
- * Dosya (müşteri) bazlı aylık çalışma raporları panelde doldurulur.
+ * SADA One — Monthly Reports
+ * Monthly work reports per client file are filled in on the panel.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -11,7 +11,7 @@ if (is_intern()) { header('Location: index.php'); exit; }
 $clients = rows("SELECT id, name FROM clients WHERE status='aktif' ORDER BY name");
 $reports = rows("SELECT r.*, d.name client_name, y.name author_name FROM monthly_reports r JOIN clients d ON d.id=r.client_id JOIN users y ON y.id=r.author_id ORDER BY r.period DESC, d.name");
 
-// Düzenlenecek rapor (dosya+donem seçiliyse)
+// Report to edit (if client file + period are selected)
 $secClient = (int)($_GET['client'] ?? 0);
 $secPeriod = preg_match('/^\d{4}-\d{2}$/', $_GET['period'] ?? '') ? $_GET['period'] : date('Y-m');
 $is_active = $secClient ? row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [$secClient, $secPeriod]) : null;

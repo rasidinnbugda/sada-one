@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA One — Duyuru Panosu
+ * SADA One — Announcement Board
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';

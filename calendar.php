@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Çekim & Prodüksiyon Takvimi
- * Çok günlü etkinlikler hafta üzerinde kesintisiz şerit (bant) olarak gösterilir.
+ * SADA One — Shoot & Production Calendar
+ * Multi-day events are shown as continuous strips (bands) across the week.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -13,16 +13,16 @@ if ($month < 1) { $month = 12; $year--; } if ($month > 12) { $month = 1; $year++
 
 $firstDay = mktime(0, 0, 0, $month, 1, $year);
 $dayCount = (int)date('t', $firstDay);
-$startWeek = (int)date('N', $firstDay); // 1=Pzt
+$startWeek = (int)date('N', $firstDay); // 1=Mon
 
 $monthInitial = sprintf('%04d-%02d-01', $year, $month);
 $monthLast = sprintf('%04d-%02d-%02d', $year, $month, $dayCount);
 
-// Ay ile kesişen tüm etkinlikler
+// All events intersecting the month
 $events = rows("SELECT e.*, p.name project_name, d.name client_name FROM events e LEFT JOIN projects p ON p.id=e.project_id LEFT JOIN clients d ON d.id=COALESCE(e.client_id, p.client_id)
     WHERE DATE(e.start) <= ? AND DATE(COALESCE(e.end, e.start)) >= ? ORDER BY e.start", [$monthLast, $monthInitial]);
 
-// Etkinlik başına bağlı ekipmanlar (detay modalı için)
+// Equipment linked to each event (for the detail modal)
 $eventEquipment = [];
 if ($events) {
     $eIdler = implode(',', array_map(fn($e) => (int)$e['id'], $events));
@@ -33,7 +33,7 @@ if ($events) {
 foreach ($events as &$e) $e['equipment'] = $eventEquipment[$e['id']] ?? [];
 unset($e);
 
-/* ---- Haftalara böl: her hafta 7 hücre (ay dışı günler null) ---- */
+/* ---- Split into weeks: 7 cells per week (days outside the month are null) ---- */
 $haftalar = [];
 $week = array_fill(0, $startWeek - 1, null);
 for ($day = 1; $day <= $dayCount; $day++) {
@@ -42,9 +42,9 @@ for ($day = 1; $day <= $dayCount; $day++) {
 }
 if ($week) $haftalar[] = array_pad($week, 7, null);
 
-/* ---- Etkinlikleri ayır: tek günlük (chip) / çok günlük (bant) ---- */
-$tekGunluk = [];   // gün → etkinlik listesi
-$cokGunluk = [];   // bant listesi
+/* ---- Separate events: single-day (chip) / multi-day (band) ---- */
+$tekGunluk = [];   // day → event list
+$cokGunluk = [];   // band list
 foreach ($events as $e) {
     $initialTs = strtotime(date('Y-m-d', strtotime($e['start'])));
     $lastTs = strtotime(date('Y-m-d', strtotime($e['end'] ?: $e['start'])));
@@ -56,9 +56,9 @@ foreach ($events as $e) {
     }
 }
 
-/* ---- Her hafta için bantları hesapla (lane istifleme) ---- */
+/* ---- Compute the bands for each week (lane stacking) ---- */
 function week_bantlari(array $week, array $cokGunluk, int $month, int $year): array {
-    // Haftadaki gerçek tarih aralığı
+    // Actual date range within the week
     $first = null; $last = null; $columnDate = [];
     foreach ($week as $kol => $day) {
         $columnDate[$kol] = $day ? mktime(0, 0, 0, $month, $day, $year) : null;
@@ -68,7 +68,7 @@ function week_bantlari(array $week, array $cokGunluk, int $month, int $year): ar
     $bantlar = [];
     foreach ($cokGunluk as $c) {
         if ($c['last'] < $first || $c['initial'] > $last) continue;
-        // Haftadaki başlangıç/bitiş kolonları
+        // Start/end columns within the week
         $initialKol = 0; $lastKol = 6;
         foreach ($columnDate as $kol => $t) {
             if ($t !== null && $t <= $c['initial']) $initialKol = $kol;
@@ -81,7 +81,7 @@ function week_bantlari(array $week, array $cokGunluk, int $month, int $year): ar
             'sagdan_ongoing' => $c['last'] > ($columnDate[$lastKol] ?? $last),
         ];
     }
-    // Lane ata (çakışanlar alt alta)
+    // Assign lanes (overlapping bands stack vertically)
     $laneler = [];
     foreach ($bantlar as $i => $b) {
         $lane = 0;
@@ -116,7 +116,7 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
     <div class="takvim-baslik-bar">
         <div class="satir-esnek" style="gap:8px">
             <a href="?month=<?= $month - 1 ?>&year=<?= $year ?>" class="ikon-eylem"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></a>
-            <div class="takvim-ay-ad"><?= AYLAR[$month] ?> <?= $year ?></div>
+            <div class="takvim-ay-ad"><?= MONTHS[$month] ?> <?= $year ?></div>
             <a href="?month=<?= $month + 1 ?>&year=<?= $year ?>" class="ikon-eylem"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></a>
         </div>
         <a href="?month=<?= date('n') ?>&year=<?= date('Y') ?>" class="btn btn-sm">Bugün</a>
@@ -131,7 +131,7 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
         $laneCount = $bantlar ? max(array_column($bantlar, 'lane')) + 1 : 0;
         $bantField = $laneCount * 26; ?>
     <div class="takvim-hafta">
-        <?php // Bantlar (hücrelerin üzerine, gün numarasının altına)
+        <?php // Bands (over the cells, below the day number)
         foreach ($bantlar as $b):
             $e = $b['e'];
             $color = $turRenkleri[$e['type']] ?? 'var(--marka)';
@@ -160,21 +160,21 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
 </div>
 
 <div class="izgara izgara-3 mt-3">
-    <?php foreach (ETKINLIK_TURLERI as $k => $v):
+    <?php foreach (EVENT_TYPES as $k => $v):
         $color = $turRenkleri[$k];
         $say = count(array_filter($events, fn($e) => $e['type'] === $k)); ?>
     <div class="kart satir-esnek" style="gap:12px;padding:14px"><span class="etiket-nokta" style="width:14px;height:14px;background:<?= $color ?>"></span><div><div class="kalin"><?= $say ?> <?= $v ?></div><div class="hucre-alt">bu ay</div></div></div>
     <?php endforeach; ?>
 </div>
 
-<!-- Etkinlik ekle -->
+<!-- Add event -->
 <div class="modal-katman" id="modalEvent">
     <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Yeni Etkinlik</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="event_save" data-refresh="evet" id="eventForm">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Başlık <span class="zorunlu">*</span></label><input name="title" class="girdi" required id="et_title"></div>
             <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" class="secim"><?php foreach (ETKINLIK_TURLERI as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" class="secim"><?php foreach (EVENT_TYPES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-grup"><label class="form-etiket">Yer</label><input name="place" class="girdi"></div>
             </div>
             <div class="form-satir">
@@ -210,7 +210,7 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
     </form></div>
 </div>
 
-<!-- Etkinlik detay -->
+<!-- Event detail -->
 <div class="modal-katman" id="modalEventDetay">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="edTitle"></div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <div class="modal-govde" id="edBody"></div>
@@ -220,9 +220,9 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
 
 <script>
 const events = <?= json_encode(array_column($events, null, 'id'), JSON_UNESCAPED_UNICODE) ?>;
-const typeName = <?= json_encode(ETKINLIK_TURLERI, JSON_UNESCAPED_UNICODE) ?>;
+const typeName = <?= json_encode(EVENT_TYPES, JSON_UNESCAPED_UNICODE) ?>;
 function eventAdd(date) { document.getElementById('et_start').value = date + 'T10:00'; modalOpen('modalEvent'); }
-// Proje seçilince dosyası otomatik dolsun
+// Auto-fill the client file when a project is selected
 document.getElementById('ev_project').addEventListener('change', function () {
     const client = this.selectedOptions[0]?.dataset.client;
     if (client) document.getElementById('ev_client').value = client;
@@ -275,7 +275,7 @@ async function etMove(id) {
     const j = await api('event_move', { id, start: bV.replace('T', ' '), end: tV.replace('T', ' ') });
     if (j.ok) { toast(j.message, 'basari'); setTimeout(() => location.reload(), 600); }
 }
-// Tek günlük etkinlikleri sürükleyerek taşı
+// Move single-day events by drag and drop
 let surEt = null;
 document.querySelectorAll('.calendar-event[data-event]').forEach(chip => {
     chip.addEventListener('dragstart', e => { surEt = chip.dataset.event; e.stopPropagation(); });

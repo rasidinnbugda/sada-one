@@ -1,15 +1,15 @@
 <?php
 /**
- * SADA One — Panel İçi Güncelleme Sistemi
- * ZIP yükleyerek veya GitHub'daki son sürümü indirerek güncelleme.
- * Aynı ZIP paketi sıfırdan kurulum için de kullanılır (install/ içerir).
+ * SADA One — In-Panel Update System
+ * Updates by uploading a ZIP or downloading the latest release from GitHub.
+ * The same ZIP package is also used for fresh installs (contains install/).
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/migration.php';
 require_once __DIR__ . '/includes/updater-core.php';
 $u = require_admin();
-/* ---------------- POST işlemleri ---------------- */
+/* ---------------- POST actions ---------------- */
 $result = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) {
     set_time_limit(300);
@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && hash_equals($_SESSION['csrf'] ?? ''
             $result = install_package($_FILES['package']['tmp_name']);
         }
     } elseif ($operation === 'github') {
-        $rel = github_json('https://api.github.com/repos/' . GITHUB_DEPO . '/releases/latest');
+        $rel = github_json('https://api.github.com/repos/' . GITHUB_REPO . '/releases/latest');
         $url = null;
         foreach (($rel['assets'] ?? []) as $a) {
             if (str_ends_with($a['name'] ?? '', '.zip')) { $url = $a['browser_download_url']; break; }
@@ -40,11 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && hash_equals($_SESSION['csrf'] ?? ''
             }
         }
     }
-    // Güncelleme sonrası yeni sürüm numarasını taze dosyadan oku
+    // After the update, read the new version number from the fresh file
     if ($result && $result[0]) {
         $newVersion = null;
-        if (preg_match("/const SURUM = '([^']+)'/", (string)@file_get_contents(ROOT . '/includes/init.php'), $m)) $newVersion = $m[1];
-        if ($newVersion) $result[1] = 'Güncelleme tamamlandı: v' . SURUM . ' → v' . $newVersion . '. Sayfayı yenilediğinizde yeni sürüm etkin olur.';
+        if (preg_match("/const APP_VERSION = '([^']+)'/", (string)@file_get_contents(ROOT . '/includes/init.php'), $m)) $newVersion = $m[1];
+        if ($newVersion) $result[1] = 'Güncelleme tamamlandı: v' . APP_VERSION . ' → v' . $newVersion . '. Sayfayı yenilediğinizde yeni sürüm etkin olur.';
     }
 }
 
@@ -52,7 +52,7 @@ $backups = is_dir(ROOT . '/backups') ? array_reverse(glob(ROOT . '/backups/backu
 
 page_start('Güncelleme', 'update');
 ?>
-<div class="sayfa-ust"><div><div class="sayfa-baslik">Sistem Güncelleme</div><div class="sayfa-alt">Mevcut sürüm: <b>v<?= SURUM ?></b> — paketle veya GitHub üzerinden güncelleyin</div></div></div>
+<div class="sayfa-ust"><div><div class="sayfa-baslik">Sistem Güncelleme</div><div class="sayfa-alt">Mevcut sürüm: <b>v<?= APP_VERSION ?></b> — paketle veya GitHub üzerinden güncelleyin</div></div></div>
 
 <?php if ($result): [$ok, $message, $d] = $result; ?>
 <div class="kart mb-3" style="border-color:<?= $ok ? 'var(--basari)' : 'var(--tehlike)' ?>">
@@ -73,7 +73,7 @@ page_start('Güncelleme', 'update');
 <div class="izgara izgara-2">
     <div class="kart">
         <div class="kart-baslik mb-2"><?= icon('web', 16) ?> GitHub'dan Güncelle</div>
-        <div class="hucre-alt mb-3">Depo: <code><?= GITHUB_DEPO ?></code> — son yayınlanan sürüm denetlenir, tek tıkla indirilip kurulur.</div>
+        <div class="hucre-alt mb-3">Depo: <code><?= GITHUB_REPO ?></code> — son yayınlanan sürüm denetlenir, tek tıkla indirilip kurulur.</div>
         <div id="ghStatus" class="kucuk metin-2 mb-3">Denetlemek için butona basın.</div>
         <div class="satir-esnek" style="gap:10px">
             <button class="btn" id="ghCheckBtn" onclick="versionCheck()">Sürüm Denetle</button>

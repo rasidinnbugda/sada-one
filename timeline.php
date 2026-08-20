@@ -1,21 +1,21 @@
 <?php
 /**
- * SADA One — Zaman Çizelgesi (Gantt görünümü)
- * Projeler ve son tarihli görevler 6 haftalık pencerede yatay çubuklarla gösterilir.
+ * SADA One — Timeline (Gantt view)
+ * Projects and tasks with due dates are shown as horizontal bars in a 6-week window.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
 require_staff();
 
-// Görünüm penceresi: bu haftanın pazartesisi + kaydırma
+// View window: this week's Monday + offset
 $kaydir = (int)($_GET['kaydir'] ?? 0);
 $start = strtotime('monday this week') + $kaydir * 7 * 86400;
-$dayCount = 42; // 6 hafta
+$dayCount = 42; // 6 weeks
 $end = $start + ($dayCount - 1) * 86400;
 $initial = date('Y-m-d', $start);
 $last = date('Y-m-d', $end);
 
-// Pencereyle kesişen projeler + görevleri
+// Projects intersecting the window + their tasks
 $projects = rows("SELECT p.*, d.name client_name, d.color client_color FROM projects p JOIN clients d ON d.id=p.client_id
     WHERE p.status IN ('aktif','beklemede') ORDER BY d.name, p.name");
 
@@ -45,14 +45,14 @@ page_start('Zaman Çizelgesi', 'cizelge');
 
 <div class="kart gantt-sar" style="padding:0">
     <div class="gantt">
-        <!-- Gün başlıkları (hafta bazlı) -->
+        <!-- Day headers (per week) -->
         <div class="gantt-gunler">
             <div class="gantt-etiket kalin" style="padding:10px 14px">Proje / Görev</div>
             <div class="gantt-gun-izgara" style="grid-template-columns:repeat(<?= intdiv($dayCount, 7) ?>, 1fr)">
                 <?php for ($h = 0; $h < intdiv($dayCount, 7); $h++):
                     $hBas = $start + $h * 7 * 86400;
                     $buWeek = date('o-W', $hBas) === date('o-W'); ?>
-                <div class="gantt-gun <?= $buWeek ? 'bugun' : '' ?>"><?= date('j', $hBas) ?> <?= AYLAR[(int)date('n', $hBas)] ?></div>
+                <div class="gantt-gun <?= $buWeek ? 'bugun' : '' ?>"><?= date('j', $hBas) ?> <?= MONTHS[(int)date('n', $hBas)] ?></div>
                 <?php endfor; ?>
             </div>
         </div>
@@ -60,9 +60,9 @@ page_start('Zaman Çizelgesi', 'cizelge');
         <?php
         $satirVar = false;
         foreach ($projects as $gi => $p):
-            // Proje çubuğu (başlangıç-bitiş varsa)
+            // Project bar (if start-end dates exist)
             $projectLocation = ($p['start'] && $p['end']) ? gantt_location($start, $dayCount, $p['start'], $p['end']) : null;
-            // Penceredeki görevler
+            // Tasks within the window
             $tasks = rows("SELECT g.*, u.name assignee_name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id
                 WHERE g.project_id=? AND g.due_date IS NOT NULL AND g.due_date BETWEEN ? AND ? ORDER BY g.due_date", [$p['id'], $initial, $last]);
             if (!$projectLocation && !$tasks) continue;
@@ -89,7 +89,7 @@ page_start('Zaman Çizelgesi', 'cizelge');
             <div class="gantt-etiket" style="padding-left:32px">└ <?= e($gr['title']) ?></div>
             <div class="gantt-alan">
                 <?php if ($todayLocation !== null): ?><div class="gantt-bugun-cizgi" style="left:<?= $todayLocation ?>%"></div><?php endif; ?>
-                <div class="gantt-cubuk <?= $sinif ?>" style="left:<?= $location[0] ?>%;width:<?= max(3, $location[1]) ?>%;animation-delay:<?= 100 + $ti * 50 ?>ms" onclick="location.href='task.php?id=<?= $gr['id'] ?>'" title="<?= e($gr['title']) ?> · <?= GOREV_DURUMLARI[$gr['status']] ?> · Son: <?= format_date($gr['due_date']) ?>"><?= $gr['assignee_name'] ? e(explode(' ', $gr['assignee_name'])[0]) : '' ?></div>
+                <div class="gantt-cubuk <?= $sinif ?>" style="left:<?= $location[0] ?>%;width:<?= max(3, $location[1]) ?>%;animation-delay:<?= 100 + $ti * 50 ?>ms" onclick="location.href='task.php?id=<?= $gr['id'] ?>'" title="<?= e($gr['title']) ?> · <?= TASK_STATUSES[$gr['status']] ?> · Son: <?= format_date($gr['due_date']) ?>"><?= $gr['assignee_name'] ? e(explode(' ', $gr['assignee_name'])[0]) : '' ?></div>
             </div>
         </div>
         <?php endforeach; endforeach; ?>

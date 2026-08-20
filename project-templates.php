@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Proje Şablonları
- * Hazır görev setleriyle tek tıkla proje kurulumu.
+ * SADA One — Project Templates
+ * One-click project setup with ready-made task sets.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -41,7 +41,7 @@ page_start('Proje Şablonları', 'ptemplates');
             <div class="satir-esnek arasi kucuk" style="padding:7px 11px;background:var(--surface-2);border-radius:9px">
                 <span><?= e($sg['title']) ?></span>
                 <span class="satir-esnek" style="gap:6px">
-                    <?php if (($sg['priority'] ?? 'normal') !== 'normal'): ?><?= badge($sg['priority'], ONCELIKLER) ?><?php endif; ?>
+                    <?php if (($sg['priority'] ?? 'normal') !== 'normal'): ?><?= badge($sg['priority'], PRIORITIES) ?><?php endif; ?>
                     <?php if (!empty($sg['workflow_id'])): $workflowName = ''; foreach ($workflows as $ak) if ($ak['id'] == $sg['workflow_id']) $workflowName = $ak['name']; ?>
                     <span class="rozet rozet-tur"><?= icon('roket', 10) ?> <?= e($workflowName ?: 'Akış') ?></span>
                     <?php endif; ?>
@@ -75,7 +75,7 @@ page_start('Proje Şablonları', 'ptemplates');
 
 <script>
 const psWorkflows = <?= json_encode($workflows, JSON_UNESCAPED_UNICODE) ?>;
-const psPriorities = <?= json_encode(ONCELIKLER, JSON_UNESCAPED_UNICODE) ?>;
+const psPriorities = <?= json_encode(PRIORITIES, JSON_UNESCAPED_UNICODE) ?>;
 function psTaskAdd(g = {}) {
     const div = document.createElement('div');
     div.className = 'satir-esnek ps-satir';

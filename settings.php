@@ -35,9 +35,31 @@ page_start('Ayarlar', 'settings');
                 <div class="form-ipucu">Kare PNG veya ICO (32×32 önerilir).</div>
             </div>
             <div class="form-grup">
+                <label class="form-etiket">Koyu Tema Logosu <span class="metin-muted" style="font-weight:400">(opsiyonel)</span></label>
+                <?php if (setting('site_logo_dark')): ?>
+                <div class="satir-esnek mb-2" style="gap:12px;padding:10px;background:#14181f;border-radius:10px">
+                    <img src="uploads/<?= e(setting('site_logo_dark')) ?>" style="max-height:40px;max-width:160px;object-fit:contain">
+                    <button type="button" class="mini-btn" style="color:var(--tehlike)" data-action="setting_image_delete" data-setting_key="site_logo_dark" data-approval="Koyu tema logosu kaldırılsın mı?">Kaldır</button>
+                </div>
+                <?php endif; ?>
+                <input type="file" name="site_logo_dark" class="girdi" accept="image/*">
+                <div class="form-ipucu">Koyu temalarda bu logo gösterilir (örn. beyaz sürüm). Boşsa normal logo kullanılır.</div>
+            </div>
+            <div class="form-grup">
+                <label class="form-etiket">Koyu Tema Favicon'u <span class="metin-muted" style="font-weight:400">(opsiyonel)</span></label>
+                <?php if (setting('site_favicon_dark')): ?>
+                <div class="satir-esnek mb-2" style="gap:12px;padding:10px;background:#14181f;border-radius:10px">
+                    <img src="uploads/<?= e(setting('site_favicon_dark')) ?>" style="width:24px;height:24px;object-fit:contain">
+                    <button type="button" class="mini-btn" style="color:var(--tehlike)" data-action="setting_image_delete" data-setting_key="site_favicon_dark" data-approval="Koyu tema favicon'u kaldırılsın mı?">Kaldır</button>
+                </div>
+                <?php endif; ?>
+                <input type="file" name="site_favicon_dark" class="girdi" accept=".png,.ico,image/*">
+                <div class="form-ipucu">Koyu temalarda kullanılır. Boşsa normal favicon geçerlidir.</div>
+            </div>
+            <div class="form-grup">
                 <label class="form-etiket">Varsayılan Tema</label>
                 <select name="default_theme" class="secim">
-                    <?php foreach (TEMALAR as $k => $info): ?>
+                    <?php foreach (THEMES as $k => $info): ?>
                     <option value="<?= $k ?>" <?= setting('varsayilan_tema') === $k ? 'selected' : '' ?>><?= $info[0] ?> (<?= $info[1] ?>)</option>
                     <?php endforeach; ?>
                 </select>

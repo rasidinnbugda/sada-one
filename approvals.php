@@ -4,7 +4,7 @@ require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/components.php';
 $u = require_login();
 
-// Müşterinin verdiği puanlar (onay bazında)
+// Ratings given by the customer (per approval)
 $verilenRatings = is_customer()
     ? array_column(rows("SELECT ref_id, rating FROM ratings WHERE ref_type='onay' AND user_id=?", [$u['id']]), 'rating', 'ref_id')
     : [];
@@ -28,7 +28,7 @@ page_start('Onaylar', 'approvals');
 <div class="filtre-bar">
     <div class="pill-filtre" data-pill-grup="#onayListe .onay-kart">
         <button class="pill aktif" data-setting_value="">Tümü</button>
-        <?php foreach (ONAY_DURUMLARI as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
+        <?php foreach (APPROVAL_STATUSES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>
 </div>
 
@@ -39,10 +39,10 @@ page_start('Onaylar', 'approvals');
 <?php foreach ($approvals as $o):
     $ar = $o['archive_id'] ? row("SELECT * FROM archive WHERE id=?", [$o['archive_id']]) : null;
     $image = $ar && in_array($ar['extension'], ['jpg', 'jpeg', 'png', 'gif', 'webp']); ?>
-<div class="kart mb-2 onay-kart" data-filtre="<?= $o['status'] ?>">
+<div class="kart mb-2 onay-kart" data-filter="<?= $o['status'] ?>">
     <div class="satir-esnek arasi sarma" style="gap:16px;align-items:flex-start">
         <div style="flex:1;min-width:0">
-            <div class="satir-esnek sarma" style="gap:9px"><span class="kalin"><?= e($o['title']) ?></span><?= badge($o['status'], ONAY_DURUMLARI) ?></div>
+            <div class="satir-esnek sarma" style="gap:9px"><span class="kalin"><?= e($o['title']) ?></span><?= badge($o['status'], APPROVAL_STATUSES) ?></div>
             <div class="hucre-alt mt-1"><?= e($o['client_name']) ?> · <?= e($o['project_name']) ?> · <?= e($o['sender_name']) ?> tarafından <?= time_ago($o['created']) ?></div>
             <?php if ($o['description']): ?><div class="metin-2 kucuk mt-2"><?= nl2br(e($o['description'])) ?></div><?php endif; ?>
             <?php if ($o['drive_link']): ?><a href="<?= e($o['drive_link']) ?>" target="_blank" class="btn btn-sm mt-2" style="margin-right:6px"><?= icon('web', 13) ?> Drive'da Görüntüle</a><?php endif; ?>

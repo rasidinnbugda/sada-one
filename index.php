@@ -4,7 +4,7 @@ require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/components.php';
 $u = require_login();
 
-// Widget kişiselleştirme: kullanıcının seçtiği bölümler (varsayılan hepsi açık)
+// Widget personalization: sections chosen by the user (all enabled by default)
 const PANEL_WIDGETLERI = ['duyurular' => 'Duyurular', 'yaklasanlar' => 'Yaklaşanlar (7 gün)', 'istatistik' => 'İstatistik kartları', 'ekip' => 'Ekip durumu', 'gorevlerim' => 'Görevlerim', 'hareketler' => 'Son hareketler', 'uyarilar' => 'Uyarılar (geciken/talep)'];
 $openWidgets = json_decode($u['widgets'] ?? '', true);
 if (!is_array($openWidgets)) $openWidgets = array_keys(PANEL_WIDGETLERI);
@@ -12,14 +12,14 @@ $wAcik = fn($k) => in_array($k, $openWidgets);
 
 page_start('Panel', 'panel');
 
-/* ---------- Sürüm notları (kapatılabilir) ---------- */
-if (($u['seen_version'] ?? '') !== SURUM && isset(SURUM_NOTLARI[SURUM])): ?>
+/* ---------- Release notes (dismissible) ---------- */
+if (($u['seen_version'] ?? '') !== APP_VERSION && isset(VERSION_NOTES[APP_VERSION])): ?>
 <div class="kart mb-3" id="versionCard" style="border-color:var(--marka);background:linear-gradient(135deg,var(--surface),var(--parlak))">
     <div class="satir-esnek arasi" style="align-items:flex-start;gap:12px">
         <div>
-            <div class="kart-baslik"><?= icon('roket', 17) ?> Yenilikler — sürüm <?= SURUM ?></div>
+            <div class="kart-baslik"><?= icon('roket', 17) ?> Yenilikler — sürüm <?= APP_VERSION ?></div>
             <ul class="kucuk metin-2 mt-2" style="list-style:none;display:flex;flex-direction:column;gap:6px">
-                <?php foreach (SURUM_NOTLARI[SURUM] as $notSatiri): ?><li><?= $notSatiri ?></li><?php endforeach; ?>
+                <?php foreach (VERSION_NOTES[APP_VERSION] as $notSatiri): ?><li><?= $notSatiri ?></li><?php endforeach; ?>
             </ul>
         </div>
         <button class="btn btn-sm" onclick="versionClose()" style="flex-shrink:0">Kapat ✕</button>
@@ -34,7 +34,7 @@ async function versionClose() {
 <?php endif;
 
 if (is_staff()) {
-    /* ---------- EKİP PANELİ ---------- */
+    /* ---------- TEAM DASHBOARD ---------- */
     $clientCount = (int)val("SELECT COUNT(*) FROM clients WHERE status='aktif'");
     $projectCount = (int)val("SELECT COUNT(*) FROM projects WHERE status='aktif'");
     $mineTask = (int)val("SELECT COUNT(*) FROM tasks WHERE assignee_id=? AND status!='tamamlandi'", [$u['id']]);
@@ -45,7 +45,7 @@ if (is_staff()) {
 <div class="sayfa-ust">
     <div>
         <div class="sayfa-baslik">Merhaba, <?= e(explode(' ', $u['name'])[0]) ?> 👋</div>
-        <div class="sayfa-alt"><?= GUNLER[(int)date('N') - 1] ?>, <?= format_date(date('Y-m-d')) ?> — bugünün özeti</div>
+        <div class="sayfa-alt"><?= DAYS[(int)date('N') - 1] ?>, <?= format_date(date('Y-m-d')) ?> — bugünün özeti</div>
     </div>
     <div class="sayfa-ust-aksiyon">
         <button class="btn btn-hayalet" data-modal="modalWidget" title="Panel görünümünü kişiselleştir">
@@ -60,7 +60,7 @@ if (is_staff()) {
 </div>
 
 <?php
-// Okunmamış duyurular
+// Unread announcements
 $announcements = rows("SELECT d.*, us.name creator_name FROM announcements d LEFT JOIN users us ON us.id=d.created_by
     WHERE NOT EXISTS(SELECT 1 FROM announcement_readers o WHERE o.announcement_id=d.id AND o.user_id=?)
     ORDER BY d.is_important DESC, d.id DESC LIMIT 3", [$u['id']]);
@@ -100,7 +100,7 @@ if ($announcements && $wAcik('duyurular')): ?>
 </div>
 
 <div class="izgara izgara-2">
-    <!-- Bana atanan görevler -->
+    <!-- Tasks assigned to me -->
     <div class="kart <?= $wAcik('gorevlerim') ? '' : 'widget-kapali' ?>">
         <div class="kart-ust">
             <div class="kart-baslik">
@@ -140,12 +140,12 @@ if ($announcements && $wAcik('duyurular')): ?>
                 <div class="hucre-ana" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= e($gr['title']) ?></div>
                 <div class="hucre-alt"><?= e($gr['project_name']) ?><?php if ($gr['due_date']): ?> · <span style="color:<?= $overdue ? 'var(--tehlike)' : 'inherit' ?>"><?= format_date($gr['due_date']) ?></span><?php endif; ?></div>
             </div>
-            <?= badge($gr['status'], GOREV_DURUMLARI) ?>
+            <?= badge($gr['status'], TASK_STATUSES) ?>
         </a>
         <?php endforeach; endif; ?>
     </div>
 
-    <!-- Son aktiviteler -->
+    <!-- Recent activities -->
     <div class="kart <?= $wAcik('hareketler') ? '' : 'widget-kapali' ?>">
         <div class="kart-ust">
             <div class="kart-baslik">
@@ -171,7 +171,7 @@ if ($announcements && $wAcik('duyurular')): ?>
 </div>
 
 <?php if ($wAcik('yaklasanlar')):
-    // Önümüzdeki 7 günün öğeleri: görevlerim + toplantılarım + etkinlikler + içerikler
+    // Items for the next 7 days: my tasks + my meetings + events + contents
     $today = date('Y-m-d'); $yediDay = date('Y-m-d', strtotime('+7 days'));
     $upcoming = [];
     foreach (rows("SELECT g.id, g.title, g.due_date date FROM tasks g WHERE g.is_archived=0 AND g.status!='tamamlandi' AND g.due_date BETWEEN ? AND ?
@@ -181,9 +181,9 @@ if ($announcements && $wAcik('duyurular')): ?>
         AND (e.created_by=? OR EXISTS(SELECT 1 FROM event_participants ek WHERE ek.event_id=e.id AND ek.user_id=?)) ORDER BY e.start LIMIT 8", [$today, $yediDay, $u['id'], $u['id']]) as $r)
         $upcoming[] = ['date' => $r['date'], 'time' => substr($r['time'], 0, 5), 'icon' => icon('people', 15), 'text' => $r['title'], 'bottom' => 'Toplantı' . ($r['online_link'] ? ' (online)' : ''), 'link' => 'meetings.php'];
     foreach (rows("SELECT id, title, DATE(start) date, TIME(start) time, type FROM events WHERE type!='toplanti' AND DATE(start) BETWEEN ? AND ? ORDER BY start LIMIT 6", [$today, $yediDay]) as $r)
-        $upcoming[] = ['date' => $r['date'], 'time' => substr($r['time'], 0, 5), 'icon' => icon('video', 15), 'text' => $r['title'], 'bottom' => ETKINLIK_TURLERI[$r['type']], 'link' => 'calendar.php'];
+        $upcoming[] = ['date' => $r['date'], 'time' => substr($r['time'], 0, 5), 'icon' => icon('video', 15), 'text' => $r['title'], 'bottom' => EVENT_TYPES[$r['type']], 'link' => 'calendar.php'];
     foreach (rows("SELECT id, title, date, time, platform FROM contents WHERE date BETWEEN ? AND ? AND status!='yayinlandi' ORDER BY date LIMIT 6", [$today, $yediDay]) as $r)
-        $upcoming[] = ['date' => $r['date'], 'time' => $r['time'] ? substr($r['time'], 0, 5) : null, 'icon' => icon('calendar', 15), 'text' => $r['title'], 'bottom' => (PLATFORMLAR[$r['platform']] ?? '') . ' içeriği', 'link' => 'content-calendar.php'];
+        $upcoming[] = ['date' => $r['date'], 'time' => $r['time'] ? substr($r['time'], 0, 5) : null, 'icon' => icon('calendar', 15), 'text' => $r['title'], 'bottom' => (PLATFORMS[$r['platform']] ?? '') . ' içeriği', 'link' => 'content-calendar.php'];
     usort($upcoming, fn($a, $b) => strcmp($a['date'] . ($a['time'] ?? '99'), $b['date'] . ($b['time'] ?? '99')));
     $upcoming = array_slice($upcoming, 0, 10);
     if ($upcoming): ?>
@@ -194,7 +194,7 @@ if ($announcements && $wAcik('duyurular')): ?>
     <div class="dikey" style="gap:4px">
         <?php $lastDate = '';
         foreach ($upcoming as $y):
-            $dayTag = $y['date'] === date('Y-m-d') ? 'Bugün' : ($y['date'] === date('Y-m-d', strtotime('+1 day')) ? 'Yarın' : GUNLER[(int)date('N', strtotime($y['date'])) - 1] . ' ' . date('j', strtotime($y['date']))); ?>
+            $dayTag = $y['date'] === date('Y-m-d') ? 'Bugün' : ($y['date'] === date('Y-m-d', strtotime('+1 day')) ? 'Yarın' : DAYS[(int)date('N', strtotime($y['date'])) - 1] . ' ' . date('j', strtotime($y['date']))); ?>
         <a href="<?= $y['link'] ?>" class="satir-esnek" style="gap:11px;padding:8px 10px;border-radius:10px;transition:background .2s" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
             <span class="rozet <?= $y['date'] === date('Y-m-d') ? 'rozet-tur' : '' ?>" style="min-width:76px;justify-content:center"><?= $dayTag ?><?= $y['time'] ? ' ' . $y['time'] : '' ?></span>
             <span style="color:var(--marka);display:inline-flex"><?= $y['icon'] ?></span>
@@ -256,7 +256,7 @@ if ($announcements && $wAcik('duyurular')): ?>
 </div>
 <?php endif; ?>
 
-<!-- Widget kişiselleştirme modalı -->
+<!-- Widget personalization modal -->
 <div class="modal-katman" id="modalWidget">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Paneli Düzenle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <div class="modal-govde">
@@ -282,11 +282,11 @@ async function widgetSave() {
 </script>
 
 <?php
-    // PM için proje ekleme modalı (gerekli veriler)
+    // Project creation modal for PMs (required data)
     if (permission('dosya_yonet')) project_modal();
 
 } else {
-    /* ---------- MÜŞTERİ PANELİ ---------- */
+    /* ---------- CLIENT DASHBOARD ---------- */
     [$in, $p] = in_clause(customer_client_ids());
     $projects = rows("SELECT p2.*, d.name client_name FROM projects p2 JOIN clients d ON d.id=p2.client_id WHERE p2.client_id IN $in ORDER BY d.name, p2.created DESC", $p);
     $pendingApproval = (int)val("SELECT COUNT(*) FROM approvals o JOIN projects pr ON pr.id=o.project_id WHERE pr.client_id IN $in AND o.status='bekliyor'", $p);
@@ -323,8 +323,8 @@ async function widgetSave() {
             $rate = $progress ? round($is_done / $progress * 100) : 0; ?>
         <a href="project.php?id=<?= $p['id'] ?>" class="kart kart-tik" style="padding:16px">
             <div class="satir-esnek arasi mb-2">
-                <span class="rozet rozet-tur"><?= PROJE_TURLERI[$p['type']] ?></span>
-                <?= badge($p['status'], PROJE_DURUMLARI) ?>
+                <span class="rozet rozet-tur"><?= PROJECT_TYPES[$p['type']] ?></span>
+                <?= badge($p['status'], PROJECT_STATUSES) ?>
             </div>
             <div class="kart-baslik" style="font-size:15px"><?= e($p['name']) ?></div>
             <div class="ilerleme mt-2"><div class="ilerleme-dolu" data-rate="<?= $rate ?>" style="width:0"></div></div>
@@ -339,7 +339,7 @@ async function widgetSave() {
 
 page_end();
 
-/* ---------- Yeniden kullanılabilir proje modalı ---------- */
+/* ---------- Reusable project modal ---------- */
 function project_modal(?int $clientId = null) {
     $clients = rows("SELECT id, name FROM clients WHERE status='aktif' ORDER BY name");
     $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is_active=1 ORDER BY name");
@@ -364,7 +364,7 @@ function project_modal(?int $clientId = null) {
                     <div class="form-grup">
                         <label class="form-etiket">Hizmet Türü</label>
                         <select name="type" class="secim">
-                            <?php foreach (PROJE_TURLERI as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?>
+                            <?php foreach (PROJECT_TYPES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?>
                         </select>
                     </div>
                 </div>

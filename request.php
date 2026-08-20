@@ -23,7 +23,7 @@ page_start('Talep Detayı', 'requests');
 
 <div class="sayfa-ust">
     <div>
-        <div class="satir-esnek" style="gap:9px"><span class="rozet rozet-tur"><?= e($request['form_name']) ?></span><?= badge($request['status'], TALEP_DURUMLARI) ?></div>
+        <div class="satir-esnek" style="gap:9px"><span class="rozet rozet-tur"><?= e($request['form_name']) ?></span><?= badge($request['status'], REQUEST_STATUSES) ?></div>
         <div class="sayfa-baslik mt-1"><?= e($request['title']) ?></div>
         <div class="sayfa-alt"><?= e($request['sender_name']) ?> · <?= format_date($request['created'], true) ?></div>
     </div>
@@ -46,7 +46,7 @@ page_start('Talep Detayı', 'requests');
             <div class="form-grup">
                 <label class="form-etiket">Durum</label>
                 <select class="secim" onchange="requestStatus(this.value)">
-                    <?php foreach (TALEP_DURUMLARI as $k => $v): ?><option value="<?= $k ?>" <?= $request['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
+                    <?php foreach (REQUEST_STATUSES as $k => $v): ?><option value="<?= $k ?>" <?= $request['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
                 </select>
             </div>
             <?php if (!$request['project_id']): ?>

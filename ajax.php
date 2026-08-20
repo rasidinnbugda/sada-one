@@ -1,9 +1,9 @@
 <?php
 /**
- * SADA One — Merkezi AJAX işleyici
- * Tüm istemci eylemleri buradan geçer. CSRF ve yetki kontrollüdür.
+ * SADA One — Central AJAX handler
+ * All client actions pass through here. CSRF and permission checked.
  */
-define('AJAX_ISTEK', true); // yetkisiz erişimde yönlendirme yerine JSON 403 döner
+define('IS_AJAX', true); // returns JSON 403 instead of redirecting on unauthorized access
 require __DIR__ . '/includes/init.php';
 if (!user()) json_out(['ok' => false, 'error' => 'Oturumunuz sona erdi. Sayfayı yenileyip tekrar giriş yapın.'], 401);
 csrf_check();
@@ -15,10 +15,10 @@ $g = fn($k, $v = '') => $_POST[$k] ?? $v;
 
 switch ($action) {
 
-/* ==================== TEMA & BİLDİRİM ==================== */
+/* ==================== THEME & NOTIFICATIONS ==================== */
 case 'theme_change':
-    $theme = isset(TEMALAR[$g('theme')]) ? $g('theme') : 'lime';
-    update_row('users', ['theme' => $theme, 'color' => TEMALAR[$theme][1]], 'id=?', [$u['id']]);
+    $theme = isset(THEMES[$g('theme')]) ? $g('theme') : 'lime';
+    update_row('users', ['theme' => $theme, 'color' => THEMES[$theme][1]], 'id=?', [$u['id']]);
     json_out(['ok' => true]);
 
 case 'notification_read':
@@ -28,16 +28,16 @@ case 'notification_read':
 case 'version_check':
     if ($u['role'] !== 'yonetici') deny();
     require_once __DIR__ . '/includes/updater-core.php';
-    $rel = github_json('https://api.github.com/repos/' . GITHUB_DEPO . '/releases/latest');
+    $rel = github_json('https://api.github.com/repos/' . GITHUB_REPO . '/releases/latest');
     if (!$rel || empty($rel['tag_name'])) json_out(['ok' => false, 'error' => 'GitHub\'a ulaşılamadı veya yayınlanmış sürüm yok.']);
     $last = ltrim($rel['tag_name'], 'vV');
     json_out([
-        'ok' => true, 'mevcut' => SURUM, 'last' => $rel['tag_name'],
-        'new_var' => version_compare($last, SURUM, '>'),
+        'ok' => true, 'mevcut' => APP_VERSION, 'last' => $rel['tag_name'],
+        'new_var' => version_compare($last, APP_VERSION, '>'),
         'notes' => mb_substr(trim((string)($rel['body'] ?? '')), 0, 300),
     ]);
 
-/* ==================== v14: SOP MODÜLLERİ ==================== */
+/* ==================== v14: SOP MODULES ==================== */
 case 'mentorship_save':
     if (!is_admin() && $u['role'] !== 'pm') deny();
     $data = [
@@ -52,7 +52,7 @@ case 'mentorship_save':
     json_out(['ok' => true, 'mesaj' => 'Mentörlük kaydı güncellendi.', 'refresh' => true]);
 
 case 'mentorship_output':
-    // Üye kendi kaydının çıktı notunu güncelleyebilir
+    // A member can update the output note of their own record
     $entry = row("SELECT * FROM mentorship WHERE id=?", [(int)$g('id')]);
     if (!$entry || (!is_admin() && $u['role'] !== 'pm' && $entry['member_id'] != $u['id'])) deny();
     update_row('mentorship', ['output' => trim($g('output')), 'updated' => $now], 'id=?', [(int)$g('id')]);
@@ -121,7 +121,7 @@ case 'mnote_save':
        ON DUPLICATE KEY UPDATE note=VALUES(note), updated=VALUES(updated)", [$gid, $u['id'], trim($g('note')), $now]);
     json_out(['ok' => true, 'mesaj' => 'Not kaydedildi.']);
 
-/* ---- Proje istasyonu ---- */
+/* ---- Project station ---- */
 case 'station_save':
     if (!permission('dosya_yonet')) deny();
     $pid = (int)$g('project_id');
@@ -166,7 +166,7 @@ case 'pcheck_add':
     json_out(['ok' => true, 'id' => $id, 'refresh' => true]);
 
 case 'pcheck_standard':
-    // SOP standart teknik kontrol listesi tek tıkla yüklenir
+    // Loads the standard SOP technical checklist with one click
     if (!is_staff()) deny();
     $pid = (int)$g('project_id');
     if (!project_access($pid)) deny();
@@ -230,14 +230,14 @@ case 'notification_all_read':
     json_out(['ok' => true]);
 
 case 'live_status':
-    // Canlı senkron: sayfanın güncel durum özetini döner
+    // Live sync: returns the page's current state summary
     require_login();
     $context = $g('context');
     if ($context === 'task') json_out(['ok' => true, 'hash' => live_hash_task((int)$g('id'))]);
     if ($context === 'list') json_out(['ok' => true, 'hash' => live_hash_list()]);
     json_out(['ok' => false, 'error' => 'Geçersiz bağlam.']);
 
-/* ==================== DOSYALAR ==================== */
+/* ==================== CLIENT FILES ==================== */
 case 'client_save':
     require_permission('dosya_yonet');
     $data = [
@@ -274,7 +274,7 @@ case 'client_delete':
     q("DELETE FROM clients WHERE id=?", [$id]);
     json_out(['ok' => true, 'mesaj' => 'Dosya silindi.', 'redirect' => 'clients.php']);
 
-/* ==================== PROJELER ==================== */
+/* ==================== PROJECTS ==================== */
 case 'project_save':
     require_permission('dosya_yonet');
     $data = [
@@ -289,17 +289,17 @@ case 'project_save':
         $id = (int)$g('id');
         update_row('projects', $data, 'id=?', [$id]);
         project_members_save($id, $g('members'));
-        log_activity('"' . $data['name'] . '" projesini güncelledi', 'project', $id);
+        log_activity('"' . $data['name'] . '" projesini güncelledi', 'proje', $id);
         json_out(['ok' => true, 'mesaj' => 'Proje güncellendi.']);
     } else {
         $data['created'] = $now;
         $id = insert('projects', $data);
-        // Aylık projeyse mevcut ay için dönem aç
+        // For monthly projects, open a period for the current month
         if ($data['type'] === 'aylik') get_or_create_period($id, (int)date('Y'), (int)date('n'));
         project_channel($id, 'project');
         project_channel($id, 'musteri');
         project_members_save($id, $g('members'));
-        // Proje şablonundan görevleri kur
+        // Set up tasks from the project template
         if ($g('ptemplate_id')) {
             $ps = row("SELECT * FROM project_templates WHERE id=?", [(int)$g('ptemplate_id')]);
             foreach (json_decode($ps['tasks'] ?? '[]', true) ?: [] as $si => $sg) {
@@ -307,7 +307,7 @@ case 'project_save':
                 if (!empty($sg['workflow_id'])) task_steps_setup($gid, (int)$sg['workflow_id']);
             }
         }
-        log_activity('"' . $data['name'] . '" projesini oluşturdu', 'project', $id);
+        log_activity('"' . $data['name'] . '" projesini oluşturdu', 'proje', $id);
         json_out(['ok' => true, 'mesaj' => 'Proje oluşturuldu.', 'redirect' => 'project.php?id=' . $id]);
     }
 
@@ -322,14 +322,14 @@ case 'period_open':
     require_pm();
     $projectId = (int)$g('project_id');
     $periodId = get_or_create_period($projectId, (int)$g('year'), (int)$g('month'));
-    // Şablondan görev oluşturma opsiyonu
+    // Option to create a task from a template
     if ($g('template_id')) {
         $template = row("SELECT * FROM workflow_templates WHERE id=?", [(int)$g('template_id')]);
         $firstStep = row("SELECT name FROM template_steps WHERE template_id=? ORDER BY sort_order LIMIT 1", [(int)$g('template_id')]);
         if ($template) {
             $taskId = insert('tasks', [
                 'project_id' => $projectId, 'period_id' => $periodId,
-                'title' => $template['name'] . ' — ' . AYLAR[(int)$g('month')] . ' ' . $g('year'),
+                'title' => $template['name'] . ' — ' . MONTHS[(int)$g('month')] . ' ' . $g('year'),
                 'created_by' => $u['id'], 'status' => 'yapilacak', 'created' => $now,
             ]);
             task_steps_setup($taskId, (int)$g('template_id'));
@@ -337,7 +337,7 @@ case 'period_open':
     }
     json_out(['ok' => true, 'mesaj' => 'Dönem açıldı.']);
 
-/* ==================== GÖREVLER ==================== */
+/* ==================== TASKS ==================== */
 case 'task_save':
     require_staff();
     if (!$g('id') && !permission('gorev_olustur')) json_out(['ok' => false, 'error' => 'Görev oluşturma yetkiniz yok.']);
@@ -347,14 +347,14 @@ case 'task_save':
         'priority' => $g('priority', 'normal'), 'due_date' => $g('due_date') ?: null,
         'period_id' => $g('period_id') ? (int)$g('period_id') : null,
         'bagimli_id' => $g('bagimli_id') ? (int)$g('bagimli_id') : null,
-        'repeat' => isset(TEKRARLAR[$g('repeat')]) ? $g('repeat') : 'yok',
+        'repeat' => isset(REPEAT_OPTIONS[$g('repeat')]) ? $g('repeat') : 'yok',
         'tags' => mb_substr(trim($g('tags')), 0, 255) ?: null,
         'estimated_minutes' => max(0, (int)((float)str_replace(',', '.', $g('estimated_time', '0')) * 60)),
         'start_date' => $g('start_date') ?: null,
     ];
     if ($data['title'] === '' || !$data['project_id']) json_out(['ok' => false, 'error' => 'Görev başlığı ve proje gerekli.']);
     if ($data['bagimli_id'] === (int)$g('id') && $data['bagimli_id']) json_out(['ok' => false, 'error' => 'Görev kendisine bağlanamaz.']);
-    // Çoklu atama listesi (JSON); atanan_id uyumluluk için ilk kişiye ayarlanır
+    // Multi-assignee list (JSON); assignee_id is set to the first person for compatibility
     $assignees = json_decode($g('assignees', ''), true);
     if (is_array($assignees)) {
         $assignees = array_values(array_unique(array_filter(array_map('intval', $assignees))));
@@ -368,7 +368,7 @@ case 'task_save':
             q("DELETE FROM task_assignees WHERE task_id=?", [$id]);
             foreach ($assignees as $aid) {
                 q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$id, $aid]);
-                if (!in_array($aid, $eskiler)) notify($aid, 'Görev atandı', $data['title'], 'task.php?id=' . $id, 'task');
+                if (!in_array($aid, $eskiler)) notify($aid, 'Görev atandı', $data['title'], 'task.php?id=' . $id, 'gorev');
             }
         }
         json_out(['ok' => true, 'mesaj' => 'Görev güncellendi.']);
@@ -376,13 +376,13 @@ case 'task_save':
         $data['created_by'] = $u['id']; $data['status'] = 'yapilacak'; $data['created'] = $now;
         $data['sort_order'] = (int)val("SELECT COALESCE(MAX(sort_order),0)+1 FROM tasks WHERE project_id=? AND status='yapilacak'", [$data['project_id']]);
         $id = insert('tasks', $data);
-        // İçerik görevi: mevcut içeriğe bağla veya yeni içerik oluştur
+        // Content task: link to existing content or create new content
         if ($g('content_select') === 'yeni') {
             $projectClient = (int)val("SELECT client_id FROM projects WHERE id=?", [$data['project_id']]);
             $newContentId = insert('contents', [
                 'client_id' => $projectClient ?: null, 'project_id' => $data['project_id'],
                 'title' => $data['title'],
-                'platform' => isset(PLATFORMLAR[$g('content_platform')]) ? $g('content_platform') : 'instagram',
+                'platform' => isset(PLATFORMS[$g('content_platform')]) ? $g('content_platform') : 'instagram',
                 'date' => $g('content_date') ?: ($data['due_date'] ?: date('Y-m-d')),
                 'status' => 'taslak', 'created_by' => $u['id'], 'created' => $now,
             ]);
@@ -394,13 +394,13 @@ case 'task_save':
         if (is_array($assignees)) {
             foreach ($assignees as $aid) {
                 q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$id, $aid]);
-                notify($aid, 'Yeni görev atandı', $data['title'], 'task.php?id=' . $id, 'task');
+                notify($aid, 'Yeni görev atandı', $data['title'], 'task.php?id=' . $id, 'gorev');
             }
         } elseif ($data['assignee_id']) {
             q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$id, $data['assignee_id']]);
-            notify($data['assignee_id'], 'Yeni görev atandı', $data['title'], 'task.php?id=' . $id, 'task');
+            notify($data['assignee_id'], 'Yeni görev atandı', $data['title'], 'task.php?id=' . $id, 'gorev');
         }
-        log_activity('"' . $data['title'] . '" görevini oluşturdu', 'project', $data['project_id']);
+        log_activity('"' . $data['title'] . '" görevini oluşturdu', 'proje', $data['project_id']);
         json_out(['ok' => true, 'mesaj' => 'Görev oluşturuldu.']);
     }
 
@@ -409,10 +409,10 @@ case 'task_sort':
     require_staff();
     $id = (int)$g('id');
     $status = $g('status');
-    if (!isset(GOREV_DURUMLARI[$status])) json_out(['ok' => false, 'error' => 'Geçersiz durum.']);
+    if (!isset(TASK_STATUSES[$status])) json_out(['ok' => false, 'error' => 'Geçersiz durum.']);
     $task = row("SELECT * FROM tasks WHERE id=?", [$id]);
     if (!$task) json_out(['ok' => false, 'error' => 'Görev bulunamadı.']);
-    // Kilit kontrolleri (bağımlılık + akış durumu)
+    // Lock checks (dependency + workflow state)
     if ($task['status'] !== $status) {
         $engel = task_lock_reason($task, $status);
         if ($engel) json_out(['ok' => false, 'error' => '🔒 ' . $engel]);
@@ -421,18 +421,18 @@ case 'task_sort':
     if ($status === 'tamamlandi' && $task['status'] !== 'tamamlandi') $ek['completion'] = $now;
     update_row('tasks', $ek, 'id=?', [$id]);
     if ($status === 'tamamlandi') task_content_sync($id);
-    // Sütun içi sıralamayı kaydet
+    // Save the in-column sort order
     $ids = json_decode($g('ids', '[]'), true);
     if (is_array($ids) && $ids) {
         $st = db()->prepare("UPDATE tasks SET sort_order=? WHERE id=?");
         foreach (array_values($ids) as $i => $gid) $st->execute([$i + 1, (int)$gid]);
     }
     if ($task['status'] !== $status) {
-        log_activity('"' . $task['title'] . '" görevini ' . GOREV_DURUMLARI[$status] . ' durumuna aldı', 'task', $id);
+        log_activity('"' . $task['title'] . '" görevini ' . TASK_STATUSES[$status] . ' durumuna aldı', 'gorev', $id);
         $alicilar = array_column(rows("SELECT user_id FROM task_watchers WHERE task_id=?", [$id]), 'user_id');
         if ($task['assignee_id']) $alicilar[] = (int)$task['assignee_id'];
         foreach (array_unique($alicilar) as $aid)
-            notify((int)$aid, 'Görev durumu değişti', $task['title'] . ' → ' . GOREV_DURUMLARI[$status], 'task.php?id=' . $id, 'task');
+            notify((int)$aid, 'Görev durumu değişti', $task['title'] . ' → ' . TASK_STATUSES[$status], 'task.php?id=' . $id, 'gorev');
     }
     json_out(['ok' => true]);
 
@@ -445,7 +445,7 @@ case 'gorev_sil':
     json_out(['ok' => true, 'mesaj' => 'Görev silindi.', 'redirect' => 'tasks.php']);
 
 case 'task_field':
-    // Tablo görünümünde hücre içi düzenleme (alan bazlı güncelleme)
+    // Inline cell editing in table view (per-field update)
     require_staff();
     $id = (int)$g('id');
     $field = $g('field');
@@ -455,7 +455,7 @@ case 'task_field':
     $allowed = ['status', 'priority', 'assignee_id', 'due_date', 'start_date', 'estimated_minutes', 'tags'];
     if (!in_array($field, $allowed)) json_out(['ok' => false, 'error' => 'Bu alan düzenlenemez.']);
     if ($field === 'status') {
-        if (!isset(GOREV_DURUMLARI[$setting_value])) json_out(['ok' => false, 'error' => 'Geçersiz durum.']);
+        if (!isset(TASK_STATUSES[$setting_value])) json_out(['ok' => false, 'error' => 'Geçersiz durum.']);
         if ($task['status'] !== $setting_value) {
             $engel = task_lock_reason($task, $setting_value);
             if ($engel) json_out(['ok' => false, 'error' => '🔒 ' . $engel]);
@@ -464,9 +464,9 @@ case 'task_field':
         if ($setting_value === 'tamamlandi' && $task['status'] !== 'tamamlandi') $ek['completion'] = $now;
         update_row('tasks', $ek, 'id=?', [$id]);
         if ($setting_value === 'tamamlandi') task_content_sync($id);
-        log_activity('"' . $task['title'] . '" görevini ' . GOREV_DURUMLARI[$setting_value] . ' durumuna aldı', 'task', $id);
+        log_activity('"' . $task['title'] . '" görevini ' . TASK_STATUSES[$setting_value] . ' durumuna aldı', 'gorev', $id);
     } elseif ($field === 'priority') {
-        if (!isset(ONCELIKLER[$setting_value])) json_out(['ok' => false, 'error' => 'Geçersiz öncelik.']);
+        if (!isset(PRIORITIES[$setting_value])) json_out(['ok' => false, 'error' => 'Geçersiz öncelik.']);
         update_row('tasks', ['priority' => $setting_value], 'id=?', [$id]);
     } elseif ($field === 'assignee_id') {
         $new = $setting_value ? (int)$setting_value : null;
@@ -474,13 +474,13 @@ case 'task_field':
         if ($task['assignee_id']) q("DELETE FROM task_assignees WHERE task_id=? AND user_id=?", [$id, $task['assignee_id']]);
         if ($new) {
             q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$id, $new]);
-            if ($new != $task['assignee_id']) notify($new, 'Görev atandı', $task['title'], 'task.php?id=' . $id, 'task');
+            if ($new != $task['assignee_id']) notify($new, 'Görev atandı', $task['title'], 'task.php?id=' . $id, 'gorev');
         }
     } elseif ($field === 'estimated_minutes') {
         update_row('tasks', ['estimated_minutes' => max(0, (int)((float)str_replace(',', '.', $setting_value) * 60))], 'id=?', [$id]);
     } elseif ($field === 'tags') {
         update_row('tasks', ['tags' => mb_substr(trim($setting_value), 0, 255) ?: null], 'id=?', [$id]);
-    } else { // tarih alanları
+    } else { // date fields
         update_row('tasks', [$field => $setting_value ?: null], 'id=?', [$id]);
     }
     json_out(['ok' => true]);
@@ -492,7 +492,7 @@ case 'task_archive':
     if (!$task) json_out(['ok' => false, 'error' => 'Görev bulunamadı.']);
     $new = $task['is_archived'] ? 0 : 1;
     update_row('tasks', ['is_archived' => $new], 'id=?', [$id]);
-    log_activity('"' . $task['title'] . '" görevini ' . ($new ? 'arşivledi' : 'arşivden çıkardı'), 'task', $id);
+    log_activity('"' . $task['title'] . '" görevini ' . ($new ? 'arşivledi' : 'arşivden çıkardı'), 'gorev', $id);
     json_out(['ok' => true, 'mesaj' => $new ? 'Görev arşive taşındı.' : 'Görev arşivden çıkarıldı.', 'redirect' => $new ? 'tasks.php' : '']);
 
 case 'view_preference':
@@ -511,7 +511,7 @@ case 'watcher_toggle':
     else {
         q("INSERT IGNORE INTO task_watchers (task_id, user_id) VALUES (?,?)", [$gid, $target]);
         $title = val("SELECT title FROM tasks WHERE id=?", [$gid]);
-        notify($target, 'Bir göreve izleyici eklendiniz', $title, 'task.php?id=' . $gid, 'task');
+        notify($target, 'Bir göreve izleyici eklendiniz', $title, 'task.php?id=' . $gid, 'gorev');
         $m = 'İzleyici eklendi.';
     }
     json_out(['ok' => true, 'mesaj' => $m]);
@@ -530,11 +530,11 @@ case 'event_move':
     $et = row("SELECT * FROM events WHERE id=?", [(int)$g('id')]);
     if (!$et) json_out(['ok' => false, 'error' => 'Etkinlik bulunamadı.']);
     if ($g('start')) {
-        // Tam datetime verildi (modal düzenleme)
+        // Full datetime provided (modal edit)
         $newInitial = $g('start');
         $newBit = $g('end') ?: null;
     } else {
-        // Yalnızca gün verildi (sürükleme): saati koru, bitişi aynı gün farkıyla kaydır
+        // Only the day provided (drag): keep the time, shift the end by the same day offset
         $day = $g('date');
         if (!$day) json_out(['ok' => false, 'error' => 'Tarih gerekli.']);
         $fark = strtotime($day) - strtotime(date('Y-m-d', strtotime($et['start'])));
@@ -564,7 +564,7 @@ case 'ptemplate_save':
     require_admin();
     $name = trim($g('name'));
     $templateTasks = json_decode($g('tasks', '[]'), true) ?: [];
-    $templateTasks = array_values(array_filter(array_map(fn($s) => ['title' => mb_substr(trim($s['title'] ?? ''), 0, 200), 'workflow_id' => (int)($s['workflow_id'] ?? 0), 'priority' => isset(ONCELIKLER[$s['priority'] ?? '']) ? $s['priority'] : 'normal'], $templateTasks), fn($s) => $s['title'] !== ''));
+    $templateTasks = array_values(array_filter(array_map(fn($s) => ['title' => mb_substr(trim($s['title'] ?? ''), 0, 200), 'workflow_id' => (int)($s['workflow_id'] ?? 0), 'priority' => isset(PRIORITIES[$s['priority'] ?? '']) ? $s['priority'] : 'normal'], $templateTasks), fn($s) => $s['title'] !== ''));
     if ($name === '' || !$templateTasks) json_out(['ok' => false, 'error' => 'Ad ve en az bir görev gerekli.']);
     if ($g('id')) {
         update_row('project_templates', ['name' => $name, 'description' => $g('description'), 'tasks' => json_encode($templateTasks, JSON_UNESCAPED_UNICODE)], 'id=?', [(int)$g('id')]);
@@ -579,13 +579,13 @@ case 'ptemplate_delete':
     json_out(['ok' => true, 'mesaj' => 'Şablon silindi.']);
 
 case 'lock_toggle':
-    require_pm(); // yalnızca yönetici ve PM kilidi devre dışı bırakabilir
+    require_pm(); // only admins and PMs can disable the lock
     $id = (int)$g('id');
     $task = row("SELECT * FROM tasks WHERE id=?", [$id]);
     if (!$task) json_out(['ok' => false, 'error' => 'Görev bulunamadı.']);
     $new = $task['lock_bypassed'] ? 0 : 1;
     update_row('tasks', ['lock_bypassed' => $new], 'id=?', [$id]);
-    log_activity('"' . $task['title'] . '" görevinin kilidini ' . ($new ? 'devre dışı bıraktı' : 'etkinleştirdi'), 'task', $id);
+    log_activity('"' . $task['title'] . '" görevinin kilidini ' . ($new ? 'devre dışı bıraktı' : 'etkinleştirdi'), 'gorev', $id);
     json_out(['ok' => true, 'mesaj' => $new ? 'Kilit devre dışı — görev serbestçe ilerletilebilir.' : 'Kilit yeniden etkin.']);
 
 case 'step_complete':
@@ -595,7 +595,7 @@ case 'step_complete':
     if (!$step) json_out(['ok' => false, 'error' => 'Adım bulunamadı.']);
     $task = row("SELECT * FROM tasks WHERE id=?", [$step['task_id']]);
     $newStatus = $step['status'] === 'tamam' ? 'bekliyor' : 'tamam';
-    // Sıralı adım zorunluluğu: önceki adımlar bitmeden bu adım tamamlanamaz
+    // Sequential step rule: this step cannot be completed until earlier steps are done
     if ($newStatus === 'tamam' && empty($task['lock_bypassed'])) {
         $oncekiEksik = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND sort_order<? AND status!='tamam'", [$step['task_id'], $step['sort_order']]);
         if ($oncekiEksik > 0) json_out(['ok' => false, 'error' => '🔒 Önceki ' . $oncekiEksik . ' adım tamamlanmadan bu adım tamamlanamaz.' . (is_pm() ? ' (Görev sayfasından kilidi devre dışı bırakabilirsiniz.)' : '')]);
@@ -606,17 +606,17 @@ case 'step_complete':
         if ($sonraki) update_row('task_steps', ['status' => 'aktif'], 'id=?', [$sonraki['id']]);
         $kalan = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND status!='tamam'", [$step['task_id']]);
         if ($kalan === 0) { update_row('tasks', ['status' => 'tamamlandi', 'completion' => $now], 'id=?', [$step['task_id']]); task_content_sync((int)$step['task_id']); }
-        // Adım sorumlusuna sıra geldi bildirimi
+        // Notify the step owner that it is their turn
         if ($sonraki) {
             $ownerId = val("SELECT owner_id FROM task_steps WHERE id=?", [$sonraki['id']]);
-            if ($ownerId) notify((int)$ownerId, 'Akışta sıra sizde', $task['title'], 'task.php?id=' . $step['task_id'], 'task');
+            if ($ownerId) notify((int)$ownerId, 'Akışta sıra sizde', $task['title'], 'task.php?id=' . $step['task_id'], 'gorev');
         }
     } else {
-        // Geri alınan adımdan sonraki tamamlar bekliyor'a düşsün (tutarlılık)
+        // Steps completed after the reverted one drop back to 'bekliyor' (consistency)
         q("UPDATE task_steps SET status='bekliyor', done_date=NULL WHERE task_id=? AND sort_order>? AND status='tamam'", [$step['task_id'], $step['sort_order']]);
         q("UPDATE tasks SET status='devam', completion=NULL WHERE id=? AND status='tamamlandi'", [$step['task_id']]);
     }
-    // Güncel akış durumunu döndür (yenilemesiz arayüz güncellemesi için)
+    // Return the current workflow state (for refresh-free UI updates)
     $stepsLast = rows("SELECT id, sort_order, status FROM task_steps WHERE task_id=? ORDER BY sort_order", [$step['task_id']]);
     $taskLast = row("SELECT status FROM tasks WHERE id=?", [$step['task_id']]);
     json_out([
@@ -625,10 +625,10 @@ case 'step_complete':
         'is_done_adet' => count(array_filter($stepsLast, fn($a) => $a['status'] === 'tamam')),
         'total' => count($stepsLast),
         'task_status' => $taskLast['status'],
-        'task_status_tag' => GOREV_DURUMLARI[$taskLast['status']],
+        'task_status_tag' => TASK_STATUSES[$taskLast['status']],
     ]);
 
-/* ==================== KONTROL LİSTESİ (checklist) ==================== */
+/* ==================== CHECKLIST ==================== */
 case 'check_add':
     require_staff();
     $name = trim($g('name'));
@@ -654,11 +654,11 @@ case 'step_owner':
     update_row('task_steps', ['owner_id' => $newOwner], 'id=?', [(int)$g('id')]);
     if ($newOwner) {
         $stepInfo = row("SELECT ga.name, g.title, g.id gid FROM task_steps ga JOIN tasks g ON g.id=ga.task_id WHERE ga.id=?", [(int)$g('id')]);
-        if ($stepInfo) notify($newOwner, 'Akış adımı size atandı', $stepInfo['title'] . ' → ' . $stepInfo['name'], 'task.php?id=' . $stepInfo['gid'], 'task');
+        if ($stepInfo) notify($newOwner, 'Akış adımı size atandı', $stepInfo['title'] . ' → ' . $stepInfo['name'], 'task.php?id=' . $stepInfo['gid'], 'gorev');
     }
     json_out(['ok' => true, 'mesaj' => 'Sorumlu atandı.']);
 
-/* ==================== ZAMAN TAKİBİ ==================== */
+/* ==================== TIME TRACKING ==================== */
 case 'time_add':
     require_staff();
     $min = (int)$g('time') * 60 + (int)$g('minutes');
@@ -669,13 +669,13 @@ case 'time_add':
     ]);
     json_out(['ok' => true, 'mesaj' => format_minutes($min) . ' zaman kaydedildi.']);
 
-/* ==================== YORUMLAR ==================== */
+/* ==================== COMMENTS ==================== */
 case 'comment_box_add':
     require_login();
     $message = trim($g('message'));
     if ($message === '') json_out(['ok' => false, 'error' => 'Yorum boş olamaz.']);
     $refType = $g('ref_type'); $refId = (int)$g('ref_id');
-    // Erişim: müşteri yalnızca kendi projelerinin görev/projelerine yorum yazabilir
+    // Access: customers may only comment on tasks/projects of their own projects
     if (is_customer()) {
         $projectId = $refType === 'project' ? $refId : (int)val("SELECT project_id FROM tasks WHERE id=?", [$refId]);
         if (!project_access($projectId)) json_out(['ok' => false, 'error' => 'Bu alana yorum yazamazsınız.']);
@@ -685,7 +685,7 @@ case 'comment_box_add':
         'mesaj' => $message, 'created' => $now,
         'parent_id' => $g('parent_id') ? (int)$g('parent_id') : null,
     ];
-    // Dosya eki
+    // File attachment
     $ek = file_upload('dosya');
     if ($ek) {
         $data['archive_id'] = insert('archive', [
@@ -696,27 +696,27 @@ case 'comment_box_add':
         ]);
     }
     $commentId = insert('comments', $data);
-    // Bağlam bilgisi + link
+    // Context info + link
     if ($refType === 'task') {
         $context = row("SELECT title, assignee_id, project_id FROM tasks WHERE id=?", [$refId]);
         $link = 'task.php?id=' . $refId;
-        // İzleyiciler + atanan kişiye bildir
+        // Notify watchers + the assignee
         $alicilar = array_column(rows("SELECT user_id FROM task_watchers WHERE task_id=?", [$refId]), 'user_id');
         if ($context['assignee_id']) $alicilar[] = (int)$context['assignee_id'];
         foreach (array_unique($alicilar) as $aid)
-            notify((int)$aid, 'Yeni yorum: ' . $context['title'], $u['name'] . ': ' . mb_substr($message, 0, 80), $link, 'message');
+            notify((int)$aid, 'Yeni yorum: ' . $context['title'], $u['name'] . ': ' . mb_substr($message, 0, 80), $link, 'mesaj');
     } else {
         $context = row("SELECT name title FROM projects WHERE id=?", [$refId]);
         $link = 'project.php?id=' . $refId . '#tartisma';
         foreach (rows("SELECT user_id FROM project_members WHERE project_id=?", [$refId]) as $pu)
-            notify((int)$pu['user_id'], 'Proje tartışması: ' . ($context['title'] ?? ''), $u['name'] . ': ' . mb_substr($message, 0, 80), $link, 'message');
+            notify((int)$pu['user_id'], 'Proje tartışması: ' . ($context['title'] ?? ''), $u['name'] . ': ' . mb_substr($message, 0, 80), $link, 'mesaj');
     }
-    // Yanıtsa, üst yorumun sahibine bildir
+    // If it is a reply, notify the parent comment's owner
     if ($data['parent_id']) {
         $topSahip = (int)val("SELECT user_id FROM comments WHERE id=?", [$data['parent_id']]);
-        if ($topSahip) notify($topSahip, $u['name'] . ' yorumunuza yanıt verdi', mb_substr($message, 0, 80), $link, 'message');
+        if ($topSahip) notify($topSahip, $u['name'] . ' yorumunuza yanıt verdi', mb_substr($message, 0, 80), $link, 'mesaj');
     }
-    // Etiketlenenlere bildir
+    // Notify mentioned users
     notify_mentions($g('mention_ids', ''), $u['name'] . ' sizi etiketledi', mb_substr($message, 0, 90), $link);
     json_out(['ok' => true, 'mesaj' => 'Yorum eklendi.']);
 
@@ -748,7 +748,7 @@ case 'reaction_toggle':
     $adet = (int)val("SELECT COUNT(*) FROM comment_box_reactions WHERE comment_box_id=? AND emoji=?", [$commentId, $emoji]);
     json_out(['ok' => true, 'adet' => $adet, 'mine' => $var ? 0 : 1]);
 
-/* ==================== ONAYLAR ==================== */
+/* ==================== APPROVALS ==================== */
 case 'onay_gonder':
     require_permission('onay_gonder');
     $data = [
@@ -758,7 +758,7 @@ case 'onay_gonder':
         'sender_id' => $u['id'], 'status' => 'bekliyor', 'created' => $now,
     ];
     if ($data['title'] === '') json_out(['ok' => false, 'error' => 'Onay başlığı gerekli.']);
-    // Dosya eki veya Drive linki
+    // File attachment or Drive link
     $yuklenen = file_upload('dosya');
     if ($yuklenen) {
         $archiveId = insert('archive', [
@@ -773,12 +773,12 @@ case 'onay_gonder':
         $data['drive_link'] = mb_substr($dLink, 0, 500);
     }
     $id = insert('approvals', $data);
-    // Müşteriye bildir (birincil dosya + ek dosya atamaları)
+    // Notify the customer (primary client file + extra file assignments)
     $clientId = (int)val("SELECT client_id FROM projects WHERE id=?", [$data['project_id']]);
     foreach (rows("SELECT DISTINCT us.id FROM users us LEFT JOIN customer_clients md ON md.user_id=us.id
         WHERE us.role='musteri' AND us.is_active=1 AND (us.client_id=? OR md.client_id=?)", [$clientId, $clientId]) as $m)
-        notify((int)$m['id'], 'Onayınız bekleniyor', $data['title'], 'approvals.php', 'approval');
-    log_activity('"' . $data['title'] . '" için onay gönderdi', 'project', $data['project_id']);
+        notify((int)$m['id'], 'Onayınız bekleniyor', $data['title'], 'approvals.php', 'onay');
+    log_activity('"' . $data['title'] . '" için onay gönderdi', 'proje', $data['project_id']);
     json_out(['ok' => true, 'mesaj' => 'Onaya gönderildi.']);
 
 case 'approval_reply':
@@ -791,20 +791,20 @@ case 'approval_reply':
     update_row('approvals', [
         'status' => $status, 'reply_note' => $g('not'), 'reply_date' => $now, 'responder_id' => $u['id'],
     ], 'id=?', [$id]);
-    notify($approval['sender_id'], 'Onay yanıtlandı: ' . ONAY_DURUMLARI[$status], $approval['title'] . ($g('not') ? ' — ' . $g('not') : ''), 'approvals.php', 'approval');
-    log_activity('"' . $approval['title'] . '" onayını ' . ONAY_DURUMLARI[$status] . ' olarak yanıtladı', 'project', $approval['project_id']);
+    notify($approval['sender_id'], 'Onay yanıtlandı: ' . APPROVAL_STATUSES[$status], $approval['title'] . ($g('not') ? ' — ' . $g('not') : ''), 'approvals.php', 'onay');
+    log_activity('"' . $approval['title'] . '" onayını ' . APPROVAL_STATUSES[$status] . ' olarak yanıtladı', 'proje', $approval['project_id']);
     json_out(['ok' => true, 'mesaj' => 'Yanıtınız kaydedildi.']);
 
-/* ==================== İÇERİK TAKVİMİ ==================== */
+/* ==================== CONTENT CALENDAR ==================== */
 case 'content_save':
     require_permission('icerik_yonet');
-    // Çoklu platform: JSON dizi → CSV
+    // Multi-platform: JSON array → CSV
     $platforms = json_decode($g('platforms', ''), true);
     if (is_array($platforms)) {
-        $platforms = array_values(array_intersect(array_map('strval', $platforms), array_keys(PLATFORMLAR)));
+        $platforms = array_values(array_intersect(array_map('strval', $platforms), array_keys(PLATFORMS)));
         $platformCsv = $platforms ? implode(',', $platforms) : 'instagram';
     } else {
-        $platformCsv = isset(PLATFORMLAR[$g('platform')]) ? $g('platform') : 'instagram';
+        $platformCsv = isset(PLATFORMS[$g('platform')]) ? $g('platform') : 'instagram';
     }
     $projectId = $g('project_id') ? (int)$g('project_id') : null;
     $clientId = $g('client_id') ? (int)$g('client_id') : null;
@@ -832,7 +832,7 @@ case 'content_status':
     $contentClient = $content ? (int)($content['client_id'] ?: val("SELECT client_id FROM projects WHERE id=?", [$content['project_id']])) : 0;
     if (!$content || !client_access($contentClient)) json_out(['ok' => false, 'error' => 'Yetkisiz.']);
     update_row('contents', ['status' => $g('status')], 'id=?', [$id]);
-    // Çift yönlü senkron: yayınlandı → bağlı görevler tamamlanır
+    // Two-way sync: published → linked tasks get completed
     if ($g('status') === 'yayinlandi') {
         foreach (rows("SELECT id FROM tasks WHERE content_id=? AND status!='tamamlandi'", [$id]) as $bg2) {
             update_row('tasks', ['status' => 'tamamlandi', 'completion' => $now], 'id=?', [$bg2['id']]);
@@ -840,7 +840,7 @@ case 'content_status':
     }
     json_out(['ok' => true, 'mesaj' => 'Durum güncellendi.']);
 
-/* ==================== SOSYAL MEDYA TAKİBİ ==================== */
+/* ==================== SOCIAL MEDIA TRACKING ==================== */
 case 'social_account_add':
     require_permission('icerik_yonet');
     $clientId = (int)$g('client_id');
@@ -850,7 +850,7 @@ case 'social_account_add':
     if ($url && !preg_match('#^https?://#i', $url)) $url = 'https://' . $url;
     insert('social_accounts', [
         'client_id' => $clientId,
-        'platform' => isset(PLATFORMLAR[$g('platform')]) ? $g('platform') : 'instagram',
+        'platform' => isset(PLATFORMS[$g('platform')]) ? $g('platform') : 'instagram',
         'username' => mb_substr($kadi, 0, 100), 'url' => $url ?: null, 'created' => $now,
     ]);
     json_out(['ok' => true, 'mesaj' => 'Sosyal medya hesabı eklendi.']);
@@ -886,7 +886,7 @@ case 'content_delete':
     q("DELETE FROM contents WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'İçerik silindi.']);
 
-/* ==================== ETKİNLİK / TAKVİM ==================== */
+/* ==================== EVENTS / CALENDAR ==================== */
 case 'event_save':
     require_permission('takvim_yonet');
     $data = [
@@ -900,7 +900,7 @@ case 'event_save':
         'needs_list' => trim($g('needs_list')) ?: null,
     ];
     if ($data['title'] === '' || !$data['start']) json_out(['ok' => false, 'error' => 'Başlık ve tarih gerekli.']);
-    // Sistem içi katılımcılar (toplantılar için)
+    // In-system participants (for meetings)
     $participantIds = json_decode($g('participant_ids', ''), true);
     if ($g('id')) {
         $eventId = (int)$g('id');
@@ -911,7 +911,7 @@ case 'event_save':
             foreach (array_unique(array_map('intval', $participantIds)) as $kid) {
                 if (!$kid) continue;
                 q("INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (?,?)", [$eventId, $kid]);
-                if (!in_array($kid, $eskiler)) notify($kid, '📅 Toplantıya davet edildiniz', $data['title'] . ' — ' . format_date($data['start'], true), 'meetings.php', 'task');
+                if (!in_array($kid, $eskiler)) notify($kid, '📅 Toplantıya davet edildiniz', $data['title'] . ' — ' . format_date($data['start'], true), 'meetings.php', 'gorev');
             }
         }
         json_out(['ok' => true, 'mesaj' => 'Etkinlik güncellendi.']);
@@ -922,10 +922,10 @@ case 'event_save':
         foreach (array_unique(array_map('intval', $participantIds)) as $kid) {
             if (!$kid) continue;
             q("INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (?,?)", [$eventId, $kid]);
-            notify($kid, '📅 Toplantıya davet edildiniz', $data['title'] . ' — ' . format_date($data['start'], true), 'meetings.php', 'task');
+            notify($kid, '📅 Toplantıya davet edildiniz', $data['title'] . ' — ' . format_date($data['start'], true), 'meetings.php', 'gorev');
         }
     }
-    // Seçilen ekipmanları çekime çıkar
+    // Check out the selected equipment for the shoot
     $equipmentIds = json_decode($g('equipment', '[]'), true) ?: [];
     $atlanabilen = [];
     foreach (array_unique(array_map('intval', $equipmentIds)) as $eid) {
@@ -944,22 +944,22 @@ case 'event_delete':
     q("DELETE FROM events WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Etkinlik silindi.']);
 
-/* ==================== MESAJLAŞMA ==================== */
+/* ==================== MESSAGING ==================== */
 case 'message_send':
     require_login();
     $channelId = (int)$g('channel_id');
     $message = trim($g('message'));
     if ($message === '') json_out(['ok' => false, 'error' => 'Mesaj boş.']);
-    // Üyelik kontrolü
+    // Membership check
     if (!val("SELECT COUNT(*) FROM channel_members WHERE channel_id=? AND user_id=?", [$channelId, $u['id']]))
         json_out(['ok' => false, 'error' => 'Bu kanala erişiminiz yok.']);
     $id = insert('messages', ['channel_id' => $channelId, 'user_id' => $u['id'], 'mesaj' => $message, 'created' => $now]);
     update_row('channel_members', ['last_read' => $now], 'channel_id=? AND user_id=?', [$channelId, $u['id']]);
-    // Diğer üyelere bildir
+    // Notify other members
     foreach (rows("SELECT user_id FROM channel_members WHERE channel_id=? AND user_id!=?", [$channelId, $u['id']]) as $member) {
-        notify($member['user_id'], $u['name'] . ' mesaj gönderdi', mb_substr($message, 0, 80), 'messages.php?channel=' . $channelId, 'message', false);
+        notify($member['user_id'], $u['name'] . ' mesaj gönderdi', mb_substr($message, 0, 80), 'messages.php?channel=' . $channelId, 'mesaj', false);
     }
-    // Etiketlenenlere ayrıca bildir (e-posta dahil)
+    // Also notify mentioned users (including email)
     notify_mentions($g('mention_ids', ''), $u['name'] . ' sizi bir sohbette etiketledi', mb_substr($message, 0, 90), 'messages.php?channel=' . $channelId);
     json_out(['ok' => true, 'id' => $id, 'created' => format_date($now, true)]);
 
@@ -993,7 +993,7 @@ case 'channel_member_add':
         json_out(['ok' => false, 'error' => 'Üyesi olmadığınız kanalı yönetemezsiniz.']);
     q("INSERT IGNORE INTO channel_members (channel_id, user_id) VALUES (?,?)", [$channelId, $targetId]);
     $target = row("SELECT name FROM users WHERE id=?", [$targetId]);
-    notify($targetId, 'Bir sohbete eklendiniz', $channel['name'], 'messages.php?channel=' . $channelId, 'message');
+    notify($targetId, 'Bir sohbete eklendiniz', $channel['name'], 'messages.php?channel=' . $channelId, 'mesaj');
     log_activity('"' . $channel['name'] . '" kanalına ' . ($target['name'] ?? '') . ' kişisini ekledi');
     json_out(['ok' => true, 'mesaj' => 'Üye eklendi.']);
 
@@ -1044,7 +1044,7 @@ case 'channel_delete':
     $channel = row("SELECT * FROM channels WHERE id=?", [$channelId]);
     if (!$channel) json_out(['ok' => false, 'error' => 'Kanal bulunamadı.']);
     $memberMi = val("SELECT COUNT(*) FROM channel_members WHERE channel_id=? AND user_id=?", [$channelId, $u['id']]);
-    // Özel (DM) sohbeti katılımcısı silebilir; diğer kanalları PM/yönetici silebilir
+    // A private (DM) chat can be deleted by a participant; other channels by PM/admin
     if ($channel['type'] === 'ozel' ? !$memberMi : !is_pm())
         json_out(['ok' => false, 'error' => 'Bu sohbeti silme yetkiniz yok.']);
     q("DELETE FROM messages WHERE channel_id=?", [$channelId]);
@@ -1059,9 +1059,9 @@ case 'dm_open':
     if ($targetId === (int)$u['id']) json_out(['ok' => false, 'error' => 'Kendinizle sohbet açamazsınız.']);
     $target = row("SELECT * FROM users WHERE id=? AND is_active=1", [$targetId]);
     if (!$target) json_out(['ok' => false, 'error' => 'Kullanıcı bulunamadı.']);
-    // Müşteriler yalnızca ekiple DM açabilir
+    // Customers can only open DMs with staff
     if (is_customer() && $target['role'] === 'musteri') json_out(['ok' => false, 'error' => 'Bu kişiyle sohbet açılamaz.']);
-    // İki kişi arasında mevcut özel kanal var mı?
+    // Is there an existing private channel between these two people?
     $mevcut = row("SELECT k.id FROM channels k
         JOIN channel_members a ON a.channel_id=k.id AND a.user_id=?
         JOIN channel_members b ON b.channel_id=k.id AND b.user_id=?
@@ -1071,7 +1071,7 @@ case 'dm_open':
     q("INSERT IGNORE INTO channel_members (channel_id, user_id) VALUES (?,?),(?,?)", [$channelId, $u['id'], $channelId, $targetId]);
     json_out(['ok' => true, 'redirect' => 'messages.php?channel=' . $channelId]);
 
-/* ==================== GLOBAL ARAMA ==================== */
+/* ==================== GLOBAL SEARCH ==================== */
 case 'search':
     require_login();
     $q = trim($g('q'));
@@ -1079,32 +1079,32 @@ case 'search':
     $search = '%' . $q . '%';
     $results = [];
     if (is_staff()) {
-        $results['Dosyalar'] = array_map(fn($r) => ['name' => $r['name'], 'bottom' => DOSYA_TURLERI[$r['type']], 'link' => 'client.php?id=' . $r['id']],
+        $results['Dosyalar'] = array_map(fn($r) => ['name' => $r['name'], 'bottom' => CLIENT_TYPES[$r['type']], 'link' => 'client.php?id=' . $r['id']],
             rows("SELECT id, name, type FROM clients WHERE name LIKE ? LIMIT 5", [$search]));
-        $results['Projeler'] = array_map(fn($r) => ['name' => $r['name'], 'bottom' => PROJE_TURLERI[$r['type']], 'link' => 'project.php?id=' . $r['id']],
+        $results['Projeler'] = array_map(fn($r) => ['name' => $r['name'], 'bottom' => PROJECT_TYPES[$r['type']], 'link' => 'project.php?id=' . $r['id']],
             rows("SELECT id, name, type FROM projects WHERE name LIKE ? LIMIT 5", [$search]));
-        $results['Görevler'] = array_map(fn($r) => ['name' => $r['title'], 'bottom' => GOREV_DURUMLARI[$r['status']], 'link' => 'task.php?id=' . $r['id']],
+        $results['Görevler'] = array_map(fn($r) => ['name' => $r['title'], 'bottom' => TASK_STATUSES[$r['status']], 'link' => 'task.php?id=' . $r['id']],
             rows("SELECT id, title, status FROM tasks WHERE title LIKE ? ORDER BY status!='tamamlandi' DESC LIMIT 6", [$search]));
         $results['İçerikler'] = array_map(fn($r) => ['name' => $r['title'], 'bottom' => format_date($r['date']), 'link' => 'content-calendar.php?month=' . date('n', strtotime($r['date'])) . '&year=' . date('Y', strtotime($r['date']))],
             rows("SELECT id, title, date FROM contents WHERE title LIKE ? LIMIT 4", [$search]));
-        $results['Talepler'] = array_map(fn($r) => ['name' => $r['title'], 'bottom' => TALEP_DURUMLARI[$r['status']], 'link' => 'request.php?id=' . $r['id']],
+        $results['Talepler'] = array_map(fn($r) => ['name' => $r['title'], 'bottom' => REQUEST_STATUSES[$r['status']], 'link' => 'request.php?id=' . $r['id']],
             rows("SELECT id, title, status FROM requests WHERE title LIKE ? LIMIT 4", [$search]));
     } else {
         [$in, $p] = in_clause(customer_client_ids());
-        $results['Projeler'] = array_map(fn($r) => ['name' => $r['name'], 'bottom' => PROJE_TURLERI[$r['type']], 'link' => 'project.php?id=' . $r['id']],
+        $results['Projeler'] = array_map(fn($r) => ['name' => $r['name'], 'bottom' => PROJECT_TYPES[$r['type']], 'link' => 'project.php?id=' . $r['id']],
             rows("SELECT id, name, type FROM projects WHERE client_id IN $in AND name LIKE ? LIMIT 6", array_merge($p, [$search])));
-        $results['Talepler'] = array_map(fn($r) => ['name' => $r['title'], 'bottom' => TALEP_DURUMLARI[$r['status']], 'link' => 'request.php?id=' . $r['id']],
+        $results['Talepler'] = array_map(fn($r) => ['name' => $r['title'], 'bottom' => REQUEST_STATUSES[$r['status']], 'link' => 'request.php?id=' . $r['id']],
             rows("SELECT id, title, status FROM requests WHERE sender_id=? AND title LIKE ? LIMIT 5", [$u['id'], $search]));
     }
     json_out(['ok' => true, 'results' => $results]);
 
-/* ==================== EKİPMAN / DEMİRBAŞ ==================== */
+/* ==================== EQUIPMENT / INVENTORY ==================== */
 case 'equipment_save':
     require_permission('ekipman_yonet');
     $data = [
         'code' => mb_substr(trim($g('code')), 0, 20) ?: null,
         'name' => trim($g('name')),
-        'category' => isset(EKIPMAN_KATEGORILERI[$g('category')]) ? $g('category') : 'diger',
+        'category' => isset(EQUIPMENT_CATEGORIES[$g('category')]) ? $g('category') : 'diger',
         'purchase_date' => $g('purchase_date') ?: null,
         'price' => (float)str_replace(',', '.', $g('price', '0')),
         'description' => $g('description'),
@@ -1144,7 +1144,7 @@ case 'equipment_custody':
     $targetName = val("SELECT name FROM users WHERE id=?", [$target]);
     update_row('equipment', ['status' => 'zimmette', 'custody_user_id' => $target, 'custody_event_id' => null], 'id=?', [(int)$g('id')]);
     log_equipment((int)$g('id'), 'custody', trim($g('description')), $target);
-    if ($target !== (int)$u['id']) notify($target, 'Ekipman zimmetlendi', ($ek['code'] ? $ek['code'] . ' — ' : '') . $ek['name'], 'equipment.php', 'task');
+    if ($target !== (int)$u['id']) notify($target, 'Ekipman zimmetlendi', ($ek['code'] ? $ek['code'] . ' — ' : '') . $ek['name'], 'equipment.php', 'gorev');
     json_out(['ok' => true, 'mesaj' => $ek['name'] . ' → ' . $targetName . ' zimmetine verildi.']);
 
 case 'equipment_return':
@@ -1191,7 +1191,7 @@ case 'sd_update_row':
     }
     if ($operation === 'bosalt') {
         if ($ek['sd_status'] === 'dolu') json_out(['ok' => false, 'error' => "Dikkat: içerik henüz Drive'a aktarılmadı! Önce aktarımı işaretleyin."]);
-        // Geçmiş hareket kaydında içerik + link saklanır, kart sıfırlanır
+        // Content + link are stored in the history log, the card is reset
         log_equipment($ek['id'], 'sd_bosaltildi', trim(($ek['sd_content'] ?: '') . ($ek['sd_drive_link'] ? ' (arşiv: ' . $ek['sd_drive_link'] . ')' : '')));
         update_row('equipment', ['sd_status' => 'bos', 'sd_content' => null, 'sd_drive_link' => null], 'id=?', [$ek['id']]);
         json_out(['ok' => true, 'mesaj' => 'Kart boşaltıldı — tekrar kullanıma hazır.']);
@@ -1209,14 +1209,14 @@ case 'event_equipment_return':
     }
     json_out(['ok' => true, 'mesaj' => $adet . ' ekipman stüdyoya iade alındı.']);
 
-/* ==================== MÜŞTERİ PUANLAMASI ==================== */
+/* ==================== CUSTOMER RATING ==================== */
 case 'rating_give':
     require_login();
     if (!is_customer()) json_out(['ok' => false, 'error' => 'Puanlamayı yalnızca müşteriler yapabilir.']);
     $refType = $g('ref_type') === 'approval' ? 'approval' : 'task';
     $refId = (int)$g('ref_id');
     $rating = max(1, min(5, (int)$g('rating')));
-    // Erişim + durum kontrolü
+    // Access + status check
     if ($refType === 'task') {
         $target = row("SELECT id, title, project_id, status FROM tasks WHERE id=?", [$refId]);
         if (!$target || $target['status'] !== 'tamamlandi') json_out(['ok' => false, 'error' => 'Yalnızca tamamlanan işler puanlanabilir.']);
@@ -1228,16 +1228,16 @@ case 'rating_give':
     $comment_box = mb_substr(trim($g('comment_box')), 0, 500) ?: null;
     q("INSERT INTO ratings (ref_type, ref_id, project_id, user_id, rating, comment_box, created) VALUES (?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE rating=VALUES(rating), comment_box=VALUES(comment_box)", [$refType, $refId, $target['project_id'], $u['id'], $rating, $comment_box, $now]);
-    // Düşük puanda PM'e haber ver
+    // Notify the PM on a low rating
     if ($rating <= 2) {
         $pmId = val("SELECT pm_id FROM projects WHERE id=?", [$target['project_id']]);
         $alicilar = $pmId ? [(int)$pmId] : array_column(rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1"), 'id');
         foreach ($alicilar as $aid)
-            notify((int)$aid, '⚠️ Düşük müşteri puanı: ' . $rating . '★', $target['title'] . ($comment_box ? ' — "' . $comment_box . '"' : ''), 'project.php?id=' . $target['project_id'], 'approval');
+            notify((int)$aid, '⚠️ Düşük müşteri puanı: ' . $rating . '★', $target['title'] . ($comment_box ? ' — "' . $comment_box . '"' : ''), 'project.php?id=' . $target['project_id'], 'onay');
     }
     json_out(['ok' => true, 'mesaj' => 'Değerlendirmeniz kaydedildi, teşekkürler! ' . str_repeat('★', $rating)]);
 
-/* ==================== RANDEVULAR ==================== */
+/* ==================== APPOINTMENTS ==================== */
 case 'appointment_create':
     require_login();
     if (!is_customer()) json_out(['ok' => false, 'error' => 'Randevu talebini müşteriler oluşturur.']);
@@ -1253,7 +1253,7 @@ case 'appointment_create':
         'notes' => mb_substr(trim($g('notes')), 0, 500) ?: null, 'status' => 'bekliyor', 'created' => $now,
     ]);
     foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $pm)
-        notify((int)$pm['id'], '📆 Yeni randevu talebi', $u['name'] . ': ' . $topic . ' — ' . format_date($date, true), 'appointments.php', 'request');
+        notify((int)$pm['id'], '📆 Yeni randevu talebi', $u['name'] . ': ' . $topic . ' — ' . format_date($date, true), 'appointments.php', 'talep');
     json_out(['ok' => true, 'mesaj' => 'Randevu talebiniz iletildi. Onaylanınca haber verilecek.']);
 
 case 'appointment_respond':
@@ -1263,7 +1263,7 @@ case 'appointment_respond':
     $operation = $g('operation'); // onayla | alternatif | reddet
     if ($operation === 'approve') {
         $link = trim($g('online_link'));
-        // Toplantı oluştur: müşteri + cevaplayan PM katılımcı
+        // Create a meeting: customer + responding PM as participants
         $eventId = insert('events', [
             'client_id' => $r['client_id'], 'title' => 'Randevu: ' . $r['topic'], 'type' => 'toplanti',
             'start' => $r['date'], 'online_link' => $link ?: null,
@@ -1271,40 +1271,40 @@ case 'appointment_respond':
         ]);
         q("INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (?,?),(?,?)", [$eventId, $r['customer_id'], $eventId, $u['id']]);
         update_row('appointments', ['status' => 'onaylandi', 'online_link' => $link ?: null, 'event_id' => $eventId, 'reply_note' => trim($g('not')) ?: null], 'id=?', [$r['id']]);
-        notify((int)$r['customer_id'], '✅ Randevunuz onaylandı', $r['topic'] . ' — ' . format_date($r['date'], true) . ($link ? ' (online)' : ''), 'appointments.php', 'request');
+        notify((int)$r['customer_id'], '✅ Randevunuz onaylandı', $r['topic'] . ' — ' . format_date($r['date'], true) . ($link ? ' (online)' : ''), 'appointments.php', 'talep');
         json_out(['ok' => true, 'mesaj' => 'Randevu onaylandı ve toplantı takvimine eklendi.']);
     }
     if ($operation === 'alternative') {
         $new = $g('alternative_date');
         if (!$new) json_out(['ok' => false, 'error' => 'Alternatif tarih seçin.']);
         update_row('appointments', ['status' => 'alternatif', 'alternative_date' => $new, 'reply_note' => trim($g('not')) ?: null], 'id=?', [$r['id']]);
-        notify((int)$r['customer_id'], '🔁 Randevu için farklı saat önerildi', $r['topic'] . ' → ' . format_date($new, true), 'appointments.php', 'request');
+        notify((int)$r['customer_id'], '🔁 Randevu için farklı saat önerildi', $r['topic'] . ' → ' . format_date($new, true), 'appointments.php', 'talep');
         json_out(['ok' => true, 'mesaj' => 'Alternatif saat önerildi.']);
     }
     if ($operation === 'reject') {
         update_row('appointments', ['status' => 'reddedildi', 'reply_note' => trim($g('not')) ?: null], 'id=?', [$r['id']]);
-        notify((int)$r['customer_id'], 'Randevu talebiniz yanıtlandı', $r['topic'] . ' — uygun değil' . ($g('not') ? ': ' . $g('not') : ''), 'appointments.php', 'request');
+        notify((int)$r['customer_id'], 'Randevu talebiniz yanıtlandı', $r['topic'] . ' — uygun değil' . ($g('not') ? ': ' . $g('not') : ''), 'appointments.php', 'talep');
         json_out(['ok' => true, 'mesaj' => 'Talep yanıtlandı.']);
     }
     json_out(['ok' => false, 'error' => 'Geçersiz işlem.']);
 
 case 'appointment_accept':
-    // Müşteri, önerilen alternatif saati kabul eder
+    // The customer accepts the proposed alternative time
     require_login();
     $r = row("SELECT * FROM appointments WHERE id=? AND customer_id=? AND status='alternatif'", [(int)$g('id'), $u['id']]);
     if (!$r || !$r['alternative_date']) json_out(['ok' => false, 'error' => 'Bekleyen öneri bulunamadı.']);
     update_row('appointments', ['date' => $r['alternative_date'], 'alternative_date' => null, 'status' => 'bekliyor'], 'id=?', [$r['id']]);
     foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $pm)
-        notify((int)$pm['id'], '📆 Müşteri önerilen saati kabul etti', $r['topic'] . ' — ' . format_date($r['alternative_date'], true) . ' (onay bekliyor)', 'appointments.php', 'request');
+        notify((int)$pm['id'], '📆 Müşteri önerilen saati kabul etti', $r['topic'] . ' — ' . format_date($r['alternative_date'], true) . ' (onay bekliyor)', 'appointments.php', 'talep');
     json_out(['ok' => true, 'mesaj' => 'Yeni saat kabul edildi; ajans onayı bekleniyor.']);
 
-/* ==================== SÜRÜM NOTLARI ==================== */
+/* ==================== RELEASE NOTES ==================== */
 case 'version_close':
     require_login();
-    update_row('users', ['seen_version' => SURUM], 'id=?', [$u['id']]);
+    update_row('users', ['seen_version' => APP_VERSION], 'id=?', [$u['id']]);
     json_out(['ok' => true]);
 
-/* ==================== DUYURULAR ==================== */
+/* ==================== ANNOUNCEMENTS ==================== */
 case 'announcement_save':
     require_permission('duyuru_yayinla');
     $title = trim($g('title'));
@@ -1313,7 +1313,7 @@ case 'announcement_save':
     $id = insert('duyurular', ['title' => $title, 'text' => $g('text'), 'is_important' => $is_important, 'created_by' => $u['id'], 'created' => $now]);
     if ($is_important) {
         foreach (rows("SELECT id FROM users WHERE is_active=1 AND role!='musteri' AND id!=?", [$u['id']]) as $take)
-            notify((int)$take['id'], '📢 Duyuru: ' . $title, mb_substr($g('text'), 0, 90), 'index.php', 'task');
+            notify((int)$take['id'], '📢 Duyuru: ' . $title, mb_substr($g('text'), 0, 90), 'index.php', 'gorev');
     }
     log_activity('"' . $title . '" duyurusunu yayınladı');
     json_out(['ok' => true, 'mesaj' => 'Duyuru yayınlandı.']);
@@ -1329,7 +1329,7 @@ case 'announcement_delete':
     q("DELETE FROM announcement_readers WHERE announcement_id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Duyuru silindi.']);
 
-/* ==================== SÖZLEŞMELER ==================== */
+/* ==================== CONTRACTS ==================== */
 case 'contract_save':
     require_permission('dosya_yonet');
     $data = [
@@ -1359,7 +1359,7 @@ case 'contract_delete':
     q("DELETE FROM contracts WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Sözleşme silindi.']);
 
-/* ==================== KİŞİSEL ALAN ==================== */
+/* ==================== PERSONAL SPACE ==================== */
 case 'not_save':
     require_login();
     $text = trim($g('text'));
@@ -1416,11 +1416,11 @@ case 'scratchpad_save':
     update_row('users', ['scratchpad' => mb_substr($g('text'), 0, 100000)], 'id=?', [$u['id']]);
     json_out(['ok' => true]);
 
-/* ==================== TERCİHLER & WIDGET ==================== */
+/* ==================== PREFERENCES & WIDGETS ==================== */
 case 'preference_save':
     require_login();
     $preferences = [];
-    foreach (array_keys(BILDIRIM_KATEGORILERI) as $k) $preferences[$k] = (int)(bool)$g('t_' . $k);
+    foreach (array_keys(NOTIFICATION_CATEGORIES) as $k) $preferences[$k] = (int)(bool)$g('t_' . $k);
     $preferences['email'] = (int)(bool)$g('t_email');
     $preferences['only_own_steps'] = (int)(bool)$g('t_only_step');
     update_row('users', ['notification_preferences' => json_encode($preferences)], 'id=?', [$u['id']]);
@@ -1432,7 +1432,7 @@ case 'widget_save':
     update_row('users', ['widgets' => json_encode(array_values($selected))], 'id=?', [$u['id']]);
     json_out(['ok' => true, 'mesaj' => 'Panel görünümü kaydedildi.']);
 
-/* ==================== TALEPLER ==================== */
+/* ==================== REQUESTS ==================== */
 case 'request_send':
     require_login();
     $templateId = (int)$g('template_id');
@@ -1465,9 +1465,9 @@ case 'request_send':
         }
         insert('request_replies', ['request_id' => $requestId, 'field_id' => $field['id'], 'setting_value' => $setting_value]);
     }
-    // PM'lere bildir
+    // Notify PMs
     foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $pm)
-        notify($pm['id'], 'Yeni talep: ' . $title, $u['name'] . ' bir talep gönderdi', 'request.php?id=' . $requestId, 'request');
+        notify($pm['id'], 'Yeni talep: ' . $title, $u['name'] . ' bir talep gönderdi', 'request.php?id=' . $requestId, 'talep');
     json_out(['ok' => true, 'mesaj' => 'Talebiniz iletildi. En kısa sürede dönüş yapılacak.']);
 
 case 'request_status':
@@ -1488,7 +1488,7 @@ case 'request_to_task':
         'priority' => 'normal', 'status' => 'yapilacak', 'created' => $now,
     ]);
     update_row('requests', ['status' => 'gorev_olusturuldu', 'task_id' => $taskId], 'id=?', [$id]);
-    notify($request['sender_id'], 'Talebiniz işleme alındı', $request['title'], 'request.php?id=' . $id, 'request');
+    notify($request['sender_id'], 'Talebiniz işleme alındı', $request['title'], 'request.php?id=' . $id, 'talep');
     json_out(['ok' => true, 'mesaj' => 'Göreve dönüştürüldü.', 'redirect' => 'task.php?id=' . $taskId]);
 
 case 'request_project':
@@ -1496,7 +1496,7 @@ case 'request_project':
     update_row('requests', ['project_id' => (int)$g('project_id')], 'id=?', [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Proje atandı.']);
 
-/* ==================== ARŞİV ==================== */
+/* ==================== ARCHIVE ==================== */
 case 'archive_upload':
     require_login();
     $yuklenen = file_upload('dosya');
@@ -1535,7 +1535,7 @@ case 'arsiv_sil':
     }
     json_out(['ok' => true, 'mesaj' => 'Dosya silindi.']);
 
-/* ==================== FİNANS ==================== */
+/* ==================== FINANCE ==================== */
 case 'payment_save':
     require_permission('finans');
     $data = [
@@ -1562,11 +1562,11 @@ case 'payment_delete':
     q("DELETE FROM payments WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Kayıt silindi.']);
 
-/* ==================== GİDERLER ==================== */
+/* ==================== EXPENSES ==================== */
 case 'expense_save':
     require_permission('finans');
     $data = [
-        'type' => isset(GIDER_TURLERI[$g('type')]) ? $g('type') : 'diger',
+        'type' => isset(EXPENSE_TYPES[$g('type')]) ? $g('type') : 'diger',
         'title' => trim($g('title')),
         'amount' => (float)str_replace(',', '.', $g('amount', '0')),
         'date' => $g('date') ?: date('Y-m-d'),
@@ -1593,7 +1593,7 @@ case 'expense_delete':
     q("DELETE FROM expenses WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Gider silindi.']);
 
-/* ==================== TEKLİF & FATURA BELGELERİ ==================== */
+/* ==================== QUOTE & INVOICE DOCUMENTS ==================== */
 case 'document_save':
     require_permission('belge_olustur');
     $type = $g('type') === 'fatura' ? 'fatura' : 'teklif';
@@ -1611,7 +1611,7 @@ case 'document_save':
             'valid_until' => $g('valid_until') ?: null, 'notes' => $g('notes')], 'id=?', [(int)$g('id')]);
         json_out(['ok' => true, 'mesaj' => 'Belge güncellendi.']);
     }
-    // Numaralandırma: TKF-2026-001 / FTR-2026-001
+    // Numbering: TKF-2026-001 / FTR-2026-001
     $onek = $type === 'fatura' ? 'FTR' : 'TKF';
     $counterKey = 'document_counter_' . $type . '_' . date('Y');
     $counter = (int)val("SELECT setting_value FROM settings WHERE setting_key=?", [$counterKey]) + 1;
@@ -1631,7 +1631,7 @@ case 'document_status':
     if (!$b) json_out(['ok' => false, 'error' => 'Belge bulunamadı.']);
     $status = in_array($g('status'), ['taslak', 'gonderildi', 'onaylandi', 'reddedildi']) ? $g('status') : 'taslak';
     update_row('documents', ['status' => $status], 'id=?', [$b['id']]);
-    // Teklif onaylandıysa: dosyanın ilk aktif projesine gelir (fatura) kaydı öner/oluştur
+    // If the quote was approved: suggest/create an income (invoice) record on the file's first active project
     if ($status === 'onaylandi' && $b['type'] === 'teklif' && $b['client_id']) {
         $projectId = val("SELECT id FROM projects WHERE client_id=? AND status='aktif' ORDER BY id LIMIT 1", [$b['client_id']]);
         if ($projectId) {
@@ -1657,29 +1657,29 @@ case 'budget_save':
     q("INSERT INTO settings (setting_key, setting_value) VALUES ('butce_hedef', ?) ON DUPLICATE KEY UPDATE setting_value=?", [$target, $target]);
     json_out(['ok' => true, 'mesaj' => 'Aylık gelir hedefi kaydedildi.']);
 
-/* ==================== KULLANICILAR (admin) ==================== */
+/* ==================== USERS (admin) ==================== */
 case 'user_save':
     require_admin();
-    $email = mb_strtolower(trim($g('email'))); // e-posta tekilliği: normalize edilmiş halde saklanır
+    $email = mb_strtolower(trim($g('email'))); // email uniqueness: stored in normalized form
     $data = [
-        'name' => trim($g('name')), 'email' => $email, 'role' => $g('role', 'ekip'),
+        'name' => trim($g('name')), 'email' => $email, 'role' => $g('role', 'team'),
         'job_title' => $g('job_title'), 'client_id' => $g('client_id') ? (int)$g('client_id') : null,
         'weekly_capacity' => max(0, (int)$g('weekly_capacity', 45)),
         'maas' => max(0, (float)str_replace(',', '.', $g('salary', '0'))),
     ];
-    if (!isset(ROLLER[$data['role']])) json_out(['ok' => false, 'error' => 'Geçersiz rol.']);
-    // Kullanıcı bazlı izin geçersiz kılmaları
+    if (!isset(ROLES[$data['role']])) json_out(['ok' => false, 'error' => 'Geçersiz rol.']);
+    // Per-user permission overrides
     if ($g('permissions') !== '') {
         $permissions = json_decode($g('permissions'), true);
         if (is_array($permissions)) {
             $temiz = [];
-            foreach (IZIN_ANAHTARLARI as $setting_key => $_) if (isset($permissions[$setting_key])) $temiz[$setting_key] = (int)(bool)$permissions[$setting_key];
+            foreach (PERMISSION_KEYS as $setting_key => $_) if (isset($permissions[$setting_key])) $temiz[$setting_key] = (int)(bool)$permissions[$setting_key];
             $data['permissions'] = $temiz ? json_encode($temiz) : null;
         }
     }
     if ($data['name'] === '' || !filter_var($email, FILTER_VALIDATE_EMAIL))
         json_out(['ok' => false, 'error' => 'Ad ve geçerli e-posta gerekli.']);
-    // Müşteri çoklu dosya listesi (JSON); birincil dosya = ilk seçim
+    // Customer multi-file list (JSON); primary file = first selection
     $customerClients = json_decode($g('customer_clients', ''), true);
     if ($data['role'] === 'musteri' && is_array($customerClients)) {
         $customerClients = array_values(array_unique(array_filter(array_map('intval', $customerClients))));
@@ -1707,14 +1707,14 @@ case 'user_save':
     $data['password'] = password_hash($g('password'), PASSWORD_DEFAULT);
     $data['theme'] = 'lime'; $data['color'] = '#b1fb01'; $data['created'] = $now;
     $id = insert('users', $data);
-    // Yeni kullanıcıyı ilgili kanallara otomatik ekle
+    // Automatically add the new user to the relevant channels
     if ($data['role'] !== 'musteri') {
-        // Genel kanal + (stajyer hariç) tüm proje kanalları
+        // General channel + all project channels (except for interns)
         foreach (rows("SELECT id, type FROM channels WHERE type='genel' OR (type='proje' AND ?='tam')", [$data['role'] === 'stajyer' ? 'stajyer' : 'full']) as $channel) {
             q("INSERT IGNORE INTO channel_members (channel_id, user_id) VALUES (?,?)", [$channel['id'], $id]);
         }
     } else {
-        // Müşteri: erişebildiği tüm dosyaların müşteri kanallarına
+        // Customer: added to the customer channels of all files they can access
         $customerClientSave($id);
         $clientList = is_array($customerClients) && $customerClients ? $customerClients : [$data['client_id']];
         [$in, $p] = in_clause(array_map('intval', $clientList));
@@ -1730,7 +1730,7 @@ case 'user_status':
     update_row('users', ['is_active' => (int)$g('is_active')], 'id=?', [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Durum güncellendi.']);
 
-/* ==================== AKIŞ ŞABLONLARI (admin) ==================== */
+/* ==================== WORKFLOW TEMPLATES (admin) ==================== */
 case 'workflow_save':
     require_admin();
     $name = trim($g('name'));
@@ -1754,7 +1754,7 @@ case 'workflow_delete':
     q("DELETE FROM workflow_templates WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Şablon silindi.']);
 
-/* ==================== FORM ŞABLONLARI (admin) ==================== */
+/* ==================== FORM TEMPLATES (admin) ==================== */
 case 'form_save':
     require_admin();
     $name = trim($g('name'));
@@ -1783,15 +1783,19 @@ case 'form_delete':
     q("DELETE FROM form_templates WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Form silindi.']);
 
-/* ==================== AYARLAR (admin) ==================== */
+/* ==================== SETTINGS (admin) ==================== */
 case 'setting_save':
     require_admin();
-    foreach (['site_name', 'varsayilan_tema', 'smtp_aktif', 'smtp_host', 'smtp_port', 'smtp_kullanici', 'smtp_gonderen', 'eposta_bildirim'] as $setting_key) {
-        if (isset($_POST[$setting_key])) q("INSERT INTO settings (setting_key,setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?", [$setting_key, $_POST[$setting_key], $_POST[$setting_key]]);
+    $fieldToKey = ['site_name' => 'site_adi', 'default_theme' => 'varsayilan_tema', 'smtp_is_active' => 'smtp_aktif',
+        'smtp_host' => 'smtp_host', 'smtp_port' => 'smtp_port', 'smtp_user' => 'smtp_kullanici',
+        'smtp_sender' => 'smtp_gonderen', 'email_notification' => 'eposta_bildirim'];
+    foreach ($fieldToKey as $fieldName => $setting_key) {
+        if (isset($_POST[$fieldName])) q("INSERT INTO settings (setting_key,setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?", [$setting_key, $_POST[$fieldName], $_POST[$fieldName]]);
     }
     if (!empty($_POST['smtp_password'])) q("INSERT INTO settings (setting_key,setting_value) VALUES ('smtp_sifre',?) ON DUPLICATE KEY UPDATE setting_value=?", [$_POST['smtp_password'], $_POST['smtp_password']]);
-    // Logo & favicon yükleme
-    foreach (['site_logo' => ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'site_favicon' => ['png', 'ico', 'jpg', 'jpeg', 'gif', 'webp']] as $fieldName => $allowed_ones) {
+    // Logo & favicon upload
+    foreach (['site_logo' => ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'site_favicon' => ['png', 'ico', 'jpg', 'jpeg', 'gif', 'webp'],
+              'site_logo_dark' => ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'site_favicon_dark' => ['png', 'ico', 'jpg', 'jpeg', 'gif', 'webp']] as $fieldName => $allowed_ones) {
         $new = file_upload($fieldName);
         if ($new) {
             if (!in_array($new['extension'], $allowed_ones)) json_out(['ok' => false, 'error' => ($fieldName === 'site_logo' ? 'Logo' : 'Favicon') . ' için görsel dosyası seçin.']);
@@ -1804,7 +1808,7 @@ case 'setting_save':
 
 case 'setting_image_delete':
     require_admin();
-    $setting_key = in_array($g('setting_key'), ['site_logo', 'site_favicon']) ? $g('setting_key') : '';
+    $setting_key = in_array($g('setting_key'), ['site_logo', 'site_favicon', 'site_logo_dark', 'site_favicon_dark']) ? $g('setting_key') : '';
     if (!$setting_key) json_out(['ok' => false, 'error' => 'Geçersiz.']);
     $old = setting($setting_key);
     if ($old) @unlink(ROOT . '/uploads/' . $old);
@@ -1814,11 +1818,11 @@ case 'setting_image_delete':
 case 'test_email':
     require_admin();
     require_once __DIR__ . '/includes/mailer.php';
-    // Geçici ayarları uygula (kaydetmeden test)
+    // Apply temporary settings (test without saving)
     $ok = send_email($u['email'], 'SADA Test E-postası', "Bu bir test e-postasıdır.\nSMTP ayarlarınız çalışıyor. 🎉");
     json_out(['ok' => $ok, 'mesaj' => $ok ? 'Test e-postası gönderildi: ' . $u['email'] : 'Gönderilemedi. SMTP ayarlarını kontrol edin.', 'error' => $ok ? '' : 'SMTP gönderimi başarısız.']);
 
-/* ==================== PROFİL ==================== */
+/* ==================== PROFILE ==================== */
 case 'profile_save':
     require_login();
     $data = ['name' => trim($g('name')), 'job_title' => $g('job_title')];
@@ -1846,7 +1850,7 @@ default:
     json_out(['ok' => false, 'error' => 'Bilinmeyen işlem.'], 400);
 }
 
-/* ---------- Yardımcı: görev adımlarını şablondan kur ---------- */
+/* ---------- Helper: set up task steps from a template ---------- */
 function task_steps_setup(int $taskId, int $templateId): void {
     $steps = rows("SELECT * FROM template_steps WHERE template_id=? ORDER BY sort_order", [$templateId]);
     foreach ($steps as $i => $a) {
@@ -1857,9 +1861,9 @@ function task_steps_setup(int $taskId, int $templateId): void {
     }
 }
 
-/* ---------- Yardımcı: proje/dosya üyelerini kaydet (çoklu atama) ---------- */
+/* ---------- Helper: save project/file members (multi-assign) ---------- */
 function project_members_save(int $projectId, string $membersJson): void {
-    if ($membersJson === '') return; // form üye alanı göndermediyse dokunma
+    if ($membersJson === '') return; // do nothing if the form did not send a members field
     $members = json_decode($membersJson, true);
     if (!is_array($members)) return;
     $old = array_column(rows("SELECT user_id FROM project_members WHERE project_id=?", [$projectId]), 'user_id');
@@ -1868,7 +1872,7 @@ function project_members_save(int $projectId, string $membersJson): void {
     foreach (array_unique(array_map('intval', $members)) as $uid) {
         if (!$uid) continue;
         q("INSERT IGNORE INTO project_members (project_id, user_id) VALUES (?,?)", [$projectId, $uid]);
-        if (!in_array($uid, $old)) notify($uid, 'Projeye atandınız', $projectName, 'project.php?id=' . $projectId, 'task');
+        if (!in_array($uid, $old)) notify($uid, 'Projeye atandınız', $projectName, 'project.php?id=' . $projectId, 'gorev');
     }
 }
 
@@ -1882,6 +1886,6 @@ function client_members_save(int $clientId, string $membersJson): void {
     foreach (array_unique(array_map('intval', $members)) as $uid) {
         if (!$uid) continue;
         q("INSERT IGNORE INTO client_members (client_id, user_id) VALUES (?,?)", [$clientId, $uid]);
-        if (!in_array($uid, $old)) notify($uid, 'Dosyaya atandınız', $clientName, 'client.php?id=' . $clientId, 'task');
+        if (!in_array($uid, $old)) notify($uid, 'Dosyaya atandınız', $clientName, 'client.php?id=' . $clientId, 'gorev');
     }
 }

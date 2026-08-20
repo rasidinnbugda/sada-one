@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Çekim Listesi
- * Proje adı · tarih · çekime gidecek kişiler · ekipmanlar · alınacaklar · ihtiyaç listesi
+ * SADA One — Shoot List
+ * Project name · date · people attending the shoot · equipment · shopping list · needs list
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';

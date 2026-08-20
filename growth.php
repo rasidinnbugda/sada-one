@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Ekip İçi Gelişim ve Mentörlük Takip Programı
- * Üye · gelişim istenen alan · atanan mentör · uygulama sahası/proje · çıktı & değerlendirme
+ * SADA One — Internal Team Development and Mentorship Tracking Program
+ * Member · desired development area · assigned mentor · practice arena/project · output & evaluation
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -119,10 +119,10 @@ function mDuzenle(k) {
 async function mCikti(id, btn) {
     const box = btn.closest('div').nextElementSibling;
     const mevcut = box.querySelector('.text-muted') ? '' : box.textContent.trim();
-    const new = prompt('Çıktı & değerlendirme notu:', mevcut);
-    if (new === null) return;
-    const j = await api('mentorship_output', { id, output: new });
-    if (j.ok) { box.textContent = new || 'Henüz not girilmedi.'; toast(j.message, 'basari'); }
+    const newNote = prompt('Çıktı & değerlendirme notu:', mevcut);
+    if (newNote === null) return;
+    const j = await api('mentorship_output', { id, output: newNote });
+    if (j.ok) { box.textContent = newNote || 'Henüz not girilmedi.'; toast(j.message, 'basari'); }
 }
 </script>
 <?php page_end(); ?>

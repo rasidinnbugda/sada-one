@@ -1,8 +1,8 @@
 <?php
 /**
- * SADA One — Randevu Talepleri
- * Müşteri: talep oluşturur ve durumunu izler. Ekip: onaylar / alternatif saat önerir / reddeder.
- * Onaylanan randevu otomatik olarak toplantı takvimine düşer.
+ * SADA One — Appointment Requests
+ * Customer: creates a request and tracks its status. Team: approves / suggests an alternative time / rejects.
+ * An approved appointment is automatically added to the meeting calendar.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -77,7 +77,7 @@ page_start('Randevular', 'appointments');
 <?php endforeach; endif; ?>
 
 <?php if (is_customer()): ?>
-<!-- Randevu talep modalı -->
+<!-- Appointment request modal -->
 <div class="modal-katman" id="modalAppointment">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Randevu Talep Et</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="appointment_create">
@@ -98,7 +98,7 @@ page_start('Randevular', 'appointments');
 <?php endif; ?>
 
 <?php if (is_pm()): ?>
-<!-- Onayla modalı -->
+<!-- Approve modal -->
 <div class="modal-katman" id="modalROnay">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Randevuyu Onayla</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="appointment_respond">
@@ -110,7 +110,7 @@ page_start('Randevular', 'appointments');
         <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Onayla & Takvime Ekle</button></div>
     </form></div>
 </div>
-<!-- Alternatif saat modalı -->
+<!-- Alternative time modal -->
 <div class="modal-katman" id="modalRAlt">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Farklı Saat Öner</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="appointment_respond">
@@ -122,7 +122,7 @@ page_start('Randevular', 'appointments');
         <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Öner</button></div>
     </form></div>
 </div>
-<!-- Reddet modalı -->
+<!-- Reject modal -->
 <div class="modal-katman" id="modalRRed">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Talebi Reddet</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="appointment_respond">

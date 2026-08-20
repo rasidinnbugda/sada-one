@@ -3,29 +3,29 @@ require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
 $u = require_permission('rapor');
 
-// Genel metrikler
+// General metrics
 $totalTask = (int)val("SELECT COUNT(*) FROM tasks");
 $doneTask = (int)val("SELECT COUNT(*) FROM tasks WHERE status='tamamlandi'");
 $overdueTask = (int)val("SELECT COUNT(*) FROM tasks WHERE due_date<CURDATE() AND status!='tamamlandi'");
 $doneRate = $totalTask ? round($doneTask / $totalTask * 100) : 0;
 
-// Durum dağılımı
+// Status distribution
 $statusDagilim = [];
-foreach (GOREV_DURUMLARI as $k => $v) $statusDagilim[$k] = (int)val("SELECT COUNT(*) FROM tasks WHERE status=?", [$k]);
+foreach (TASK_STATUSES as $k => $v) $statusDagilim[$k] = (int)val("SELECT COUNT(*) FROM tasks WHERE status=?", [$k]);
 $maxStatus = max(1, max($statusDagilim));
 
-// Kişi bazlı performans
+// Per-person performance
 $people = rows("SELECT u.id, u.name, u.color,
     (SELECT COUNT(*) FROM tasks g WHERE g.assignee_id=u.id) total,
     (SELECT COUNT(*) FROM tasks g WHERE g.assignee_id=u.id AND g.status='tamamlandi') is_done,
     (SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z WHERE z.user_id=u.id) minutes
     FROM users u WHERE u.role IN ('yonetici','pm','ekip') AND u.is_active=1 ORDER BY total DESC");
 
-// Dosya bazlı proje sayısı
+// Project count per client file
 $clientDagilim = rows("SELECT d.name, d.color, COUNT(p.id) project FROM clients d LEFT JOIN projects p ON p.client_id=d.id GROUP BY d.id ORDER BY project DESC LIMIT 8");
 $maxClient = max(1, max(array_column($clientDagilim, 'project') ?: [1]));
 
-// Onay istatistikleri
+// Approval statistics
 $approvalTotal = (int)val("SELECT COUNT(*) FROM approvals");
 $approvalApprovedItems = (int)val("SELECT COUNT(*) FROM approvals WHERE status='onaylandi'");
 $approvalPending = (int)val("SELECT COUNT(*) FROM approvals WHERE status='bekliyor'");
@@ -49,20 +49,20 @@ $statusColor = ['yapilacak' => 'var(--muted)', 'devam' => 'var(--info)', 'incele
 </div>
 
 <div class="izgara izgara-2">
-    <!-- Durum dağılımı -->
+    <!-- Status distribution -->
     <div class="kart">
         <div class="kart-baslik mb-3">Görev Durum Dağılımı</div>
         <div class="dikey" style="gap:14px">
             <?php foreach ($statusDagilim as $k => $count): ?>
             <div>
-                <div class="satir-esnek arasi mb-2"><span class="satir-esnek kucuk" style="gap:7px"><span class="etiket-nokta" style="background:<?= $statusColor[$k] ?>"></span><?= GOREV_DURUMLARI[$k] ?></span><span class="kucuk kalin"><?= $count ?></span></div>
+                <div class="satir-esnek arasi mb-2"><span class="satir-esnek kucuk" style="gap:7px"><span class="etiket-nokta" style="background:<?= $statusColor[$k] ?>"></span><?= TASK_STATUSES[$k] ?></span><span class="kucuk kalin"><?= $count ?></span></div>
                 <div class="ilerleme"><div class="ilerleme-dolu" data-rate="<?= round($count / $maxStatus * 100) ?>" style="width:0;background:<?= $statusColor[$k] ?>"></div></div>
             </div>
             <?php endforeach; ?>
         </div>
     </div>
 
-    <!-- Dosya başına proje -->
+    <!-- Projects per client file -->
     <div class="kart">
         <div class="kart-baslik mb-3">Dosya Başına Proje</div>
         <div class="dikey" style="gap:14px">
@@ -99,7 +99,7 @@ $statusColor = ['yapilacak' => 'var(--muted)', 'devam' => 'var(--info)', 'incele
     <div class="kart orta"><div class="stat-deger" style="color:var(--uyari)" data-counter="<?= $approvalPending ?>">0</div><div class="stat-etiket">Bekleyen Onay</div></div>
 </div>
 
-<!-- MÜŞTERİ MEMNUNİYETİ -->
+<!-- CLIENT SATISFACTION -->
 <?php
 $genelRating = row("SELECT AVG(rating) ort, COUNT(*) adet FROM ratings");
 if ((int)$genelRating['adet'] > 0):

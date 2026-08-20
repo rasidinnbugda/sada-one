@@ -1,8 +1,8 @@
 <?php
 /**
- * SADA One — Kurulum Sihirbazı
- * Sistem gereksinimlerini kontrol eder, veritabanını kurar,
- * yönetici hesabını oluşturur ve config.php dosyasını yazar.
+ * SADA One — Installation Wizard
+ * Checks system requirements, sets up the database,
+ * creates the admin account and writes the config.php file.
  */
 session_start();
 error_reporting(E_ALL);
@@ -10,7 +10,7 @@ ini_set('display_errors', '1');
 
 $configPath = dirname(__DIR__) . '/config.php';
 
-// Zaten kuruluysa engelle
+// Block if already installed
 if (file_exists($configPath)) {
     $cfg = include $configPath;
     if (!empty($cfg['installed'])) {
@@ -21,7 +21,7 @@ if (file_exists($configPath)) {
 $step = isset($_GET['step']) ? (int)$_GET['step'] : 1;
 $error = '';
 
-/* ---------- Adım 1: Gereksinim kontrolü ---------- */
+/* ---------- Step 1: Requirements check ---------- */
 $gereksinimler = [
     'PHP 7.4 veya üzeri' => version_compare(PHP_VERSION, '7.4.0', '>='),
     'PDO MySQL eklentisi' => extension_loaded('pdo_mysql'),
@@ -33,7 +33,7 @@ $gereksinimler = [
 ];
 $gereksinimTamam = !in_array(false, $gereksinimler, true);
 
-/* ---------- Adım 2: Veritabanı bağlantısı ---------- */
+/* ---------- Step 2: Database connection ---------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
     $dbHost = trim($_POST['db_host'] ?? 'localhost');
     $dbName = trim($_POST['db_name'] ?? '');
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
     }
 }
 
-/* ---------- Adım 3: Site + yönetici → kurulumu çalıştır ---------- */
+/* ---------- Step 3: Site + admin → run the installation ---------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
     if (empty($_SESSION['install_db'])) { header('Location: ?step=2'); exit; }
     $siteName   = trim($_POST['site_name'] ?? 'SADA One');
@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
     }
 }
 
-/* ---------- Şema + başlangıç verileri ---------- */
+/* ---------- Schema + seed data ---------- */
 function install_run(PDO $pdo, $siteName, $adminAd, $adminMail, $adminSifre) {
     $sql = <<<'SQL'
 CREATE TABLE IF NOT EXISTS settings (
@@ -668,19 +668,19 @@ CREATE TABLE IF NOT EXISTS notifications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 SQL;
 
-    // Tabloları tek tek çalıştır
+    // Run the table statements one by one
     foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
         if ($stmt !== '') $pdo->exec($stmt);
     }
 
     $now = date('Y-m-d H:i:s');
 
-    // Yönetici hesabı
+    // Admin account
     $st = $pdo->prepare("INSERT INTO users (name, email, password, role, job_title, theme, color, is_active, created) VALUES (?, ?, ?, 'yonetici', 'Kurucu', 'lime', '#b1fb01', 1, ?)");
     $st->execute([$adminAd, $adminMail, password_hash($adminSifre, PASSWORD_DEFAULT), $now]);
     $adminId = (int)$pdo->lastInsertId();
 
-    // Ayarlar
+    // Settings
     $settings = [
         'site_name' => $siteName,
         'default_theme' => 'lime',
@@ -695,7 +695,7 @@ SQL;
     $st = $pdo->prepare("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
     foreach ($settings as $k => $v) $st->execute([$k, $v]);
 
-    // Varsayılan akış şablonları
+    // Default workflow templates
     $workflows = [
         ['Sosyal Medya İçerik Üretimi', 'Aylık düzenli içerik üretim akışı', ['Brief & Konsept', 'Tasarım / Üretim', 'İç Onay', 'Müşteri Onayı', 'Yayın / Planlama']],
         ['Video Prodüksiyon', 'Çekim ve kurgu süreci', ['Senaryo & Plan', 'Çekim', 'Kurgu', 'İç Onay', 'Müşteri Onayı', 'Teslim']],
@@ -710,7 +710,7 @@ SQL;
         foreach ($a[2] as $i => $stepName) $stB->execute([$sid, $i + 1, $stepName]);
     }
 
-    // Hazır talep form şablonları
+    // Ready-made request form templates
     $forms = [
         ['Yeni İş Talebi', 'Yeni bir iş veya proje talebi iletin', [
             ['Talep konusu', 'metin', null], ['Detaylı açıklama', 'uzun_metin', null],
@@ -736,11 +736,11 @@ SQL;
         foreach ($f[2] as $i => $field) $stFa->execute([$fid, $i + 1, $field[0], $field[1], $field[2]]);
     }
 
-    // Merkezi migrasyon: sonradan eklenen tüm şema değişikliklerini uygula
+    // Central migration: apply all schema changes added later
     require_once dirname(__DIR__) . '/includes/migration.php';
     run_migrations($pdo);
 
-    // Genel kanal + yöneticiyi üye yap
+    // General channel + make the admin a member
     $pdo->prepare("INSERT INTO channels (name, type, created) VALUES ('Genel', 'genel', ?)")->execute([$now]);
     $channelId = (int)$pdo->lastInsertId();
     $pdo->prepare("INSERT INTO channel_members (channel_id, user_id) VALUES (?, ?)")->execute([$channelId, $adminId]);

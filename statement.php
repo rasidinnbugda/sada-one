@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Cari Hesap Ekstresi (yazdırılabilir)
- * Dosya bazlı fatura/tahsilat dökümü + yürüyen bakiye.
+ * SADA One — Account Statement (printable)
+ * Per-client invoice/collection breakdown + running balance.
  */
 require __DIR__ . '/includes/init.php';
 require_permission('finans');

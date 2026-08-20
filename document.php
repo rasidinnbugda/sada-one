@@ -1,6 +1,6 @@
 <?php
 /**
- * SADA One — Teklif / Fatura Belgesi (yazdırılabilir)
+ * SADA One — Quote / Invoice Document (printable)
  */
 require __DIR__ . '/includes/init.php';
 require_permission('finans');

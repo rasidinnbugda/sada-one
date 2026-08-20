@@ -1,21 +1,21 @@
 <?php
 /**
- * SADA One — Paylaşımlı görsel bileşenler
- * Birden fazla sayfada kullanılan render fonksiyonları.
+ * SADA One — Shared visual components
+ * Render functions used across multiple pages.
  */
 
-/** Kanban panosu render eder */
+/** Renders the kanban board */
 function task_kanban(array $tasks, int $projectId = 0): void {
     $colors = ['yapilacak' => 'var(--muted)', 'devam' => 'var(--info)', 'incelemede' => 'var(--warning)', 'onayda' => '#a58bf0', 'tamamlandi' => 'var(--basari)'];
 ?>
 <div class="kanban">
-    <?php foreach (GOREV_DURUMLARI as $status => $tag):
+    <?php foreach (TASK_STATUSES as $status => $tag):
         $grup = array_filter($tasks, fn($g) => $g['status'] === $status); ?>
     <div class="kanban-sutun" data-status="<?= $status ?>">
         <div class="kanban-sutun-ust"><span class="kanban-nokta" style="background:<?= $colors[$status] ?>"></span><span class="kanban-baslik"><?= $tag ?></span><span class="kanban-sayi"><?= count($grup) ?></span></div>
         <div class="kanban-liste">
             <?php foreach ($grup as $gr):
-                // Kilitli mi? (bağımlı görev bitmemiş ve yönetici kilidi açmamış)
+                // Locked? (dependency task unfinished and no admin has bypassed the lock)
                 $locked = !empty($gr['bagimli_status']) && $gr['bagimli_status'] !== 'tamamlandi' && empty($gr['lock_bypassed']);
                 $surukle = is_staff() ? 'draggable="true"' : ''; ?>
             <div class="kanban-kart <?= $locked ? 'kilitli' : '' ?>" <?= $surukle ?> data-task="<?= $gr['id'] ?>" data-status="<?= $status ?>" <?= $locked && !empty($gr['bagimli_title']) ? 'title="Kilitli — bağlı olduğu görev: ' . e($gr['bagimli_title']) . '"' : '' ?> onclick="if(!event.defaultPrevented)location.href='task.php?id=<?= $gr['id'] ?>'">
@@ -23,8 +23,8 @@ function task_kanban(array $tasks, int $projectId = 0): void {
                 <?php if (!empty($gr['project_name'])): ?><div class="kanban-etiket" style="margin-bottom:6px"><span class="etiket-nokta" style="width:7px;height:7px;background:<?= e($gr['client_color'] ?? 'var(--marka)') ?>"></span><?= e($gr['project_name']) ?></div><?php endif; ?>
                 <?php if (!empty($gr['tags'])): ?><div class="satir-esnek sarma" style="gap:4px;margin-bottom:7px"><?= tag_chips($gr['tags']) ?></div><?php endif; ?>
                 <div class="kanban-kart-meta">
-                    <?php if ($gr['priority'] !== 'normal'): ?><?= badge($gr['priority'], ONCELIKLER) ?><?php endif; ?>
-                    <?php if (!empty($gr['repeat']) && $gr['repeat'] !== 'yok'): ?><span class="kanban-etiket" title="<?= TEKRARLAR[$gr['repeat']] ?>"><?= icon('repeat', 12) ?></span><?php endif; ?>
+                    <?php if ($gr['priority'] !== 'normal'): ?><?= badge($gr['priority'], PRIORITIES) ?><?php endif; ?>
+                    <?php if (!empty($gr['repeat']) && $gr['repeat'] !== 'yok'): ?><span class="kanban-etiket" title="<?= REPEAT_OPTIONS[$gr['repeat']] ?>"><?= icon('repeat', 12) ?></span><?php endif; ?>
                     <?php if ($gr['due_date']): $overdue = $gr['due_date'] < date('Y-m-d') && $status !== 'tamamlandi'; ?><span class="kanban-etiket" style="<?= $overdue ? 'color:var(--tehlike)' : '' ?>"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><?= date('j.n', strtotime($gr['due_date'])) ?></span><?php endif; ?>
                     <?php if (!empty($gr['check_total'])): ?><span class="kanban-etiket" style="<?= $gr['check_is_done'] == $gr['check_total'] ? 'color:var(--basari)' : '' ?>"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2m-6 9l2 2 4-4"/></svg><?= $gr['check_is_done'] ?>/<?= $gr['check_total'] ?></span><?php endif; ?>
                 </div>
@@ -37,7 +37,7 @@ function task_kanban(array $tasks, int $projectId = 0): void {
 </div>
 <?php }
 
-/** Görev ekleme modalı render eder */
+/** Renders the task creation modal */
 function task_modal(int $projectId, array $team, array $templates, array $periods = []): void {
 ?>
 <div class="modal-katman" id="modalTask">
@@ -62,7 +62,7 @@ function task_modal(int $projectId, array $team, array $templates, array $period
                 </div>
             </div>
             <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Öncelik</label><select name="priority" class="secim"><?php foreach (ONCELIKLER as $k => $v): ?><option value="<?= $k ?>" <?= $k === 'normal' ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-grup"><label class="form-etiket">Öncelik</label><select name="priority" class="secim"><?php foreach (PRIORITIES as $k => $v): ?><option value="<?= $k ?>" <?= $k === 'normal' ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
                 <?php if ($periods): ?><div class="form-grup"><label class="form-etiket">Dönem</label><select name="period_id" class="secim"><option value="">—</option><?php foreach ($periods as $d): ?><option value="<?= $d['id'] ?>"><?= period_name($d) ?></option><?php endforeach; ?></select></div><?php endif; ?>
             </div>
             <div class="form-satir">
@@ -74,7 +74,7 @@ function task_modal(int $projectId, array $team, array $templates, array $period
                 <div class="form-grup"><label class="form-etiket">Etiketler</label><input name="tags" class="girdi" placeholder="video, instagram (virgülle)"></div>
             </div>
             <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Tekrar</label><select name="repeat" class="secim"><?php foreach (TEKRARLAR as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select><div class="form-ipucu">Her hafta/ay başında taze kopyası oluşturulur.</div></div>
+                <div class="form-grup"><label class="form-etiket">Tekrar</label><select name="repeat" class="secim"><?php foreach (REPEAT_OPTIONS as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select><div class="form-ipucu">Her hafta/ay başında taze kopyası oluşturulur.</div></div>
                 <?php if ($projectId): $projectTasks = rows("SELECT id, title FROM tasks WHERE project_id=? AND status!='tamamlandi' ORDER BY title", [$projectId]); ?>
                 <div class="form-grup"><label class="form-etiket">Bağlı Olduğu Görev</label><select name="bagimli_id" class="secim"><option value="">— Bağımsız</option><?php foreach ($projectTasks as $pg): ?><option value="<?= $pg['id'] ?>"><?= e($pg['title']) ?></option><?php endforeach; ?></select><div class="form-ipucu">Seçilen görev bitmeden bu görev ilerleyemez.</div></div>
                 <?php endif; ?>
@@ -92,7 +92,7 @@ function task_modal(int $projectId, array $team, array $templates, array $period
                 </select>
                 <div class="form-satir mt-2" id="yeniIcerikAlan-<?= $projectId ?>" style="display:none">
                     <div><label class="form-etiket">Yayın Tarihi</label><input type="date" name="content_date" class="girdi"></div>
-                    <div><label class="form-etiket">Platform</label><select name="content_platform" class="secim"><?php foreach (PLATFORMLAR as $pk => $pv): ?><option value="<?= $pk ?>"><?= $pv ?></option><?php endforeach; ?></select></div>
+                    <div><label class="form-etiket">Platform</label><select name="content_platform" class="secim"><?php foreach (PLATFORMS as $pk => $pv): ?><option value="<?= $pk ?>"><?= $pv ?></option><?php endforeach; ?></select></div>
                 </div>
                 <div class="form-ipucu">Görev tamamlanınca içerik onaylanır; içerik yayınlanınca görev tamamlanır.</div>
             </div>
@@ -103,7 +103,7 @@ function task_modal(int $projectId, array $team, array $templates, array $period
 </div>
 <?php }
 
-/** Çoklu üye seçici: checkbox listesi + gizli JSON alanı (app.js otomatik serileştirir) */
+/** Multi-member picker: checkbox list + hidden JSON field (app.js serializes automatically) */
 function member_picker(array $selectedIds = [], string $tag = 'Atanan Ekip Üyeleri'): void {
     $team = rows("SELECT id, name, color, avatar FROM users WHERE role IN ('yonetici','pm','ekip','finans') AND is_active=1 ORDER BY name");
 ?>
@@ -121,7 +121,7 @@ function member_picker(array $selectedIds = [], string $tag = 'Atanan Ekip Üyel
 </div>
 <?php }
 
-/** Üye avatarlarını üst üste dizerek gösterir */
+/** Shows member avatars stacked on top of each other */
 function member_avatars(array $members, int $size = 28): string {
     if (!$members) return '';
     $h = '<span class="avatar-dizi">';
@@ -130,7 +130,7 @@ function member_avatars(array $members, int $size = 28): string {
     return $h . '</span>';
 }
 
-/** Müşteri puanlama modalı + JS (sayfada bir kez basılır) */
+/** Customer rating modal + JS (printed once per page) */
 function rating_modal(): void {
     static $basildi = false;
     if ($basildi || !is_customer()) return;
@@ -160,19 +160,19 @@ function ratingGive(refType, refId, title) {
 }
 function ratingSec(n) {
     document.getElementById('p_rating').value = n;
-    document.querySelectorAll('#puanYildizlar span').forEach(s => {
+    document.querySelectorAll('#ratingStars span').forEach(s => {
         s.style.opacity = parseInt(s.dataset.rating) <= n ? '1' : '.25';
         s.style.color = parseInt(s.dataset.rating) <= n ? 'var(--warning)' : 'inherit';
     });
 }
-document.querySelectorAll('#puanYildizlar span').forEach(s => {
+document.querySelectorAll('#ratingStars span').forEach(s => {
     s.addEventListener('click', () => ratingSec(parseInt(s.dataset.rating)));
     s.addEventListener('mouseenter', () => ratingSec(parseInt(s.dataset.rating)));
 });
 </script>
 <?php }
 
-/** Etiketlenebilir kişi listesini sayfaya bir kez gömer (mention autocomplete için) */
+/** Embeds the mentionable user list once per page (for mention autocomplete) */
 function mention_script(): void {
     static $basildi = false;
     if ($basildi) return;
@@ -183,7 +183,7 @@ function mention_script(): void {
     echo '<script>window.sadaKisiler = ' . json_encode($people, JSON_UNESCAPED_UNICODE) . ';</script>';
 }
 
-/** Tek bir yorumu render eder (kök veya yanıt) */
+/** Renders a single comment (root or reply) */
 function comment_show(array $y, array $reactions, bool $answer = false): void {
     $u = user();
     $benimki = $y['user_id'] == $u['id'];
@@ -208,7 +208,7 @@ function comment_show(array $y, array $reactions, bool $answer = false): void {
             </div>
             <?php endif; ?>
             <div class="satir-esnek sarma mt-1" style="gap:6px">
-                <!-- Tepkiler -->
+                <!-- Reactions -->
                 <?php foreach ($yTepkiler as $emoji => $info): ?>
                 <button class="tepki-cip <?= in_array($u['id'], $info['ids']) ? 'benim' : '' ?>" data-comment_box="<?= $y['id'] ?>" data-emoji="<?= e($emoji) ?>" onclick="tepki(<?= $y['id'] ?>,'<?= e($emoji) ?>')" title="<?= e(implode(', ', $info['names'])) ?>"><?= e($emoji) ?> <span class="tepki-adet"><?= count($info['ids']) ?></span></button>
                 <?php endforeach; ?>
@@ -229,11 +229,11 @@ function comment_show(array $y, array $reactions, bool $answer = false): void {
 </div>
 <?php }
 
-/** Yorum akışı: thread + tepki + dosya + mention destekli */
+/** Comment stream: supports threads + reactions + files + mentions */
 function comment_feed(string $refType, int $refId): void {
     mention_script();
     $comments = rows("SELECT y.*, u.name, u.color, u.avatar FROM comments y JOIN users u ON u.id=y.user_id WHERE y.ref_type=? AND y.ref_id=? ORDER BY y.id", [$refType, $refId]);
-    // Tepkileri topla
+    // Collect reactions
     $reactions = [];
     if ($comments) {
         $ids = implode(',', array_map(fn($y) => (int)$y['id'], $comments));
@@ -251,7 +251,7 @@ function comment_feed(string $refType, int $refId): void {
     <div>
         <?php comment_show($y, $reactions); ?>
         <?php foreach ($yanitlar[$y['id']] ?? [] as $yy): comment_show($yy, $reactions, true); endforeach; ?>
-        <!-- Yanıt formu (gizli) -->
+        <!-- Reply form (hidden) -->
         <form data-ajax="comment_box_add" class="yorum-yanit mention-kap gizli mt-1" id="yanitForm-<?= $y['id'] ?>" style="display:flex;gap:8px;align-items:flex-end">
             <input type="hidden" name="ref_type" value="<?= e($refType) ?>"><input type="hidden" name="ref_id" value="<?= $refId ?>">
             <input type="hidden" name="parent_id" value="<?= $y['id'] ?>"><input type="hidden" name="mention_ids" class="mention-idler">
@@ -277,7 +277,7 @@ function answerOpen(id) { const f = document.getElementById('answerForm-' + id);
 async function reaction(commentId, emoji) {
     const j = await api('reaction_toggle', { comment_box_id: commentId, emoji });
     if (!j.ok) return;
-    // Yenilemesiz: mevcut çipi güncelle / oluştype / kaldır
+    // Without refresh: update / create / remove the existing chip
     let chip = document.querySelector(`.tepki-cip[data-yorum="${commentId}"][data-emoji="${CSS.escape(emoji)}"]`);
     if (j.adet === 0) { if (chip) chip.remove(); }
     else if (chip) {

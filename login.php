@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !hash_equals($_SESSION['csrf'] ?? '
     $password = $_POST['password'] ?? '';
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
 
-    // Brute-force koruması: son 15 dakikada 5+ başarısız deneme → kilit
+    // Brute-force protection: 5+ failed attempts in the last 15 minutes → lockout
     $attempt = (int)val("SELECT COUNT(*) FROM login_attempts WHERE (email=? OR ip=?) AND is_success=0 AND created > DATE_SUB(NOW(), INTERVAL 15 MINUTE)", [$email, $ip]);
     if ($attempt >= 5) {
         $error = 'Çok fazla başarısız deneme. Güvenlik için 15 dakika bekleyin.';
@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !hash_equals($_SESSION['csrf'] ?? '
             exit;
         }
         insert('login_attempts', ['email' => $email, 'ip' => $ip, 'is_success' => 0, 'created' => date('Y-m-d H:i:s')]);
-        // 5. başarısız denemede yöneticilere haber ver
+        // Notify admins on the 5th failed attempt
         if ($attempt === 4) {
             foreach (rows("SELECT id FROM users WHERE role='yonetici' AND is_active=1") as $yon) {
                 q("INSERT INTO notifications (user_id, title, message, link, is_read, created) VALUES (?,?,?,?,0,NOW())",
@@ -51,13 +51,13 @@ $siteName = setting('site_adi', 'SADA One');
 <title>Giriş — <?= e($siteName) ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/app.css?v=<?= SURUM ?>">
-<?php if (setting('site_favicon')): ?><link rel="icon" href="uploads/<?= e(setting('site_favicon')) ?>"><?php endif; ?>
+<link rel="stylesheet" href="assets/css/app.css?v=<?= APP_VERSION ?>">
+<?php if (theme_favicon()): ?><link rel="icon" href="uploads/<?= e(theme_favicon()) ?>"><?php endif; ?>
 </head>
 <body class="giris-govde">
 <div class="giris-kutu">
-    <?php if (setting('site_logo')): ?>
-    <div style="text-align:center;margin-bottom:6px"><img src="uploads/<?= e(setting('site_logo')) ?>" alt="<?= e($siteName) ?>" style="max-height:64px;max-width:240px;object-fit:contain"></div>
+    <?php if (theme_logo()): ?>
+    <div style="text-align:center;margin-bottom:6px"><img src="uploads/<?= e(theme_logo()) ?>" alt="<?= e($siteName) ?>" style="max-height:64px;max-width:240px;object-fit:contain"></div>
     <?php else: ?>
     <div class="giris-logo">SADA<span>.</span></div>
     <?php endif; ?>

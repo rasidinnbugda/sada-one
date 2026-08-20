@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Fikir Panosu
- * Ekip üyelerinin birbirine içerik fikri önerdiği pano: fikir · uyarlanabilecek kurum · açıklama
+ * SADA One — Idea Board
+ * Board where team members suggest content ideas to each other: idea · adaptable organization · description
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -34,7 +34,7 @@ page_start('Fikir Panosu', 'ideas');
             <span class="rozet <?= $fSinif ?>"><?= $fEtiket ?></span>
             <div class="satir-esnek" style="gap:4px">
                 <?php if ($can_manage && $f['status'] !== 'uygulandi'): ?>
-                <button class="mini-btn" title="Durum ilerlet" onclick="fikirIlerlet(<?= $f['id'] ?>, '<?= $f['status'] === 'yeni' ? 'begenildi' : 'uygulandi' ?>')"><?= $f['status'] === 'yeni' ? '👍 Beğen' : '✅ Uygulandı' ?></button>
+                <button class="mini-btn" title="Durum ilerlet" onclick="ideaIlerlet(<?= $f['id'] ?>, '<?= $f['status'] === 'yeni' ? 'begenildi' : 'uygulandi' ?>')"><?= $f['status'] === 'yeni' ? '👍 Beğen' : '✅ Uygulandı' ?></button>
                 <?php endif; ?>
                 <?php if (is_admin() || $f['proposer_id'] == $u['id']): ?>
                 <button class="ikon-eylem tehlike" style="width:26px;height:26px" data-action="idea_delete" data-id="<?= $f['id'] ?>" data-approval="Fikir silinsin mi?"><?= icon('cop', 13) ?></button>

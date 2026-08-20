@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Toplantı Takvimi
- * Katılımcı seçimi, online toplantı linki ve hatırlatma bildirimli toplantı yönetimi.
+ * SADA One — Meeting Calendar
+ * Meeting management with participant selection, online meeting link, and reminder notifications.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -17,13 +17,13 @@ $meetings = rows("SELECT e.*, p.name project_name, us.name creator_name FROM eve
     LEFT JOIN projects p ON p.id=e.project_id LEFT JOIN users us ON us.id=e.created_by
     WHERE e.type='toplanti' AND DATE(e.start) BETWEEN ? AND ? ORDER BY e.start", [$monthInitial, $monthLast]);
 
-// Katılımcıları yükle
+// Load participants
 foreach ($meetings as &$t) {
     $t['participant_list'] = rows("SELECT us.id, us.name, us.color, us.avatar FROM event_participants ek JOIN users us ON us.id=ek.user_id WHERE ek.event_id=? ORDER BY us.name", [$t['id']]);
 }
 unset($t);
 
-// Güne grupla
+// Group by day
 $days = [];
 foreach ($meetings as $t) $days[substr($t['start'], 0, 10)][] = $t;
 
@@ -41,7 +41,7 @@ page_start('Toplantı Takvimi', 'meetings');
 <div class="takvim-baslik-bar">
     <div class="satir-esnek" style="gap:8px">
         <a href="?month=<?= $month - 1 ?>&year=<?= $year ?>" class="ikon-eylem"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></a>
-        <div class="takvim-ay-ad"><?= AYLAR[$month] ?> <?= $year ?></div>
+        <div class="takvim-ay-ad"><?= MONTHS[$month] ?> <?= $year ?></div>
         <a href="?month=<?= $month + 1 ?>&year=<?= $year ?>" class="ikon-eylem"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></a>
     </div>
     <a href="?month=<?= date('n') ?>&year=<?= date('Y') ?>" class="btn btn-sm">Bu Ay</a>
@@ -58,7 +58,7 @@ page_start('Toplantı Takvimi', 'meetings');
     $todayMu = $dayDate === date('Y-m-d');
     $history = $dayDate < date('Y-m-d'); ?>
 <div class="nav-bolum" style="padding:16px 0 8px;<?= $todayMu ? 'color:var(--marka)' : '' ?>">
-    <?= $todayMu ? 'BUGÜN — ' : '' ?><?= GUNLER[(int)date('N', strtotime($dayDate)) - 1] ?>, <?= format_date($dayDate) ?>
+    <?= $todayMu ? 'BUGÜN — ' : '' ?><?= DAYS[(int)date('N', strtotime($dayDate)) - 1] ?>, <?= format_date($dayDate) ?>
 </div>
 <div class="izgara izgara-2">
     <?php foreach ($gunToplantilari as $t):
@@ -96,7 +96,7 @@ page_start('Toplantı Takvimi', 'meetings');
 </div>
 <?php endforeach; endif; ?>
 
-<!-- Toplantı planla -->
+<!-- Schedule meeting -->
 <div class="modal-katman" id="modalMeeting">
     <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Toplantı Planla</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="event_save" data-refresh="evet" id="meetingForm">
@@ -136,7 +136,7 @@ page_start('Toplantı Takvimi', 'meetings');
 document.getElementById('meetingForm').addEventListener('submit', () => {
     document.getElementById('t_participants').value = JSON.stringify(Array.from(document.querySelectorAll('.participant-box:checked')).map(c => c.value));
 });
-// Proje seçilince dosyası otomatik dolsun
+// Auto-fill the client when a project is selected
 document.getElementById('tp_project').addEventListener('change', function () {
     const client = this.selectedOptions[0]?.dataset.client;
     if (client) document.getElementById('tp_client').value = client;

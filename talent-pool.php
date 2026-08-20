@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Çalışan Havuzu
- * Birlikte çalışılan veya bilgisi elimizde olan serbest çalışanlar: kişi · yetkinlik · çalışıldı mı · CV
+ * SADA One — Talent Pool
+ * Freelancers we have worked with or have on record: person · skill · worked before · CV
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -40,7 +40,7 @@ page_start('Çalışan Havuzu', 'pool');
     <thead><tr><th>Kişi</th><th>Yetkinlik</th><th>Daha Önce Çalışıldı mı?</th><th>İletişim</th><th>CV</th><th>Not</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($people as $k): ?>
-    <tr data-filtre="<?= $k['worked_before'] ?>">
+    <tr data-filter="<?= $k['worked_before'] ?>">
         <td><div class="hucre-ana"><?= e($k['name']) ?></div></td>
         <td class="kucuk"><?= e($k['skill'] ?: '—') ?></td>
         <td><?= $k['worked_before'] ? '<span class="rozet r-tamamlandi">Evet</span>' : '<span class="rozet r-bekliyor">Hayır</span>' ?></td>
@@ -77,7 +77,7 @@ page_start('Çalışan Havuzu', 'pool');
 
 <script>
 function hYeni() {
-    const f = document.querySelector('#modalHavuz form');
+    const f = document.querySelector('#modalPool form');
     f.reset(); document.getElementById('h_id').value = '';
     document.getElementById('hBaslik').textContent = 'Havuza Kişi Ekle';
     document.getElementById('h_cvBilgi').textContent = '';

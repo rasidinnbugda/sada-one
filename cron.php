@@ -1,13 +1,13 @@
 <?php
 /**
- * SADA One — Opsiyonel gerçek cron ucu
- * Sistem, tekrarlayan görevleri sayfa yüklenirken otomatik kontrol eder (kurulum gerektirmez).
- * Daha hassas zamanlama isterseniz Hostinger hPanel → Gelişmiş → Cron İşleri bölümünden
- * bu adresi saatlik çağırın:  php /home/uXXXX/public_html/cron.php  veya  curl -s "https://siteniz.com/cron.php?anahtar=SITE_ADINIZ"
+ * SADA One — Optional real cron endpoint
+ * The system checks recurring tasks automatically on page load (no setup required).
+ * For more precise scheduling, call this URL hourly from Hostinger hPanel → Advanced → Cron Jobs:
+ * php /home/uXXXX/public_html/cron.php  or  curl -s "https://siteniz.com/cron.php?anahtar=SITE_ADINIZ"
  */
 require __DIR__ . '/includes/init.php';
 
-// Basit koruma: ?anahtar= parametresi site adıyla eşleşmeli (CLI'dan çağrılırsa kontrol yok)
+// Simple protection: the ?anahtar= parameter must match the site name (no check when called from CLI)
 if (php_sapi_name() !== 'cli') {
     $setting_key = $_GET['setting_key'] ?? '';
     if ($setting_key !== setting('site_adi', 'SADA One')) {
@@ -18,7 +18,7 @@ if (php_sapi_name() !== 'cli') {
 
 $count = run_recurring_jobs(true);
 
-// Vadesi geçen "bekliyor" finans kayıtlarını "gecikti" yap
+// Mark overdue "bekliyor" (pending) finance records as "gecikti" (late)
 q("UPDATE payments SET status='gecikti' WHERE status='bekliyor' AND date < CURDATE()");
 
 header('Content-Type: application/json; charset=utf-8');

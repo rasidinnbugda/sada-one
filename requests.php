@@ -11,7 +11,7 @@ if (is_staff()) {
     $requests = rows("SELECT t.*, f.name form_name, ug.name sender_name, p.name project_name FROM requests t JOIN form_templates f ON f.id=t.template_id LEFT JOIN users ug ON ug.id=t.sender_id LEFT JOIN projects p ON p.id=t.project_id WHERE t.sender_id=? ORDER BY t.id DESC", [$u['id']]);
 }
 
-// Müşteri için proje listesi (talep formunda seçmek üzere)
+// Project list for the customer (to pick in the request form)
 $customerProjects = [];
 if (is_customer()) {
     [$mdIn, $mdP] = in_clause(customer_client_ids());
@@ -30,7 +30,7 @@ page_start('Talepler', 'requests');
 <div class="filtre-bar">
     <div class="pill-filtre" data-pill-grup="#talepListe .talep-sat">
         <button class="pill aktif" data-setting_value="">Tümü</button>
-        <?php foreach (TALEP_DURUMLARI as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
+        <?php foreach (REQUEST_STATUSES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>
 </div>
 <?php endif; ?>
@@ -40,21 +40,21 @@ page_start('Talepler', 'requests');
 <?php else: ?>
 <div class="tablo-sar"><table class="tablo" id="requestList"><thead><tr><th>Talep</th><?php if (is_staff()): ?><th>Gönderen</th><th>Dosya/Proje</th><?php endif; ?><th>Tarih</th><th>Durum</th><th></th></tr></thead><tbody>
     <?php foreach ($requests as $t): ?>
-    <tr class="tik talep-sat" data-filtre="<?= $t['status'] ?>" onclick="location.href='request.php?id=<?= $t['id'] ?>'">
+    <tr class="tik talep-sat" data-filter="<?= $t['status'] ?>" onclick="location.href='request.php?id=<?= $t['id'] ?>'">
         <td><div class="hucre-ana"><?= e($t['title']) ?></div><div class="hucre-alt"><?= e($t['form_name']) ?></div></td>
         <?php if (is_staff()): ?>
         <td><?= e($t['sender_name']) ?></td>
         <td class="kucuk"><?= e($t['client_name'] ?? '—') ?><?= $t['project_name'] ? ' / ' . e($t['project_name']) : '' ?></td>
         <?php endif; ?>
         <td class="kucuk"><?= format_date($t['created']) ?></td>
-        <td><?= badge($t['status'], TALEP_DURUMLARI) ?></td>
+        <td><?= badge($t['status'], REQUEST_STATUSES) ?></td>
         <td><svg width="16" fill="none" stroke="var(--muted)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></td>
     </tr>
     <?php endforeach; ?>
 </tbody></table></div>
 <?php endif; ?>
 
-<!-- Yeni talep modalı: form tipi seç → alanları doldur -->
+<!-- New request modal: pick form type → fill in the fields -->
 <div class="modal-katman" id="modalNewRequest">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Talep</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <div class="modal-govde">

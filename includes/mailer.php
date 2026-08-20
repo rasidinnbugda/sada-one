@@ -1,8 +1,8 @@
 <?php
 /**
- * SADA One — E-posta gönderimi
- * SMTP (SSL) üzerinden gönderir; SMTP kapalıysa PHP mail() kullanır.
- * Hostinger için: smtp.hostinger.com, port 465 (SSL).
+ * SADA One — Email sending
+ * Sends via SMTP (SSL); falls back to PHP mail() when SMTP is disabled.
+ * For Hostinger: smtp.hostinger.com, port 465 (SSL).
  */
 
 function send_email(string $alici, string $topic, string $text): bool {
@@ -19,7 +19,7 @@ function send_email(string $alici, string $topic, string $text): bool {
         . htmlspecialchars($siteName) . ' Yönetim Sistemi — bu e-posta otomatik gönderilmiştir.</div></div>';
 
     if (setting('smtp_aktif') !== '1' || !setting('smtp_host') || !$sender) {
-        // mail() ile dene
+        // Try with mail()
         $basliklar = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n";
         if ($sender) $basliklar .= "From: $siteName <$sender>\r\n";
         return @mail($alici, '=?UTF-8?B?' . base64_encode($topic) . '?=', $html, $basliklar);

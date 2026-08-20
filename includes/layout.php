@@ -1,12 +1,12 @@
 <?php
 /**
- * SADA One — Sayfa düzeni (kenar çubuğu + üst bar)
+ * SADA One — Page layout (sidebar + top bar)
  */
 
 function page_start(string $title, string $activePage = ''): void {
     $u = user();
-    if ($u && is_staff()) { try { run_recurring_jobs(); } catch (Throwable $e) { /* sessiz */ } }
-    $theme = isset(TEMALAR[$u['theme'] ?? '']) ? $u['theme'] : setting('varsayilan_tema', 'lime');
+    if ($u && is_staff()) { try { run_recurring_jobs(); } catch (Throwable $e) { /* silent */ } }
+    $theme = isset(THEMES[$u['theme'] ?? '']) ? $u['theme'] : setting('varsayilan_tema', 'lime');
     $siteName = setting('site_adi', 'SADA One');
     $notificationCount = $u ? (int)val("SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0", [$u['id']]) : 0;
 
@@ -20,7 +20,7 @@ function page_start(string $title, string $activePage = ''): void {
             ['projects.php', 'projects', 'Projeler', 'M9 12h6m-6 4h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z'],
             ['tasks.php', 'tasks', 'Görevler', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'],
         ];
-        // Gruplar: [anahtar, etiket, ikon, öğeler]
+        // Groups: [key, label, icon, items]
         $navGruplar[] = ['calendars', 'Takvimler', 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', [
             ['calendar.php', 'calendar', 'Prodüksiyon', 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z'],
             ['content-calendar.php', 'content', 'İçerik', 'M7 4v16M17 4v16M3 8h18M3 16h18M3 4h18v16H3z'],
@@ -45,7 +45,7 @@ function page_start(string $title, string $activePage = ''): void {
         if (permission('finans')) $analizOgeler[] = ['finance.php', 'finance', 'Finans', 'M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8c1.66 0 3.07.5 3.6 1.2M12 8V6m0 12v-2m0 2c-1.66 0-3.07-.5-3.6-1.2M21 12a9 9 0 11-18 0 9 9 0 0118 0z'];
         if (permission('rapor')) $analizOgeler[] = ['reports.php', 'reports', 'Raporlar', 'M9 19v-6M15 19v-2M12 19v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z'];
         if ($analizOgeler) $navGruplar[] = ['analiz', 'Analiz', 'M9 19v-6M15 19v-2M12 19v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z', $analizOgeler];
-        // Operasyon: SOP modülleri (v14)
+        // Operations: SOP modules (v14)
         $opOgeler = [
             ['shoot-list.php', 'shoots', 'Çekim Listesi', 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z'],
             ['growth.php', 'growth', 'Gelişim & Mentörlük', 'M12 14l9-5-9-5-9 5 9 5zm0 0v6m-6-3.5V12m12 4.5V12'],
@@ -93,7 +93,7 @@ function page_start(string $title, string $activePage = ''): void {
 <title><?= e($title) ?> — <?= e($siteName) ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/app.css?v=<?= SURUM ?>">
+<link rel="stylesheet" href="assets/css/app.css?v=<?= APP_VERSION ?>">
 <script type="speculationrules">
 {"prerender": [{"where": {"and": [
     {"href_matches": "/*"},
@@ -103,15 +103,15 @@ function page_start(string $title, string $activePage = ''): void {
     {"not": {"href_matches": "/*install*"}}
 ]}, "eagerness": "moderate"}]}
 </script>
-<?php if (setting('site_favicon')): ?><link rel="icon" href="uploads/<?= e(setting('site_favicon')) ?>"><?php endif; ?>
+<?php if (theme_favicon()): ?><link rel="icon" href="uploads/<?= e(theme_favicon()) ?>"><?php endif; ?>
 </head>
 <body>
 <div class="sayfa-cubugu" id="pageCubugu"></div>
 <div class="uygulama">
     <aside class="kenar" id="sidebar">
         <div class="kenar-logo">
-            <?php if (setting('site_logo')): ?>
-            <a href="index.php" style="display:flex;align-items:center"><img src="uploads/<?= e(setting('site_logo')) ?>" alt="<?= e($siteName) ?>" style="max-height:40px;max-width:170px;object-fit:contain"></a>
+            <?php if (theme_logo()): ?>
+            <a href="index.php" style="display:flex;align-items:center"><img src="uploads/<?= e(theme_logo()) ?>" alt="<?= e($siteName) ?>" style="max-height:40px;max-width:170px;object-fit:contain"></a>
             <?php else: ?>
             <a href="index.php" class="logotip">SADA<span>.</span></a>
             <?php endif; ?>
@@ -119,7 +119,7 @@ function page_start(string $title, string $activePage = ''): void {
         </div>
         <nav class="kenar-nav">
             <?php
-            // Tek nav öğesi render eder (mesajlar rozetiyle)
+            // Renders a single nav item (with the messages badge)
             $navOgeWrite = function (array $n, bool $bottomOge = false) use ($activePage, $u) {
                 echo '<a href="' . $n[0] . '" class="nav-oge ' . ($bottomOge ? 'nav-alt-oge ' : '') . ($activePage === $n[1] ? 'aktif' : '') . '">';
                 echo '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="' . $n[3] . '"/></svg>';
@@ -132,7 +132,7 @@ function page_start(string $title, string $activePage = ''): void {
             };
             foreach ($nav as $n) $navOgeWrite($n);
 
-            // Açılır-kapanır gruplar
+            // Collapsible groups
             foreach ($navGruplar as $grup):
                 [$gAnahtar, $gEtiket, $gIkon, $gOgeler] = $grup;
                 $grupActive = in_array($activePage, array_column($gOgeler, 1)); ?>
@@ -216,7 +216,7 @@ function page_start(string $title, string $activePage = ''): void {
                         <svg viewBox="0 0 24 24" width="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div class="acilir-panel">
-                        <div class="acilir-baslik"><?= e(ROLLER[$u['role'] ?? 'team'] ?? '') ?></div>
+                        <div class="acilir-baslik"><?= e(ROLES[$u['role'] ?? 'team'] ?? '') ?></div>
                         <a href="profile.php" class="acilir-oge">Profil & Tema</a>
                         <a href="logout.php" class="acilir-oge tehlike">Çıkış Yap</a>
                     </div>
@@ -237,7 +237,7 @@ function page_end(): void {
     $dockTodos = rows("SELECT * FROM personal_todos WHERE user_id=? AND is_done=0 ORDER BY sort_order LIMIT 8", [$u['id']]);
     $dockNotes = rows("SELECT id, title, text FROM personal_notes WHERE user_id=? ORDER BY COALESCE(`update`, created) DESC LIMIT 5", [$u['id']]);
     $dockLinks = rows("SELECT * FROM personal_links WHERE user_id=? ORDER BY name LIMIT 8", [$u['id']]); ?>
-<!-- Kişisel dock -->
+<!-- Personal dock -->
 <button class="dock-btn" id="dockBtn" title="Kişisel alan" aria-label="Kişisel alan">
     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="22"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg>
 </button>
@@ -314,7 +314,7 @@ document.getElementById('dockScratchpad').addEventListener('input', function () 
         document.getElementById('dockScratchpadStatus').textContent = j.ok ? '✓ kaydedildi' : 'kaydedilemedi';
     }, 1200);
 });
-// ?create=1 → sayfanın oluşturma modalını aç
+// ?create=1 → open the page's create modal
 if (new URLSearchParams(location.search).get('create') === '1') {
     const target = ['modalTask', 'modalEvent', 'modalMeeting', 'modalContent', 'modalNot', 'modalAnnouncement'].find(m => document.getElementById(m));
     if (target) setTimeout(() => { if (target === 'modalNot' && typeof notSifirla === 'function') notSifirla(); modalOpen(target); }, 250);
@@ -323,7 +323,7 @@ if (new URLSearchParams(location.search).get('create') === '1') {
 <?php endif; ?>
 <div class="karartma" data-karartma></div>
 <div class="toast-alan" id="toastField"></div>
-<script src="assets/js/app.js?v=<?= SURUM ?>"></script>
+<script src="assets/js/app.js?v=<?= APP_VERSION ?>"></script>
 </body>
 </html>
 <?php

@@ -3,7 +3,7 @@ require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
 $u = require_permission('finans');
 
-// Kapasite verileri (bu hafta)
+// Capacity data (this week)
 $weekHead = date('Y-m-d', strtotime('monday this week'));
 $weekEnd = date('Y-m-d', strtotime('sunday this week'));
 $capacities = permission('kapasite') ? rows("SELECT us.id, us.name, us.color, us.avatar, us.job_title, us.weekly_capacity,
@@ -11,24 +11,24 @@ $capacities = permission('kapasite') ? rows("SELECT us.id, us.name, us.color, us
     (SELECT COUNT(*) FROM tasks g WHERE g.is_archived=0 AND g.status!='tamamlandi' AND (g.assignee_id=us.id OR EXISTS(SELECT 1 FROM task_assignees ga WHERE ga.task_id=g.id AND ga.user_id=us.id))) open_task
     FROM users us WHERE us.role IN ('yonetici','pm','ekip','finans') AND us.is_active=1 ORDER BY us.name", [$weekHead, $weekEnd]) : [];
 
-// Giderler
+// Expenses
 $expenses = rows("SELECT gd.*, us.name person_name FROM expenses gd LEFT JOIN users us ON us.id=gd.user_id ORDER BY gd.date DESC LIMIT 200");
 $expenseTotal = (float)val("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE status='odendi'");
 $expensePending = (float)val("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE status='bekliyor'");
 
-// Kâr/Zarar: son 6 ay
+// Profit/Loss: last 6 months
 $monthlyData = [];
 for ($i = 5; $i >= 0; $i--) {
     $monthKey = date('Y-m', strtotime("-$i months"));
     $monthlyData[] = [
-        'tag' => AYLAR[(int)date('n', strtotime("-$i months"))] . ' ' . date('y', strtotime("-$i months")),
+        'tag' => MONTHS[(int)date('n', strtotime("-$i months"))] . ' ' . date('y', strtotime("-$i months")),
         'gelir' => (float)val("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status='odendi' AND DATE_FORMAT(date,'%Y-%m')=?", [$monthKey]),
         'expense' => (float)val("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE status='odendi' AND DATE_FORMAT(date,'%Y-%m')=?", [$monthKey]),
     ];
 }
 $maxAmount = max(1, max(array_merge(array_column($monthlyData, 'gelir'), array_column($monthlyData, 'expense'))));
 
-// Teklif & Fatura belgeleri
+// Quote & invoice documents
 $documents = rows("SELECT b.*, d.name client_name FROM documents b LEFT JOIN clients d ON d.id=b.client_id ORDER BY b.id DESC LIMIT 100");
 foreach ($documents as &$bg) {
     $kls = json_decode($bg['items'], true) ?: [];
@@ -38,11 +38,11 @@ foreach ($documents as &$bg) {
 unset($bg);
 $tumClients = rows("SELECT id, name FROM clients WHERE status='aktif' ORDER BY name");
 
-// Bütçe hedefi + bu ay gerçekleşme
+// Budget target + this month's actuals
 $budgetTarget = (float)setting('budget_target', '0');
 $buMonthGelir = (float)val("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status='odendi' AND DATE_FORMAT(date,'%Y-%m')=?", [date('Y-m')]);
 
-// Nakit akış projeksiyonu: önümüzdeki 3 ay
+// Cash flow projection: next 3 months
 $projection = [];
 $monthlyContract = (float)val("SELECT COALESCE(SUM(contract_amount),0) FROM projects WHERE status='aktif' AND type='aylik'");
 $monthlySalary = (float)val("SELECT COALESCE(SUM(salary),0) FROM users WHERE is_active=1 AND salary>0");
@@ -53,17 +53,17 @@ for ($i = 1; $i <= 3; $i++) {
     $planliExpense = (float)val("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE status='bekliyor' AND `repeat`='yok' AND DATE_FORMAT(date,'%Y-%m')=?", [$monthKey]);
     $gelir = $monthlyContract + $pendingTahsilat;
     $expense = $monthlySalary + $monthlyRepeatExpense + $planliExpense;
-    $projection[] = ['tag' => AYLAR[(int)date('n', strtotime("+$i months"))] . ' ' . date('y', strtotime("+$i months")), 'gelir' => $gelir, 'expense' => $expense];
+    $projection[] = ['tag' => MONTHS[(int)date('n', strtotime("+$i months"))] . ' ' . date('y', strtotime("+$i months")), 'gelir' => $gelir, 'expense' => $expense];
 }
 $projMax = max(1, max(array_merge(array_column($projection, 'gelir'), array_column($projection, 'expense'))));
 
-// Cari hesap: dosya bazlı borç/alacak
+// Account balances: per-client debit/credit
 $cariler = rows("SELECT d.id, d.name, d.color,
     COALESCE((SELECT SUM(o.amount) FROM payments o JOIN projects p ON p.id=o.project_id WHERE p.client_id=d.id AND o.type='fatura'),0) borc,
     COALESCE((SELECT SUM(o.amount) FROM payments o JOIN projects p ON p.id=o.project_id WHERE p.client_id=d.id AND o.type='tahsilat' AND o.status='odendi'),0) tahsil
     FROM clients d HAVING borc>0 OR tahsil>0 ORDER BY (borc-tahsil) DESC");
 
-// Proje kârlılığı: sözleşme tutarı − işçilik maliyeti (kayıtlı süre × kişi saat maliyeti; saat maliyeti = maaş/172)
+// Project profitability: contract amount − labor cost (logged time × person's hourly cost; hourly cost = salary/172)
 $karlilik = rows("SELECT p.id, p.name, p.contract_amount, d.name client_name, d.color client_color,
     COALESCE((SELECT SUM(z.minutes/60 * (us.salary/172)) FROM time_entries z JOIN tasks g ON g.id=z.task_id JOIN users us ON us.id=z.user_id WHERE g.project_id=p.id AND us.salary>0), 0) iscilik
     FROM projects p JOIN clients d ON d.id=p.client_id WHERE p.status IN ('aktif','tamamlandi') AND p.contract_amount>0 ORDER BY p.contract_amount DESC LIMIT 20");
@@ -138,7 +138,7 @@ page_start('Finans', 'finance');
 <?php endif; ?>
 </div><!-- /sekme-kayitlar -->
 
-<!-- GİDERLER -->
+<!-- EXPENSES -->
 <div class="sekme-icerik" id="sekme-giderler">
     <div class="satir-esnek arasi mb-3 sarma" style="gap:10px">
         <div class="satir-esnek sarma" style="gap:14px">
@@ -154,7 +154,7 @@ page_start('Finans', 'finance');
         <?php foreach ($expenses as $gd): ?>
         <tr>
             <td class="hucre-ana"><?= e($gd['title']) ?><?php if ($gd['repeat'] === 'aylik'): ?> <span class="rozet rozet-tur" title="Her ay otomatik yinelenir"><?= icon('repeat', 11) ?> Aylık</span><?php endif; ?><?php if ($gd['description']): ?><div class="hucre-alt"><?= e($gd['description']) ?></div><?php endif; ?></td>
-            <td><span class="rozet"><?= GIDER_TURLERI[$gd['type']] ?></span></td>
+            <td><span class="rozet"><?= EXPENSE_TYPES[$gd['type']] ?></span></td>
             <td class="kalin" style="color:var(--tehlike)">−<?= money($gd['amount']) ?></td>
             <td class="kucuk"><?= format_date($gd['date']) ?></td>
             <td><select class="secim" style="padding:5px 28px 5px 10px;font-size:12px;width:auto" onchange="giderDurum(<?= $gd['id'] ?>,this.value)"><option value="bekliyor" <?= $gd['status'] === 'bekliyor' ? 'selected' : '' ?>>Bekliyor</option><option value="odendi" <?= $gd['status'] === 'odendi' ? 'selected' : '' ?>>Ödendi</option></select></td>
@@ -165,7 +165,7 @@ page_start('Finans', 'finance');
     <?php endif; ?>
 </div>
 
-<!-- TEKLİF & FATURA -->
+<!-- QUOTES & INVOICES -->
 <div class="sekme-icerik" id="sekme-belgeler">
     <div class="satir-esnek arasi mb-3">
         <div class="hucre-alt">Numaralı teklif/fatura belgeleri — yazdırıp PDF olarak müşteriye gönderin</div>
@@ -196,7 +196,7 @@ page_start('Finans', 'finance');
     <?php endif; ?>
 </div>
 
-<!-- CARİ HESAP -->
+<!-- ACCOUNT BALANCES -->
 <div class="sekme-icerik" id="sekme-cari">
     <div class="hucre-alt mb-3">Dosya bazında borç (kesilen faturalar) − tahsilat = güncel bakiye. Satıra tıklayarak yazdırılabilir ekstre alın.</div>
     <?php if (!$cariler): ?>
@@ -216,7 +216,7 @@ page_start('Finans', 'finance');
     <?php endif; ?>
 </div>
 
-<!-- KÂR / ZARAR -->
+<!-- PROFIT / LOSS -->
 <div class="sekme-icerik" id="sekme-karzarar">
     <?php
     $lastMonth = end($monthlyData);
@@ -247,7 +247,7 @@ page_start('Finans', 'finance');
             <span class="satir-esnek kucuk" style="gap:6px"><span class="etiket-nokta" style="background:var(--tehlike)"></span>Gider</span>
         </div>
     </div>
-    <!-- Bütçe hedefi -->
+    <!-- Budget target -->
     <div class="kart mb-3">
         <div class="satir-esnek arasi sarma mb-2" style="gap:10px">
             <div class="kart-baslik">Aylık Gelir Hedefi</div>
@@ -257,12 +257,12 @@ page_start('Finans', 'finance');
             </form>
         </div>
         <?php if ($budgetTarget > 0): $targetRate = min(100, round($buMonthGelir / $budgetTarget * 100)); ?>
-        <div class="satir-esnek arasi mb-2"><span class="kucuk"><?= AYLAR[(int)date('n')] ?> gerçekleşme: <b><?= money($buMonthGelir) ?></b> / <?= money($budgetTarget) ?></span><span class="kalin" style="color:<?= $targetRate >= 100 ? 'var(--basari)' : 'var(--text)' ?>">%<?= round($buMonthGelir / $budgetTarget * 100) ?></span></div>
+        <div class="satir-esnek arasi mb-2"><span class="kucuk"><?= MONTHS[(int)date('n')] ?> gerçekleşme: <b><?= money($buMonthGelir) ?></b> / <?= money($budgetTarget) ?></span><span class="kalin" style="color:<?= $targetRate >= 100 ? 'var(--basari)' : 'var(--text)' ?>">%<?= round($buMonthGelir / $budgetTarget * 100) ?></span></div>
         <div class="ilerleme" style="height:10px"><div class="ilerleme-dolu <?= $targetRate >= 100 ? '' : ($targetRate >= 70 ? '' : 'yogun') ?>" data-rate="<?= $targetRate ?>" style="width:0;<?= $targetRate >= 100 ? 'background:var(--basari)' : '' ?>"></div></div>
         <?php else: ?><div class="hucre-alt">Hedef girin — bu ayın tahsilatları hedefe oranla izlenir.</div><?php endif; ?>
     </div>
 
-    <!-- Nakit akış projeksiyonu -->
+    <!-- Cash flow projection -->
     <div class="kart mb-3">
         <div class="kart-baslik mb-2">Nakit Akış Projeksiyonu — önümüzdeki 3 ay</div>
         <div class="hucre-alt mb-3">Beklenen gelir = aktif aylık sözleşmeler + planlanan tahsilatlar · Gider = maaşlar + tekrarlayan ve planlı giderler</div>
@@ -355,14 +355,14 @@ page_start('Finans', 'finance');
         <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
-<!-- Gider ekleme modalı -->
+<!-- Add expense modal -->
 <div class="modal-katman" id="modalExpense">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Gider Kaydı</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="expense_save">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Başlık <span class="zorunlu">*</span></label><input name="title" class="girdi" required placeholder="Örn. Ofis kirası"></div>
             <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" class="secim"><?php foreach (GIDER_TURLERI as $k => $v): if ($k === 'maas') continue; ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" class="secim"><?php foreach (EXPENSE_TYPES as $k => $v): if ($k === 'maas') continue; ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-grup"><label class="form-etiket">Tutar (₺) <span class="zorunlu">*</span></label><input name="amount" class="girdi" required placeholder="0,00"></div>
             </div>
             <div class="form-satir">
@@ -376,7 +376,7 @@ page_start('Finans', 'finance');
     </form></div>
 </div>
 
-<!-- Teklif/Fatura oluşturma modalı -->
+<!-- Create quote/invoice modal -->
 <div class="modal-katman" id="modalDocument">
     <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Yeni Teklif / Fatura</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="document_save" id="documentForm">

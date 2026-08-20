@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Yönetici Takip Sistemi
- * Görev · sahibi · durum · dosya + her yönetici/PM için ayrı not kolonu
+ * SADA One — Manager Tracking System
+ * Task · owner · status · client + a separate note column for each manager/PM
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -16,7 +16,7 @@ $tasks = rows("SELECT g.id, g.title, g.status, g.due_date, p.name project_name, 
     LEFT JOIN users uu ON uu.id=g.assignee_id
     WHERE g.is_archived=0 ORDER BY g.status='tamamlandi', g.due_date IS NULL, g.due_date");
 
-// Tüm notları tek sorguda çek: [gorev_id][user_id] => not
+// Fetch all notes in a single query: [task_id][user_id] => note
 $notes = [];
 foreach (rows("SELECT * FROM task_manager_notes") as $n) $notes[$n['task_id']][$n['user_id']] = $n['note'];
 
@@ -29,7 +29,7 @@ page_start('Yönetici Takip', 'ytakip');
 <div class="filtre-bar">
     <div class="pill-filtre" data-pill-grup="#ytTablo tbody tr">
         <button class="pill aktif" data-setting_value="">Tümü</button>
-        <?php foreach (GOREV_DURUMLARI as $min => $dv): ?><button class="pill" data-setting_value="<?= $min ?>"><?= $dv ?></button><?php endforeach; ?>
+        <?php foreach (TASK_STATUSES as $min => $dv): ?><button class="pill" data-setting_value="<?= $min ?>"><?= $dv ?></button><?php endforeach; ?>
     </div>
     <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Görev ara..." data-search="#ytTablo tbody tr"></div>
 </div>
@@ -41,10 +41,10 @@ page_start('Yönetici Takip', 'ytakip');
     </tr></thead>
     <tbody>
     <?php foreach ($tasks as $gr): ?>
-    <tr data-filtre="<?= $gr['status'] ?>">
+    <tr data-filter="<?= $gr['status'] ?>">
         <td><a href="task.php?id=<?= $gr['id'] ?>" class="hucre-ana"><?= e($gr['title']) ?></a><div class="hucre-alt"><?= e($gr['project_name']) ?><?= $gr['due_date'] ? ' · ' . format_date($gr['due_date']) : '' ?></div></td>
         <td class="kucuk"><?= e($gr['assignees'] ?: $gr['assignee_name'] ?: '—') ?></td>
-        <td><?= badge($gr['status'], GOREV_DURUMLARI) ?></td>
+        <td><?= badge($gr['status'], TASK_STATUSES) ?></td>
         <td class="kucuk"><?= e($gr['client_name']) ?></td>
         <?php foreach ($managers as $y):
             $notText = $notes[$gr['id']][$y['id']] ?? '';

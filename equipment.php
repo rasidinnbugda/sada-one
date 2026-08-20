@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Stüdyo Ekipman Envanteri
- * Demirbaş takibi, zimmet, çekim bağlantısı ve SD kart yaşam döngüsü.
+ * SADA One — Studio Equipment Inventory
+ * Asset tracking, custody, shoot linkage, and SD card lifecycle.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -43,7 +43,7 @@ page_start('Ekipman', 'ekipman');
     <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Ekipman ara..." data-search="#ekipmanListe .ekipman-kart"></div>
     <div class="pill-filtre" data-pill-grup="#ekipmanListe .ekipman-kart">
         <button class="pill aktif" data-setting_value="">Tümü</button>
-        <?php foreach (EKIPMAN_KATEGORILERI as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
+        <?php foreach (EQUIPMENT_CATEGORIES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>
 </div>
 
@@ -54,7 +54,7 @@ page_start('Ekipman', 'ekipman');
     <?php foreach ($equipment as $ek):
         $statusColor = ['studyoda' => 'var(--basari)', 'zimmette' => 'var(--info)', 'cekimde' => 'var(--warning)', 'arizali' => 'var(--tehlike)', 'bakimda' => 'var(--tehlike)'][$ek['status']];
         $sdCard = $ek['category'] === 'sd_kart'; ?>
-    <div class="kart ekipman-kart" data-filtre="<?= $ek['category'] ?>" data-search="<?= e(($ek['code'] ?? '') . ' ' . $ek['name'] . ' ' . ($ek['sd_content'] ?? '') . ' ' . ($ek['custody_name'] ?? '')) ?>" style="padding:16px">
+    <div class="kart ekipman-kart" data-filter="<?= $ek['category'] ?>" data-search="<?= e(($ek['code'] ?? '') . ' ' . $ek['name'] . ' ' . ($ek['sd_content'] ?? '') . ' ' . ($ek['custody_name'] ?? '')) ?>" style="padding:16px">
         <div class="satir-esnek arasi" style="align-items:flex-start;gap:10px">
             <div class="satir-esnek" style="gap:11px;min-width:0">
                 <?php if ($ek['photo']): ?>
@@ -64,7 +64,7 @@ page_start('Ekipman', 'ekipman');
                 <?php endif; ?>
                 <div style="min-width:0">
                     <div class="kalin" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= $ek['code'] ? '<span style="color:var(--marka)">' . e($ek['code']) . '</span> · ' : '' ?><?= e($ek['name']) ?></div>
-                    <div class="hucre-alt"><?= EKIPMAN_KATEGORILERI[$ek['category']] ?></div>
+                    <div class="hucre-alt"><?= EQUIPMENT_CATEGORIES[$ek['category']] ?></div>
                 </div>
             </div>
             <span class="rozet" style="background:color-mix(in srgb, <?= $statusColor ?> 15%, transparent);color:<?= $statusColor ?>;flex-shrink:0"><?= EKIPMAN_DURUMLARI[$ek['status']] ?></span>
@@ -79,7 +79,7 @@ page_start('Ekipman', 'ekipman');
         <?php endif; ?>
 
         <?php if ($sdCard): ?>
-        <!-- SD kart yaşam döngüsü paneli -->
+        <!-- SD card lifecycle panel -->
         <div class="mt-2" style="padding:10px 12px;background:var(--surface-2);border-radius:10px">
             <div class="satir-esnek arasi">
                 <span class="kucuk kalin satir-esnek" style="gap:6px"><?= icon('sd_kart', 13) ?> <?= SD_DURUMLARI[$ek['sd_status'] ?: 'bos'] ?></span>
@@ -121,7 +121,7 @@ page_start('Ekipman', 'ekipman');
 <?php endif; ?>
 
 <?php if ($can_manage): ?>
-<!-- Ekipman ekle/düzenle -->
+<!-- Add/edit equipment -->
 <div class="modal-katman" id="modalEquipment">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="equipmentTitle">Yeni Ekipman</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="equipment_save" id="equipmentForm">
@@ -129,7 +129,7 @@ page_start('Ekipman', 'ekipman');
         <div class="modal-govde">
             <div class="form-satir">
                 <div class="form-grup"><label class="form-etiket">Kod / Etiket No</label><input name="code" id="e_code" class="girdi" placeholder="Örn. CAM-01, SD-04"></div>
-                <div class="form-grup"><label class="form-etiket">Kategori</label><select name="category" id="e_category" class="secim"><?php foreach (EKIPMAN_KATEGORILERI as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-grup"><label class="form-etiket">Kategori</label><select name="category" id="e_category" class="secim"><?php foreach (EQUIPMENT_CATEGORIES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
             </div>
             <div class="form-grup"><label class="form-etiket">Ad <span class="zorunlu">*</span></label><input name="name" id="e_name" class="girdi" required placeholder="Örn. Sony A7 IV"></div>
             <div class="form-grup"><label class="form-etiket">Fotoğraf</label><input type="file" name="photo" class="girdi" accept="image/*"></div>
@@ -147,7 +147,7 @@ page_start('Ekipman', 'ekipman');
 </div>
 <?php endif; ?>
 
-<!-- Zimmet ver (başkasına) -->
+<!-- Assign custody (to someone else) -->
 <div class="modal-katman" id="modalCustody">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="custodyTitle">Zimmet Ver</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="equipment_custody">
@@ -160,7 +160,7 @@ page_start('Ekipman', 'ekipman');
     </form></div>
 </div>
 
-<!-- Arıza bildir -->
+<!-- Report fault -->
 <div class="modal-katman" id="modalFault">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Arıza / Bakım Bildir</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="equipment_fault">
@@ -173,7 +173,7 @@ page_start('Ekipman', 'ekipman');
     </form></div>
 </div>
 
-<!-- SD: dolu işaretle -->
+<!-- SD: mark as full -->
 <div class="modal-katman" id="modalSdFull">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Kartı Dolu İşaretle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="sd_update_row">
@@ -185,7 +185,7 @@ page_start('Ekipman', 'ekipman');
     </form></div>
 </div>
 
-<!-- SD: Drive'a aktarıldı -->
+<!-- SD: transferred to Drive -->
 <div class="modal-katman" id="modalSdAktar">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Drive'a Aktarıldı</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="sd_update_row">
@@ -197,7 +197,7 @@ page_start('Ekipman', 'ekipman');
     </form></div>
 </div>
 
-<!-- Hareket geçmişi -->
+<!-- Activity history -->
 <div class="modal-katman" id="modalHistory">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="historyTitle">Hareket Geçmişi</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <div class="modal-govde" id="historyBody"><div class="bos-mini">Yükleniyor...</div></div>
@@ -243,9 +243,9 @@ function equipmentEdit(ek) {
     document.getElementById('e_purchase').value = ek.purchase_date || '';
     document.getElementById('e_price').value = ek.price || 0;
     document.getElementById('e_description').value = ek.description || '';
-    const delete = document.getElementById('equipmentDeleteBtn');
-    delete.classList.remove('gizli');
-    delete.onclick = async () => {
+    const deleteBtn = document.getElementById('equipmentDeleteBtn');
+    deleteBtn.classList.remove('gizli');
+    deleteBtn.onclick = async () => {
         if (!confirm('Ekipman ve tüm hareket geçmişi silinsin mi?')) return;
         const j = await api('equipment_delete', { id: ek.id });
         if (j.ok) { toast(j.message, 'basari'); setTimeout(() => location.reload(), 550); }

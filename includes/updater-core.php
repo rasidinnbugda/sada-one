@@ -1,11 +1,11 @@
 <?php
 /**
- * SADA One — Güncelleyici çekirdeği (guncelleme.php + ajax.php ortak kullanır)
+ * SADA One — Updater core (shared by guncelleme.php + ajax.php)
  */
 
-const GITHUB_DEPO = 'rasidinnbugda/sada-one';
+const GITHUB_REPO = 'rasidinnbugda/sada-one';
 
-/** GitHub API'den JSON çeker (önce file_get_contents, olmazsa cURL) */
+/** Fetches JSON from the GitHub API (file_get_contents first, cURL as fallback) */
 function github_json(string $url): ?array {
     $ua = 'SADA-One-Guncelleyici';
     $ctx = stream_context_create(['http' => ['header' => "User-Agent: $ua\r\nAccept: application/vnd.github+json\r\n", 'timeout' => 15]]);
@@ -20,7 +20,7 @@ function github_json(string $url): ?array {
     return is_array($j) ? $j : null;
 }
 
-/** Uzak dosyayı indirir, kaydedilen yolu döner (başarısızsa null) */
+/** Downloads a remote file, returns the saved path (null on failure) */
 function download_url(string $url, string $target): bool {
     $ua = 'SADA-One-Guncelleyici';
     $ctx = stream_context_create(['http' => ['header' => "User-Agent: $ua\r\n", 'timeout' => 120, 'follow_location' => 1]]);
@@ -35,21 +35,21 @@ function download_url(string $url, string $target): bool {
     return file_put_contents($target, $ham) !== false;
 }
 
-/** Mevcut kurulumun kod yedeğini backups/ altına alır */
+/** Creates a code backup of the current installation under backups/ */
 function create_backup(): ?string {
     $kok = ROOT;
     $backupDirectory = $kok . '/backups';
     if (!is_dir($backupDirectory)) { mkdir($backupDirectory, 0755, true); }
     if (!file_exists($backupDirectory . '/.htaccess')) file_put_contents($backupDirectory . '/.htaccess', "Require all denied\n");
     if (!file_exists($backupDirectory . '/index.html')) file_put_contents($backupDirectory . '/index.html', '');
-    $path = $backupDirectory . '/backup-v' . SURUM . '-' . date('Ymd-His') . '.zip';
+    $path = $backupDirectory . '/backup-v' . APP_VERSION . '-' . date('Ymd-His') . '.zip';
     $zip = new ZipArchive();
     if ($zip->open($path, ZipArchive::CREATE) !== true) return null;
     $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($kok, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST);
     foreach ($it as $client) {
         if ($client->isDir()) continue;
         $goreli = str_replace('\\', '/', substr($client->getPathname(), strlen($kok) + 1));
-        // Yedeğe girmeyecekler: yedekler, kullanıcı yüklemeleri (büyük), git
+        // Excluded from the backup: backups, user uploads (large), git
         if (str_starts_with($goreli, 'backups/') || str_starts_with($goreli, 'uploads/') || str_starts_with($goreli, '.git/')) continue;
         $zip->addFile($client->getPathname(), $goreli);
     }
@@ -57,12 +57,12 @@ function create_backup(): ?string {
     return $path;
 }
 
-/** ZIP paketini mevcut kurulumun üzerine uygular; [ok, mesaj, detaylar] döner */
+/** Applies a ZIP package over the current installation; returns [ok, message, details] */
 function install_package(string $zipPath): array {
     $zip = new ZipArchive();
     if ($zip->open($zipPath) !== true) return [false, 'ZIP açılamadı — dosya bozuk olabilir.', []];
 
-    // Doğrulama: gerçek bir SADA One paketi mi? (kök önekini de destekle)
+    // Validation: is it a genuine SADA One package? (also support a root prefix)
     $onek = '';
     if ($zip->locateName('includes/init.php') === false) {
         $first = $zip->getNameIndex(0);
@@ -80,9 +80,9 @@ function install_package(string $zipPath): array {
         if ($onek && !str_starts_with($name, $onek)) { $atlanan++; continue; }
         $goreli = $onek ? substr($name, strlen($onek)) : $name;
         if ($goreli === '' || str_ends_with($goreli, '/')) continue;
-        // Güvenlik: dizin dışına çıkma (zip slip) engeli
+        // Security: prevent path traversal (zip slip)
         if (str_contains($goreli, '..')) { $atlanan++; continue; }
-        // Korunanlar: yapılandırma, kullanıcı yüklemeleri, yedekler
+        // Protected: configuration, user uploads, backups
         if ($goreli === 'config.php' || str_starts_with($goreli, 'uploads/') || str_starts_with($goreli, 'backups/') || str_starts_with($goreli, '.git/')) { $atlanan++; continue; }
         $target = ROOT . '/' . $goreli;
         $directory = dirname($target);
@@ -93,7 +93,7 @@ function install_package(string $zipPath): array {
     }
     $zip->close();
 
-    // Veritabanı şemasını güncelle
+    // Update the database schema
     $migResult = run_migrations(db());
     $migError = array_filter($migResult, fn($s) => $s[0] === 'hata');
 

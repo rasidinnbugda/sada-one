@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Müşteri Raporu (yazdırılabilir / PDF)
- * Tarayıcının "PDF olarak kaydet" özelliğiyle çıktı alınır.
+ * SADA One — Client Report (printable / PDF)
+ * Output is produced via the browser's "Save as PDF" feature.
  */
 require __DIR__ . '/includes/init.php';
 require_staff();
@@ -27,7 +27,7 @@ $memnuniyet = row("SELECT AVG(rating) ort, COUNT(*) adet FROM ratings WHERE proj
 <html lang="tr" data-theme="navy-light">
 <head>
 <meta charset="UTF-8">
-<title><?= e($project['client_name']) ?> — <?= AYLAR[$month] ?> <?= $year ?> Raporu</title>
+<title><?= e($project['client_name']) ?> — <?= MONTHS[$month] ?> <?= $year ?> Raporu</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Unbounded:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/app.css">
 <style>
@@ -53,7 +53,7 @@ body { background: #fff !important; color: #1a2233; }
     <span style="display:flex;gap:10px">
         <select onchange="location.href='report.php?project=<?= $projectId ?>&'+this.value" style="padding:6px 10px;border-radius:8px;border:none">
             <?php for ($i = 0; $i < 6; $i++): $t = strtotime("-$i months"); $sec = ((int)date('n', $t) === $month && (int)date('Y', $t) === $year); ?>
-            <option value="ay=<?= date('n', $t) ?>&year=<?= date('Y', $t) ?>" <?= $sec ? 'selected' : '' ?>><?= AYLAR[(int)date('n', $t)] ?> <?= date('Y', $t) ?></option>
+            <option value="ay=<?= date('n', $t) ?>&year=<?= date('Y', $t) ?>" <?= $sec ? 'selected' : '' ?>><?= MONTHS[(int)date('n', $t)] ?> <?= date('Y', $t) ?></option>
             <?php endfor; ?>
         </select>
         <button onclick="window.print()" style="background:#b1fb01;color:#14210a;border:none;padding:8px 18px;border-radius:9px;font-weight:700;cursor:pointer">🖨 Yazdır / PDF</button>
@@ -69,7 +69,7 @@ body { background: #fff !important; color: #1a2233; }
         <div style="text-align:right">
             <div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700"><?= e($project['client_name']) ?></div>
             <div style="font-size:13px;color:#3a466c"><?= e($project['name']) ?></div>
-            <div style="font-size:12px;color:#6a7590;margin-top:3px"><?= AYLAR[$month] ?> <?= $year ?> · Rapor tarihi: <?= format_date(date('Y-m-d')) ?></div>
+            <div style="font-size:12px;color:#6a7590;margin-top:3px"><?= MONTHS[$month] ?> <?= $year ?> · Rapor tarihi: <?= format_date(date('Y-m-d')) ?></div>
         </div>
     </div>
 
@@ -102,7 +102,7 @@ body { background: #fff !important; color: #1a2233; }
         <?php foreach ($contents as $internal):
             $colors = ['yayinlandi' => '#dcf5e4;color:#1d7a41', 'onaylandi' => '#dcf5e4;color:#1d7a41', 'taslak' => '#eef0f5;color:#5a6780'];
             $stil = $colors[$internal['status']] ?? '#fdf0d9;color:#9a6b10'; ?>
-        <tr><td><?= e($internal['title']) ?></td><td><?= implode(', ', array_map(fn($pl) => PLATFORMLAR[trim($pl)] ?? trim($pl), explode(',', $internal['platform']))) ?></td><td><?= format_date($internal['date']) ?></td><td><span class="durum-cip" style="background:<?= $stil ?>"><?= ICERIK_DURUMLARI[$internal['status']] ?></span></td></tr>
+        <tr><td><?= e($internal['title']) ?></td><td><?= implode(', ', array_map(fn($pl) => PLATFORMS[trim($pl)] ?? trim($pl), explode(',', $internal['platform']))) ?></td><td><?= format_date($internal['date']) ?></td><td><span class="durum-cip" style="background:<?= $stil ?>"><?= CONTENT_STATUSES[$internal['status']] ?></span></td></tr>
         <?php endforeach; ?>
     </tbody></table>
     <?php endif; ?>
@@ -111,7 +111,7 @@ body { background: #fff !important; color: #1a2233; }
     <h2>🔏 Onay Süreçleri</h2>
     <table><thead><tr><th>İş</th><th>Gönderim</th><th>Sonuç</th></tr></thead><tbody>
         <?php foreach ($approvals as $o): ?>
-        <tr><td><?= e($o['title']) ?></td><td><?= format_date(substr($o['created'], 0, 10)) ?></td><td><?= ONAY_DURUMLARI[$o['status']] ?></td></tr>
+        <tr><td><?= e($o['title']) ?></td><td><?= format_date(substr($o['created'], 0, 10)) ?></td><td><?= APPROVAL_STATUSES[$o['status']] ?></td></tr>
         <?php endforeach; ?>
     </tbody></table>
     <?php endif; ?>
@@ -120,7 +120,7 @@ body { background: #fff !important; color: #1a2233; }
     <h2>🔄 Devam Eden İşler</h2>
     <table><thead><tr><th>İş</th><th>Durum</th><th>Hedef Tarih</th></tr></thead><tbody>
         <?php foreach ($ongoingEden as $d): ?>
-        <tr><td><?= e($d['title']) ?></td><td><?= GOREV_DURUMLARI[$d['status']] ?></td><td><?= format_date($d['due_date']) ?></td></tr>
+        <tr><td><?= e($d['title']) ?></td><td><?= TASK_STATUSES[$d['status']] ?></td><td><?= format_date($d['due_date']) ?></td></tr>
         <?php endforeach; ?>
     </tbody></table>
     <?php endif; ?>

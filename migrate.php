@@ -1,10 +1,10 @@
 <?php
 /**
- * SADA One — Sürüm Güncelleme Scripti (v1 → v2)
- * Mevcut kurulumlara yeni kolonları/tabloları güvenle ekler.
- * Birden fazla kez çalıştırılabilir (idempotent).
- * Kullanım: tarayıcıda /guncelle.php açın (yönetici girişi gerekir),
- * bittikten sonra bu dosyayı sunucudan silin.
+ * SADA One — Version Upgrade Script (v1 → v2)
+ * Safely adds new columns/tables to existing installations.
+ * Can be run multiple times (idempotent).
+ * Usage: open /guncelle.php in the browser (admin login required),
+ * then delete this file from the server when finished.
  */
 require __DIR__ . '/includes/init.php';
 $u = require_admin();

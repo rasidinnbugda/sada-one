@@ -4,7 +4,7 @@ require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/components.php';
 $u = require_login();
 
-// Kullanıcının üye olduğu kanallar (arşivlenenler ayrı bölümde)
+// Channels the user is a member of (archived ones in a separate section)
 $channels = rows("SELECT k.*, ku.archive,
     (SELECT m.message FROM messages m WHERE m.channel_id=k.id ORDER BY m.id DESC LIMIT 1) last_message,
     (SELECT m.created FROM messages m WHERE m.channel_id=k.id ORDER BY m.id DESC LIMIT 1) last_time,
@@ -12,7 +12,7 @@ $channels = rows("SELECT k.*, ku.archive,
     FROM channels k JOIN channel_members ku ON ku.channel_id=k.id AND ku.user_id=?
     ORDER BY ku.archive, last_time IS NULL, last_time DESC", [$u['id'], $u['id']]);
 
-// Özel (DM) kanallarında ad = karşıdaki kişinin adı
+// In private (DM) channels the name = the other person's name
 foreach ($channels as &$k) {
     if ($k['type'] === 'ozel') {
         $diger = row("SELECT us.name, us.color, us.avatar FROM channel_members ku JOIN users us ON us.id=ku.user_id WHERE ku.channel_id=? AND ku.user_id!=? LIMIT 1", [$k['id'], $u['id']]);
@@ -32,11 +32,11 @@ if ($activeChannel) update_row('channel_members', ['last_read' => date('Y-m-d H:
 $lastMessageId = $messages ? end($messages)['id'] : 0;
 
 $teamMembers = is_staff() ? rows("SELECT id, name FROM users WHERE id!=? AND role IN ('yonetici','pm','ekip','finans') AND is_active=1 ORDER BY name", [$u['id']]) : [];
-// DM açılabilecek kişiler: ekip herkesle, müşteri sadece ekiple
+// People a DM can be opened with: staff with everyone, clients only with staff
 $dmPeople = is_staff()
     ? rows("SELECT id, name, color, avatar, role FROM users WHERE id!=? AND is_active=1 ORDER BY role='musteri', name", [$u['id']])
     : rows("SELECT id, name, color, avatar, role FROM users WHERE id!=? AND is_active=1 AND role!='musteri' ORDER BY name", [$u['id']]);
-// Aktif kanal üyeleri (yönetim paneli için)
+// Active channel members (for the management panel)
 $channelMembers = $activeChannel ? rows("SELECT us.id, us.name, us.color, us.avatar, us.role FROM channel_members ku JOIN users us ON us.id=ku.user_id WHERE ku.channel_id=? ORDER BY us.name", [$activeChannelId]) : [];
 $memberOlmayanlar = ($activeChannel && is_staff() && $activeChannel['type'] !== 'ozel')
     ? rows("SELECT id, name FROM users WHERE is_active=1 AND id NOT IN (SELECT user_id FROM channel_members WHERE channel_id=?) ORDER BY name", [$activeChannelId]) : [];
@@ -128,7 +128,7 @@ page_start('Mesajlar', 'messages');
     <?php endif; ?>
 </div>
 
-<!-- Birebir mesaj (DM) modalı -->
+<!-- Direct message (DM) modal -->
 <div class="modal-katman" id="modalDM">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Birebir Mesaj</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <div class="modal-govde">
@@ -137,7 +137,7 @@ page_start('Mesajlar', 'messages');
             <?php foreach ($dmPeople as $person): ?>
             <button class="satir-esnek dm-kisi" style="gap:11px;padding:9px 11px;border-radius:11px;text-align:left;transition:background .2s" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" data-action="dm_open" data-user_id="<?= $person['id'] ?>" data-refresh="hayir" data-search="<?= e($person['name']) ?>">
                 <?= avatar($person, 34) ?>
-                <div><div class="hucre-ana kucuk"><?= e($person['name']) ?></div><div class="hucre-alt"><?= ROLLER[$person['role']] ?></div></div>
+                <div><div class="hucre-ana kucuk"><?= e($person['name']) ?></div><div class="hucre-alt"><?= ROLES[$person['role']] ?></div></div>
             </button>
             <?php endforeach; ?>
             <?php if (!$dmPeople): ?><div class="bos-mini">Mesaj atılabilecek kişi yok.</div><?php endif; ?>
@@ -147,7 +147,7 @@ page_start('Mesajlar', 'messages');
 </div>
 
 <?php if ($activeChannel): ?>
-<!-- Kanal üyeleri modalı -->
+<!-- Channel members modal -->
 <div class="modal-katman" id="modalMembers">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik"><?= e($activeChannel['name']) ?> — Üyeler</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <div class="modal-govde">
@@ -163,7 +163,7 @@ page_start('Mesajlar', 'messages');
         <div class="dikey" style="gap:4px;max-height:320px;overflow-y:auto">
             <?php foreach ($channelMembers as $ku): ?>
             <div class="satir-esnek arasi" style="padding:8px 10px;border-radius:10px">
-                <div class="satir-esnek" style="gap:10px"><?= avatar($ku, 32) ?><div><div class="hucre-ana kucuk"><?= e($ku['name']) ?></div><div class="hucre-alt"><?= ROLLER[$ku['role']] ?></div></div></div>
+                <div class="satir-esnek" style="gap:10px"><?= avatar($ku, 32) ?><div><div class="hucre-ana kucuk"><?= e($ku['name']) ?></div><div class="hucre-alt"><?= ROLES[$ku['role']] ?></div></div></div>
                 <?php if ($activeChannel['type'] !== 'ozel' && (is_pm() || $ku['id'] == $u['id'])): ?>
                 <button class="ikon-eylem tehlike" data-action="channel_member_cikar" data-channel_id="<?= $activeChannelId ?>" data-user_id="<?= $ku['id'] ?>" data-approval="<?= $ku['id'] == $u['id'] ? 'Kanaldan ayrılmak istiyor musunuz?' : e($ku['name']) . ' kanaldan çıkarılsın mı?' ?>" title="<?= $ku['id'] == $u['id'] ? 'Kanaldan ayrıl' : 'Çıkar' ?>">
                     <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="16"><path d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a7 7 0 00-7 7h11m5-9l5 5m0-5l-5 5"/></svg>
@@ -237,7 +237,7 @@ if (form) {
     });
 }
 
-// Yeni messagesı çek (polling)
+// Fetch new messages (polling)
 if (channelId) setInterval(async () => {
     const j = await api('message_fetch', { channel_id: channelId, last_id: lastId });
     if (j.ok && j.messages.length) {
@@ -245,17 +245,17 @@ if (channelId) setInterval(async () => {
     }
 }, 4000);
 
-// Kanal üye seçimi
+// Channel member selection
 const channelForm = document.getElementById('channelForm');
 if (channelForm) channelForm.addEventListener('submit', () => {
     const selected = Array.from(document.querySelectorAll('.channelMember:checked')).map(c => c.value);
     document.getElementById('channelMembers').value = JSON.stringify(selected);
 });
 
-// Mobil geri butonu
+// Mobile back button
 if (window.innerWidth <= 760) { const gb = document.getElementById('geriBtn'); if (gb) gb.style.display = 'flex'; }
 
-// Sohbet nameını değiştir
+// Rename the chat
 async function channelNameChange() {
     const newName = prompt('Yeni sohbet adı:', <?= json_encode($activeChannel['name'] ?? '', JSON_UNESCAPED_UNICODE) ?>);
     if (!newName || !newName.trim()) return;

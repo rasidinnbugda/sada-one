@@ -1,9 +1,9 @@
 <?php
 /**
- * SADA One — Çekirdek başlatma dosyası
- * Oturum, veritabanı bağlantısı, yetki kontrolü ve yardımcı fonksiyonlar.
+ * SADA One — Core bootstrap file
+ * Session, database connection, authorization checks and helper functions.
  */
-// Oturum güvenliği: çerez sertleştirme (XSS ile çerez çalınması ve CSRF yüzeyini daraltır)
+// Session security: cookie hardening (reduces cookie theft via XSS and the CSRF surface)
 ini_set('session.cookie_httponly', '1');
 ini_set('session.use_strict_mode', '1');
 ini_set('session.cookie_samesite', 'Lax');
@@ -33,7 +33,7 @@ if (!headers_sent()) header('Cache-Control: no-store, max-age=0');
 define('ROOT', dirname(__DIR__));
 define('BASE_URL', rtrim(dirname($_SERVER['SCRIPT_NAME']) === '/' ? '' : str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/'));
 
-// Kurulum kontrolü
+// Installation check
 if (!file_exists(ROOT . '/config.php')) {
     header('Location: install/index.php');
     exit;
@@ -53,7 +53,7 @@ function legacy_schema_check(): void {
     } catch (Throwable $e) { /* connection problems surface later with a clearer error */ }
 }
 
-/* ---------------- Veritabanı ---------------- */
+/* ---------------- Database ---------------- */
 
 function db(): PDO {
     static $pdo = null;
@@ -91,7 +91,7 @@ function update_row(string $table, array $data, string $where_sql, array $kosulP
     q("UPDATE $table SET $set WHERE $where_sql", array_merge(array_values($data), $kosulP));
 }
 
-/* ---------------- Ayarlar ---------------- */
+/* ---------------- Settings ---------------- */
 
 function setting(string $setting_key, $default = '') {
     static $cache = null;
@@ -102,7 +102,7 @@ function setting(string $setting_key, $default = '') {
     return $cache[$setting_key] ?? $default;
 }
 
-/* ---------------- Oturum & Yetki ---------------- */
+/* ---------------- Session & Authorization ---------------- */
 
 function user(): ?array {
     static $u = false;
@@ -125,9 +125,9 @@ function is_finance(): bool { return (user()['role'] ?? '') === 'finans'; }
 function is_intern(): bool { return (user()['role'] ?? '') === 'stajyer'; }
 function is_customer(): bool { return (user()['role'] ?? '') === 'musteri'; }
 
-/** Yetkisiz erişimde: AJAX isteğiyse JSON 403, normal sayfa ise yönlendirme */
+/** On unauthorized access: JSON 403 for AJAX requests, redirect for regular pages */
 function deny(): void {
-    if (defined('AJAX_ISTEK')) {
+    if (defined('IS_AJAX')) {
         json_out(['ok' => false, 'error' => 'Bu işlem için yetkiniz yok.'], 403);
     }
     header('Location: index.php');
@@ -150,11 +150,11 @@ function require_admin(): array {
     return $u;
 }
 
-/* ---------------- Kullanıcı bazlı izinler ----------------
- * Rol varsayılanları + kullanıcıya özel geçersiz kılmalar (users.izinler JSON).
- * Anahtarlar: finans, rapor, dosya_yonet, gorev_sil, icerik_yonet, kapasite
+/* ---------------- Per-user permissions ----------------
+ * Role defaults + per-user overrides (users.izinler JSON).
+ * Keys: finans, rapor, dosya_yonet, gorev_sil, icerik_yonet, kapasite
  */
-const IZIN_ANAHTARLARI = [
+const PERMISSION_KEYS = [
     'finans' => 'Finans sayfası',
     'rapor' => 'Raporlar sayfası',
     'kapasite' => 'Kapasite takibi',
@@ -178,10 +178,10 @@ function permission(string $setting_key): bool {
     if (!$u) return false;
     if ($u['role'] === 'yonetici') return true;
     if ($u['role'] === 'musteri') return false;
-    // Kullanıcıya özel geçersiz kılma
+    // Per-user override
     $ozel = json_decode($u['permissions'] ?? '', true);
     if (is_array($ozel) && array_key_exists($setting_key, $ozel)) return (bool)$ozel[$setting_key];
-    // Rol varsayılanları
+    // Role defaults
     $default = [
         'pm'      => ['finans' => 1, 'rapor' => 1, 'kapasite' => 1, 'dosya_yonet' => 1, 'gorev_olustur' => 1, 'gorev_sil' => 1, 'icerik_yonet' => 1, 'ekipman_yonet' => 1, 'onay_gonder' => 1, 'duyuru_yayinla' => 1, 'takvim_yonet' => 1, 'kanal_kur' => 1, 'belge_olustur' => 1, 'arsiv_sil' => 1, 'talep_yonet' => 1],
         'ekip'    => ['finans' => 0, 'rapor' => 0, 'kapasite' => 0, 'dosya_yonet' => 0, 'gorev_olustur' => 1, 'gorev_sil' => 0, 'icerik_yonet' => 1, 'ekipman_yonet' => 0, 'onay_gonder' => 1, 'duyuru_yayinla' => 0, 'takvim_yonet' => 1, 'kanal_kur' => 1, 'belge_olustur' => 0, 'arsiv_sil' => 0, 'talep_yonet' => 0],
@@ -197,7 +197,7 @@ function require_permission(string $setting_key): array {
     return $u;
 }
 
-/** Müşterinin erişebildiği dosya id'leri (birincil dosya + ek atamalar) */
+/** Client ids the customer can access (primary client + extra assignments) */
 function customer_client_ids(?int $userId = null): array {
     static $cache = [];
     $u = user();
@@ -209,13 +209,13 @@ function customer_client_ids(?int $userId = null): array {
     return $cache[$userId] = $ids;
 }
 
-/** IN (...) sorguları için yer tutucu üretir; boş listede imkânsız koşul döner */
+/** Builds placeholders for IN (...) queries; returns an impossible condition for an empty list */
 function in_clause(array $ids): array {
-    if (!$ids) return ['(SELECT 0 WHERE 1=0)', []]; // hiç dosyası yoksa boş sonuç
+    if (!$ids) return ['(SELECT 0 WHERE 1=0)', []]; // no clients at all → empty result
     return ['(' . implode(',', array_fill(0, count($ids), '?')) . ')', $ids];
 }
 
-/** Müşteri kullanıcının erişebileceği proje mi? */
+/** Is this project accessible to the customer user? */
 function project_access(int $projectId): bool {
     $u = user();
     if (!$u) return false;
@@ -226,7 +226,7 @@ function project_access(int $projectId): bool {
     return (bool)val("SELECT COUNT(*) FROM projects WHERE id=? AND client_id IN $in", array_merge([$projectId], $p));
 }
 
-/** Müşteri bu dosyaya erişebilir mi? */
+/** Can the customer access this client? */
 function client_access(int $clientId): bool {
     if (is_staff()) return true;
     return in_array($clientId, customer_client_ids());
@@ -245,7 +245,7 @@ function csrf_check(): void {
     }
 }
 
-/* ---------------- Yardımcılar ---------------- */
+/* ---------------- Helpers ---------------- */
 
 function e($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
@@ -256,13 +256,13 @@ function json_out($data, int $code = 200): void {
     exit;
 }
 
-const AYLAR = [1=>'Ocak',2=>'Şubat',3=>'Mart',4=>'Nisan',5=>'Mayıs',6=>'Haziran',7=>'Temmuz',8=>'Ağustos',9=>'Eylül',10=>'Ekim',11=>'Kasım',12=>'Aralık'];
-const GUNLER = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+const MONTHS = [1=>'Ocak',2=>'Şubat',3=>'Mart',4=>'Nisan',5=>'Mayıs',6=>'Haziran',7=>'Temmuz',8=>'Ağustos',9=>'Eylül',10=>'Ekim',11=>'Kasım',12=>'Aralık'];
+const DAYS = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
 
 function format_date(?string $dt, bool $saatli = false): string {
     if (!$dt || $dt === '0000-00-00') return '—';
     $ts = strtotime($dt);
-    $s = date('j', $ts) . ' ' . AYLAR[(int)date('n', $ts)] . ' ' . date('Y', $ts);
+    $s = date('j', $ts) . ' ' . MONTHS[(int)date('n', $ts)] . ' ' . date('Y', $ts);
     if ($saatli) $s .= ' ' . date('H:i', $ts);
     return $s;
 }
@@ -301,7 +301,7 @@ function avatar(?array $u, int $size = 34): string {
     return '<span class="avatar" title="' . e($u['name']) . '" style="width:' . $size . 'px;height:' . $size . 'px;background:' . $color . '22;color:' . $color . ';border:1.5px solid ' . $color . '55">' . e(initials($u['name'])) . '</span>';
 }
 
-/** Dosya logosu ya da renkli baş harf kutusu */
+/** Client logo or a colored initials box */
 function client_logo(array $d, int $size = 40, int $fontPx = 15): string {
     if (!empty($d['logo'])) {
         return '<span class="dosya-avatar" style="width:' . $size . 'px;height:' . $size . 'px;background-image:url(\'uploads/' . e($d['logo']) . '\');background-size:cover;background-position:center"></span>';
@@ -310,25 +310,34 @@ function client_logo(array $d, int $size = 40, int $fontPx = 15): string {
     return '<span class="dosya-avatar" style="width:' . $size . 'px;height:' . $size . 'px;font-size:' . $fontPx . 'px;background:' . $color . '22;color:' . $color . '">' . e(initials($d['name'])) . '</span>';
 }
 
-/* ---------------- Etiket sözlükleri ---------------- */
+/* ---------------- Label dictionaries ---------------- */
 
-const PROJE_TURLERI = ['aylik' => 'Aylık Düzenli', 'donemsel' => 'Dönemsel', 'tek' => 'Tek Seferlik'];
-const DOSYA_TURLERI = ['marka' => 'Marka', 'sirket' => 'Şirket', 'stk' => 'STK'];
-const GOREV_DURUMLARI = ['yapilacak' => 'Yapılacak', 'devam' => 'Devam Ediyor', 'incelemede' => 'İncelemede', 'onayda' => 'Onayda', 'tamamlandi' => 'Tamamlandı'];
-const ONCELIKLER = ['dusuk' => 'Düşük', 'normal' => 'Normal', 'yuksek' => 'Yüksek', 'acil' => 'Acil'];
-const PROJE_DURUMLARI = ['is_active' => 'Aktif', 'beklemede' => 'Beklemede', 'tamamlandi' => 'Tamamlandı', 'iptal' => 'İptal'];
-const ICERIK_DURUMLARI = ['taslak' => 'Taslak', 'internal_approval' => 'İç Onayda', 'customer_approval' => 'Müşteri Onayında', 'revize' => 'Revize', 'onaylandi' => 'Onaylandı', 'yayinlandi' => 'Yayınlandı'];
-const ONAY_DURUMLARI = ['bekliyor' => 'Bekliyor', 'onaylandi' => 'Onaylandı', 'revize' => 'Revize İstendi', 'reddedildi' => 'Reddedildi'];
-const TALEP_DURUMLARI = ['new' => 'Yeni', 'inceleniyor' => 'İnceleniyor', 'gorev_olusturuldu' => 'Göreve Dönüştürüldü', 'tamamlandi' => 'Tamamlandı', 'reddedildi' => 'Reddedildi'];
-const PLATFORMLAR = ['instagram' => 'Instagram', 'facebook' => 'Facebook', 'x' => 'X (Twitter)', 'linkedin' => 'LinkedIn', 'youtube' => 'YouTube', 'tiktok' => 'TikTok', 'web' => 'Web Sitesi', 'diger' => 'Diğer'];
-const ETKINLIK_TURLERI = ['cekim' => 'Çekim', 'toplanti' => 'Toplantı', 'is_delivered' => 'Teslim', 'diger' => 'Diğer'];
-const ROLLER = ['yonetici' => 'Yönetici', 'pm' => 'Proje Yöneticisi', 'ekip' => 'Ekip Üyesi', 'finans' => 'Finans', 'stajyer' => 'Stajyer', 'musteri' => 'Müşteri'];
-const TEKRARLAR = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'aylik' => 'Her Ay'];
-const GIDER_TURLERI = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
+const PROJECT_TYPES = ['aylik' => 'Aylık Düzenli', 'donemsel' => 'Dönemsel', 'tek' => 'Tek Seferlik'];
+const CLIENT_TYPES = ['marka' => 'Marka', 'sirket' => 'Şirket', 'stk' => 'STK'];
+const TASK_STATUSES = ['yapilacak' => 'Yapılacak', 'devam' => 'Devam Ediyor', 'incelemede' => 'İncelemede', 'onayda' => 'Onayda', 'tamamlandi' => 'Tamamlandı'];
+const PRIORITIES = ['dusuk' => 'Düşük', 'normal' => 'Normal', 'yuksek' => 'Yüksek', 'acil' => 'Acil'];
+const PROJECT_STATUSES = ['is_active' => 'Aktif', 'beklemede' => 'Beklemede', 'tamamlandi' => 'Tamamlandı', 'iptal' => 'İptal'];
+const CONTENT_STATUSES = ['taslak' => 'Taslak', 'internal_approval' => 'İç Onayda', 'customer_approval' => 'Müşteri Onayında', 'revize' => 'Revize', 'onaylandi' => 'Onaylandı', 'yayinlandi' => 'Yayınlandı'];
+const APPROVAL_STATUSES = ['bekliyor' => 'Bekliyor', 'onaylandi' => 'Onaylandı', 'revize' => 'Revize İstendi', 'reddedildi' => 'Reddedildi'];
+const REQUEST_STATUSES = ['new' => 'Yeni', 'inceleniyor' => 'İnceleniyor', 'gorev_olusturuldu' => 'Göreve Dönüştürüldü', 'tamamlandi' => 'Tamamlandı', 'reddedildi' => 'Reddedildi'];
+const PLATFORMS = ['instagram' => 'Instagram', 'facebook' => 'Facebook', 'x' => 'X (Twitter)', 'linkedin' => 'LinkedIn', 'youtube' => 'YouTube', 'tiktok' => 'TikTok', 'web' => 'Web Sitesi', 'diger' => 'Diğer'];
+const EVENT_TYPES = ['cekim' => 'Çekim', 'toplanti' => 'Toplantı', 'is_delivered' => 'Teslim', 'diger' => 'Diğer'];
+const ROLES = ['yonetici' => 'Yönetici', 'pm' => 'Proje Yöneticisi', 'ekip' => 'Ekip Üyesi', 'finans' => 'Finans', 'stajyer' => 'Stajyer', 'musteri' => 'Müşteri'];
+const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'aylik' => 'Her Ay'];
+const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
-/* ---------------- Sürüm & güncelleme notları ---------------- */
-const SURUM = '4.0';
-const SURUM_NOTLARI = [
+/* ---------------- Version & update notes ---------------- */
+const APP_VERSION = '5.0';
+const VERSION_NOTES = [
+    '5.0' => [
+        'Takılma sorunu çözüldü: oturum kilidi artık anında bırakılıyor — çok sekmede sayfalar birbirini beklemiyor',
+        'Kişisel sayfaların CDN/proxy önbelleğine takılması engellendi',
+        'Güvenlik: giriş formuna CSRF doğrulaması, detay pencerelerinde XSS kaçışları',
+        'Kod tabanı tamamen İngilizce: dosya adları, veritabanı şeması, değişkenler, yorumlar (arayüz Türkçe)',
+        'Eski kurulumlar kendini onarır: ilk açılışta şema otomatik taşınır, eski linkler yönlenir',
+        '5 yeni ferah tema: Liquid Glass, Glassmorphism (koyu/aydınlık) ve Claymorphism',
+        'Koyu temalar için ayrı logo ve favicon yüklenebiliyor',
+    ],
     '4.0' => [
         'Panel artık SADA One — yeni kimlik her yerde',
         'Panel içi güncelleme sistemi: ZIP yükle veya GitHub\'dan tek tıkla kur (otomatik yedekli)',
@@ -384,9 +393,9 @@ const SURUM_NOTLARI = [
 ];
 const RANDEVU_DURUMLARI = ['bekliyor' => 'Bekliyor', 'onaylandi' => 'Onaylandı', 'alternative' => 'Farklı Saat Önerildi', 'reddedildi' => 'Reddedildi'];
 
-/* ---------------- Merkezi SVG ikon kütüphanesi (monokrom çizgi) ---------------- */
-const IKONLAR = [
-    // Sosyal platformlar
+/* ---------------- Central SVG icon library (monochrome line) ---------------- */
+const ICONS = [
+    // Social platforms
     'instagram' => 'M7 3h10a4 4 0 014 4v10a4 4 0 01-4 4H7a4 4 0 01-4-4V7a4 4 0 014-4zm5 5.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zM17.2 6.8h.01',
     'facebook'  => 'M15 3h-2.5A3.5 3.5 0 009 6.5V9H6v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3V3z',
     'x'         => 'M4 4l7.2 9.4L4.4 20h2.4l5.5-5.5L16.8 20H20l-7.5-9.8L18.9 4h-2.4l-4.9 5L8 4H4z',
@@ -395,7 +404,7 @@ const IKONLAR = [
     'tiktok'    => 'M14 4v9.5a3.5 3.5 0 11-3.5-3.5M14 4a5 5 0 005 5',
     'web'       => 'M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z',
     'diger'     => 'M12 8v8m-4-4h8M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-    // Ekipman kategorileri
+    // Equipment categories
     'kamera'    => 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z',
     'lens'      => 'M12 19a7 7 0 100-14 7 7 0 000 14zm0-3.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM19 5l1.5-1.5',
     'sd_kart'   => 'M8 3h9a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V7l3-4zM9 7v3m3-3v3m3-3v3',
@@ -404,7 +413,7 @@ const IKONLAR = [
     'ses'       => 'M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3zm-7-3a7 7 0 0014 0M12 19v3',
     'drone'     => 'M4 6a2 2 0 104 0 2 2 0 10-4 0zm12 0a2 2 0 104 0 2 2 0 10-4 0zM4 18a2 2 0 104 0 2 2 0 10-4 0zm12 0a2 2 0 104 0 2 2 0 10-4 0zM7.5 7.5l3 3m6-3l-3 3m-6 6l3-3m6 3l-3-3m-3 3v-3a3 3 0 013-3',
     'aksesuar'  => 'M6 7h12l1 4H5l1-4zm-1 4v8a1 1 0 001 1h12a1 1 0 001-1v-8M12 7V4',
-    // Genel arayüz
+    // General UI
     'archive'     => 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
     'megafon'   => 'M11 5.88V19.24a1.76 1.76 0 01-3.42.6L5.44 14M18.7 4a9 9 0 01.3 13.3M5.44 14A2 2 0 015 10h1a8 8 0 005-2l3-2v12l-3-2a8 8 0 00-5-2H5.44z',
     'pin'       => 'M12 21s-7-5.5-7-11a7 7 0 1114 0c0 5.5-7 11-7 11zm0-8.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z',
@@ -433,19 +442,19 @@ const IKONLAR = [
     'document'     => 'M9 17h6M9 13h6M9 9h1m4 12H7a2 2 0 01-2-2V5a2 2 0 012-2h5.6a1 1 0 01.7.3l5.4 5.4a1 1 0 01.3.7V19a2 2 0 01-2 2z',
 ];
 
-/** Monokrom çizgi SVG ikon üretir (currentColor — bulunduğu metnin rengini alır) */
+/** Renders a monochrome line SVG icon (currentColor — inherits the surrounding text color) */
 function icon(string $name, int $size = 16, string $stil = ''): string {
-    $path = IKONLAR[$name] ?? IKONLAR['diger'];
+    $path = ICONS[$name] ?? ICONS['diger'];
     return '<svg class="ikon" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"' . ($stil ? ' style="' . $stil . '"' : '') . '><path d="' . $path . '"/></svg>';
 }
 
-/** CSV saklanan çoklu platformları ikonlu rozetlere çevirir */
+/** Converts CSV-stored multi-platform values into icon badges */
 function platform_badges(?string $csv, bool $onlyIcon = false): string {
     if (!$csv) return '';
     $h = '';
     foreach (array_filter(array_map('trim', explode(',', $csv))) as $pl) {
-        $tag = PLATFORMLAR[$pl] ?? $pl;
-        $svg = icon(isset(IKONLAR[$pl]) ? $pl : 'diger', $onlyIcon ? 13 : 13);
+        $tag = PLATFORMS[$pl] ?? $pl;
+        $svg = icon(isset(ICONS[$pl]) ? $pl : 'diger', $onlyIcon ? 13 : 13);
         $h .= $onlyIcon
             ? '<span class="p-ikon" title="' . e($tag) . '">' . $svg . '</span>'
             : '<span class="rozet" style="padding:2px 8px;gap:5px">' . $svg . ' ' . e($tag) . '</span> ';
@@ -453,15 +462,15 @@ function platform_badges(?string $csv, bool $onlyIcon = false): string {
     return $h;
 }
 
-/** 1-5 yıldız görseli üretir */
+/** Renders a 1-5 star visual */
 function stars(float $rating, int $size = 14): string {
     $h = '<span class="yildizlar" style="font-size:' . $size . 'px">';
     for ($i = 1; $i <= 5; $i++) $h .= '<span style="opacity:' . ($i <= round($rating) ? '1' : '.25') . '">★</span>';
     return $h . '</span>';
 }
 
-/* Ekipman modülü sabitleri */
-const EKIPMAN_KATEGORILERI = ['kamera' => 'Kamera', 'lens' => 'Lens', 'sd_kart' => 'SD Kart', 'tripod' => 'Tripod', 'isik' => 'Işık', 'ses' => 'Ses', 'drone' => 'Drone', 'aksesuar' => 'Aksesuar', 'diger' => 'Diğer'];
+/* Equipment module constants */
+const EQUIPMENT_CATEGORIES = ['kamera' => 'Kamera', 'lens' => 'Lens', 'sd_kart' => 'SD Kart', 'tripod' => 'Tripod', 'isik' => 'Işık', 'ses' => 'Ses', 'drone' => 'Drone', 'aksesuar' => 'Aksesuar', 'diger' => 'Diğer'];
 const EKIPMAN_DURUMLARI = ['studyoda' => 'Stüdyoda', 'zimmette' => 'Zimmette', 'cekimde' => 'Çekimde', 'arizali' => 'Arızalı', 'bakimda' => 'Bakımda'];
 const SD_DURUMLARI = ['bos' => 'Boş / Hazır', 'dolu' => 'Dolu', 'aktarildi' => "Drive'a Aktarıldı"];
 const EKIPMAN_HAREKET_TURLERI = [
@@ -471,7 +480,7 @@ const EKIPMAN_HAREKET_TURLERI = [
     'fault' => 'arızalı işaretlendi', 'bakim' => 'bakıma alındı', 'duzeltildi' => 'kullanıma döndü',
 ];
 
-/** Ekipman hareket kaydı düşer */
+/** Records an equipment movement log entry */
 function log_equipment(int $equipmentId, string $type, string $description = '', ?int $targetUserId = null, ?int $eventId = null): void {
     insert('equipment_logs', [
         'equipment_id' => $equipmentId, 'user_id' => (int)(user()['id'] ?? 0),
@@ -480,8 +489,31 @@ function log_equipment(int $equipmentId, string $type, string $description = '',
     ]);
 }
 
-/* Temalar: anahtar => [Etiket, vurgu rengi, koyu mu] */
-const TEMALAR = [
+/* ---------------- Theme-aware branding ---------------- */
+
+/** The theme the current visitor sees (user preference or site default). */
+function active_theme(): string {
+    $u = user();
+    $theme = $u['theme'] ?? '';
+    return isset(THEMES[$theme]) ? $theme : setting('varsayilan_tema', 'lime');
+}
+/** Is the active theme a dark one? */
+function theme_is_dark(): bool {
+    return (bool)(THEMES[active_theme()][2] ?? true);
+}
+/** Logo path for the active theme: dark themes prefer the dark logo when set. */
+function theme_logo(): string {
+    if (theme_is_dark() && setting('site_logo_dark')) return setting('site_logo_dark');
+    return setting('site_logo');
+}
+/** Favicon path for the active theme. */
+function theme_favicon(): string {
+    if (theme_is_dark() && setting('site_favicon_dark')) return setting('site_favicon_dark');
+    return setting('site_favicon');
+}
+
+/* Themes: key => [Label, accent color, is dark] */
+const THEMES = [
     'lime'         => ['Lime', '#b1fb01', true],
     'lime-light'   => ['Lime Aydınlık', '#76a900', false],
     'navy'         => ['Lacivert', '#2f5fb5', true],
@@ -492,20 +524,26 @@ const TEMALAR = [
     'gece'         => ['Gece', '#f8f2cb', true],
     'koyu'         => ['Klasik Koyu', '#60a5fa', true],
     'acik'         => ['Klasik Açık', '#2563eb', false],
+    // v5.0 airy styles: liquid glass / glassmorphism / claymorphism
+    'liquid-glass'       => ['Liquid Glass', '#8ad8ff', true],
+    'liquid-glass-light' => ['Liquid Glass Aydınlık', '#0284c7', false],
+    'glass'              => ['Glassmorphism', '#c4b5fd', true],
+    'glass-light'        => ['Glassmorphism Aydınlık', '#7c3aed', false],
+    'clay'               => ['Claymorphism', '#2563eb', false],
 ];
 
-/* Bildirim kategorileri (kullanıcı tercihine tabi) */
-const BILDIRIM_KATEGORILERI = [
+/* Notification categories (subject to user preference) */
+const NOTIFICATION_CATEGORIES = [
     'gorev' => 'Görev atama ve durum değişiklikleri',
     'onay' => 'Onay talepleri ve yanıtları',
-    'request' => 'Yeni talepler',
+    'talep' => 'Yeni talepler',
     'mesaj' => 'Mesajlar',
 ];
 
 function notification_pref(array $alici, string $category): array {
-    // Dönen: [panel_bildirimi_acik, eposta_acik]
+    // Returns: [panel_notification_on, email_on]
     $t = json_decode($alici['notification_preferences'] ?? '', true);
-    if (!is_array($t)) return [true, true]; // varsayılan: hepsi açık
+    if (!is_array($t)) return [true, true]; // default: everything on
     $panel = !isset($t[$category]) || (bool)$t[$category];
     $email = !isset($t['email']) || (bool)$t['email'];
     return [$panel, $email];
@@ -516,14 +554,14 @@ function badge(string $setting_value, array $sozluk, string $sinifOn = ''): stri
     return '<span class="rozet r-' . ($sinifOn ? $sinifOn . '-' : '') . e($setting_value) . '">' . e($tag) . '</span>';
 }
 
-/* ---------------- Bildirim & Aktivite ---------------- */
+/* ---------------- Notifications & Activity ---------------- */
 
-function notify(int $userId, string $title, string $message = '', string $link = '', string $category = 'task', bool $email = true): void {
-    if ($userId === (int)(user()['id'] ?? 0)) return; // kendine bildirim yok
+function notify(int $userId, string $title, string $message = '', string $link = '', string $category = 'gorev', bool $email = true): void {
+    if ($userId === (int)(user()['id'] ?? 0)) return; // no self-notifications
     $alici = row("SELECT * FROM users WHERE id=? AND is_active=1", [$userId]);
     if (!$alici) return;
     [$panelOpen, $emailOpen] = notification_pref($alici, $category);
-    if (!$panelOpen) return; // kullanıcı bu kategoriyi kapatmış
+    if (!$panelOpen) return; // the user has turned this category off
     insert('notifications', [
         'user_id' => $userId, 'title' => $title, 'mesaj' => $message,
         'link' => $link, 'is_read' => 0, 'created' => date('Y-m-d H:i:s'),
@@ -546,14 +584,14 @@ function log_activity(string $description, ?string $refType = null, ?int $refId 
     ]);
 }
 
-/* ---------------- Dosya yükleme ---------------- */
+/* ---------------- File upload ---------------- */
 
 function file_upload(string $field): ?array {
     if (empty($_FILES[$field]) || $_FILES[$field]['error'] !== UPLOAD_ERR_OK) return null;
     $f = $_FILES[$field];
-    if ($f['size'] > 50 * 1024 * 1024) return null; // 50 MB sınır
+    if ($f['size'] > 50 * 1024 * 1024) return null; // 50 MB limit
     $extension = mb_strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
-    // Güvenlik: yalnızca bilinen güvenli türlere izin ver (beyaz liste)
+    // Security: allow only known-safe types (whitelist)
     $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'ico', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
         'txt', 'csv', 'zip', 'rar', '7z', 'mp4', 'mov', 'avi', 'mp3', 'wav', 'aac', 'psd', 'ai', 'indd', 'srt', 'otf', 'ttf'];
     if (!in_array($extension, $allowed)) return null;
@@ -570,9 +608,9 @@ function format_size(int $b): string {
     return round($b / 1048576, 1) . ' MB';
 }
 
-/* ---------------- Dönem yardımcıları ---------------- */
+/* ---------------- Period helpers ---------------- */
 
-function period_name(array $d): string { return AYLAR[(int)$d['month']] . ' ' . $d['year']; }
+function period_name(array $d): string { return MONTHS[(int)$d['month']] . ' ' . $d['year']; }
 
 function get_or_create_period(int $projectId, int $year, int $month): int {
     $d = row("SELECT id FROM periods WHERE project_id=? AND year=? AND month=?", [$projectId, $year, $month]);
@@ -580,44 +618,44 @@ function get_or_create_period(int $projectId, int $year, int $month): int {
     return insert('periods', ['project_id' => $projectId, 'year' => $year, 'month' => $month, 'status' => 'acik', 'created' => date('Y-m-d H:i:s')]);
 }
 
-/* ---------------- Etiketleme (@mention) & görev etiketleri ---------------- */
+/* ---------------- Mentions (@mention) & task tags ---------------- */
 
-/** Metindeki @Ad Soyad ifadelerini vurgular (aktif kullanıcı adlarına göre, uzun ad önce) */
+/** Highlights @First Last mentions in text (matched against active user names, longest name first) */
 function highlight_mentions(string $kacisliText): string {
     static $names = null;
     if ($names === null) {
         $names = array_column(rows("SELECT name FROM users WHERE is_active=1 ORDER BY CHAR_LENGTH(name) DESC"), 'name');
     }
     foreach ($names as $name) {
-        $kacisli = e($name); // metin zaten e() ile kaçışlı
+        $kacisli = e($name); // the text is already escaped with e()
         $kacisliText = str_ireplace('@' . $kacisli, '<span class="mention">@' . $kacisli . '</span>', $kacisliText);
     }
     return $kacisliText;
 }
 
-/** Virgülle ayrılmış görev etiketlerini renkli çiplere dönüştürür */
+/** Converts comma-separated task tags into colored chips */
 function tag_chips(?string $tags, string $ekSinif = ''): string {
     if (!$tags) return '';
     $h = '';
     foreach (array_filter(array_map('trim', explode(',', $tags))) as $et) {
-        $ton = crc32(mb_strtolower($et)) % 360; // etikete sabit renk
+        $ton = crc32(mb_strtolower($et)) % 360; // stable color per tag
         $h .= '<span class="etiket-cip ' . $ekSinif . '" style="--cip-ton:' . $ton . '">' . e($et) . '</span>';
     }
     return $h;
 }
 
-/** Mention edilen kullanıcı id'lerini bildirir (JSON dizi bekler) */
+/** Notifies mentioned user ids (expects a JSON array) */
 function notify_mentions(string $tagsJson, string $title, string $message, string $link): void {
     $ids = json_decode($tagsJson, true);
     if (!is_array($ids)) return;
     foreach (array_unique(array_map('intval', $ids)) as $uid) {
-        if ($uid > 0) notify($uid, $title, $message, $link, 'message');
+        if ($uid > 0) notify($uid, $title, $message, $link, 'mesaj');
     }
 }
 
-/* ---------------- Tekrarlayan görev otomasyonu ----------------
- * Sunucuda cron kurulumu gerektirmez: sayfa yüklenirken saatte bir tetiklenir.
- * İsteyen /cron.php adresini gerçek cron'a da bağlayabilir.
+/* ---------------- Recurring task automation ----------------
+ * Requires no cron setup on the server: triggered hourly during page loads.
+ * Optionally, /cron.php can also be wired to a real cron job.
  */
 function run_recurring_jobs(bool $force = false): int {
     $last = (int)val("SELECT setting_value FROM settings WHERE setting_key='son_tekrar_kontrol'");
@@ -629,11 +667,11 @@ function run_recurring_jobs(bool $force = false): int {
         $periodKey = $g['repeat'] === 'haftalik' ? date('o-W') : date('Y-m');
         if ($g['last_repeat'] === $periodKey) continue;
         if ($g['last_repeat'] === null) {
-            // İlk dönem: görevin kendisi zaten bu dönemin işi — sadece damgala
+            // First period: the task itself is already this period's work — just stamp it
             update_row('tasks', ['last_repeat' => $periodKey], 'id=?', [$g['id']]);
             continue;
         }
-        // Yeni dönem başladı: şablon görevden taze bir kopya üret
+        // A new period has started: create a fresh copy from the template task
         $newLastDate = $g['repeat'] === 'haftalik' ? date('Y-m-d', strtotime('sunday this week')) : date('Y-m-t');
         $periodId = null;
         $projectType = val("SELECT type FROM projects WHERE id=?", [$g['project_id']]);
@@ -647,7 +685,7 @@ function run_recurring_jobs(bool $force = false): int {
             'due_date' => $newLastDate, 'repeat' => 'yok',
             'created' => date('Y-m-d H:i:s'),
         ]);
-        // Akış adımlarını sıfırlanmış olarak kopyala
+        // Copy the workflow steps in a reset state
         $steps = rows("SELECT * FROM task_steps WHERE task_id=? ORDER BY sort_order", [$g['id']]);
         foreach ($steps as $i => $a) {
             insert('task_steps', [
@@ -655,28 +693,28 @@ function run_recurring_jobs(bool $force = false): int {
                 'owner_id' => $a['owner_id'], 'status' => $i === 0 ? 'aktif' : 'bekliyor',
             ]);
         }
-        // Kontrol listesini sıfırlanmış kopyala
+        // Copy the checklist in a reset state
         foreach (rows("SELECT * FROM task_checklist WHERE task_id=? ORDER BY sort_order", [$g['id']]) as $k) {
             insert('task_checklist', ['task_id' => $newId, 'name' => $k['name'], 'is_done' => 0, 'sort_order' => $k['sort_order']]);
         }
         update_row('tasks', ['last_repeat' => $periodKey], 'id=?', [$g['id']]);
-        if ($g['assignee_id']) notify((int)$g['assignee_id'], 'Tekrarlayan görev oluşturuldu', $g['title'], 'task.php?id=' . $newId, 'task');
+        if ($g['assignee_id']) notify((int)$g['assignee_id'], 'Tekrarlayan görev oluşturuldu', $g['title'], 'task.php?id=' . $newId, 'gorev');
         $count++;
     }
 
-    /* --- Aylık maaş giderleri: her ay başında otomatik oluştur --- */
+    /* --- Monthly salary expenses: auto-created at the start of each month --- */
     $buMonth = date('Y-m');
     foreach (rows("SELECT id, name, salary FROM users WHERE salary>0 AND is_active=1") as $person) {
         $var = val("SELECT COUNT(*) FROM expenses WHERE type='maas' AND user_id=? AND last_repeat=?", [$person['id'], $buMonth]);
         if (!$var) {
             insert('expenses', [
-                'type' => 'maas', 'title' => $person['name'] . ' — ' . AYLAR[(int)date('n')] . ' maaşı',
+                'type' => 'maas', 'title' => $person['name'] . ' — ' . MONTHS[(int)date('n')] . ' maaşı',
                 'amount' => $person['salary'], 'date' => date('Y-m-01'), 'status' => 'bekliyor',
                 'repeat' => 'yok', 'last_repeat' => $buMonth, 'user_id' => $person['id'], 'created' => date('Y-m-d H:i:s'),
             ]);
         }
     }
-    /* --- Aylık tekrarlayan giderler (kira, abonelik vb.) --- */
+    /* --- Monthly recurring expenses (rent, subscriptions, etc.) --- */
     foreach (rows("SELECT * FROM expenses WHERE `repeat`='aylik'") as $gd) {
         if ($gd['last_repeat'] === $buMonth) continue;
         if ($gd['last_repeat'] === null) { update_row('expenses', ['last_repeat' => $buMonth], 'id=?', [$gd['id']]); continue; }
@@ -689,7 +727,7 @@ function run_recurring_jobs(bool $force = false): int {
         update_row('expenses', ['last_repeat' => $buMonth], 'id=?', [$gd['id']]);
     }
 
-    /* --- Toplantı hatırlatması: ~1 saat kala katılımcılara bildir --- */
+    /* --- Meeting reminder: notify participants ~1 hour ahead --- */
     $upcomingMeetings = rows("SELECT * FROM events WHERE type='toplanti' AND is_reminded=0
         AND start BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 75 MINUTE)");
     foreach ($upcomingMeetings as $top) {
@@ -698,12 +736,12 @@ function run_recurring_jobs(bool $force = false): int {
         $alicilar = array_column(rows("SELECT user_id FROM event_participants WHERE event_id=?", [$top['id']]), 'user_id');
         $alicilar[] = (int)$top['created_by'];
         foreach (array_unique($alicilar) as $aid) {
-            notify((int)$aid, '⏰ Toplantı yaklaşıyor: ' . $top['title'], $messageText, 'meetings.php', 'task');
+            notify((int)$aid, '⏰ Toplantı yaklaşıyor: ' . $top['title'], $messageText, 'meetings.php', 'gorev');
         }
         update_row('events', ['is_reminded' => 1], 'id=?', [$top['id']]);
     }
 
-    /* --- Günlük özet: her kullanıcıya günde bir kez "bugün seni bekleyenler" --- */
+    /* --- Daily digest: once a day per user — "what awaits you today" --- */
     $lastSummary = val("SELECT setting_value FROM settings WHERE setting_key='son_gunluk_ozet'");
     if ($lastSummary !== date('Y-m-d')) {
         q("INSERT INTO settings (setting_key, setting_value) VALUES ('son_gunluk_ozet', ?) ON DUPLICATE KEY UPDATE setting_value=?", [date('Y-m-d'), date('Y-m-d')]);
@@ -722,12 +760,12 @@ function run_recurring_jobs(bool $force = false): int {
             $contentCount = (int)val("SELECT COUNT(*) FROM contents WHERE date=? AND status NOT IN ('yayinlandi')", [$today]);
             if ($contentCount) $parcalar[] = $contentCount . ' içerik yayını';
             if ($parcalar) {
-                notify($kid, '🌅 Bugün seni bekleyenler', implode(' · ', $parcalar), 'index.php', 'task', false);
+                notify($kid, '🌅 Bugün seni bekleyenler', implode(' · ', $parcalar), 'index.php', 'gorev', false);
             }
         }
     }
 
-    /* --- Haftalık yönetici özeti: her pazartesi bir kez --- */
+    /* --- Weekly manager digest: once every Monday --- */
     $buWeek = date('o-W');
     if (date('N') == 1 && val("SELECT setting_value FROM settings WHERE setting_key='son_haftalik_ozet'") !== $buWeek) {
         q("INSERT INTO settings (setting_key, setting_value) VALUES ('son_haftalik_ozet', ?) ON DUPLICATE KEY UPDATE setting_value=?", [$buWeek, $buWeek]);
@@ -746,15 +784,15 @@ function run_recurring_jobs(bool $force = false): int {
         if ($t5 || $t6) $summary[] = 'gelir ' . money($t5) . ' / gider ' . money($t6);
         if ($summary) {
             foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $yo) {
-                notify((int)$yo['id'], '📅 Haftalık özet', implode(' · ', $summary), 'reports.php', 'task');
+                notify((int)$yo['id'], '📅 Haftalık özet', implode(' · ', $summary), 'reports.php', 'gorev');
             }
         }
     }
 
-    /* --- Sözleşme bitiş hatırlatması (30 gün kala, bir kez) --- */
+    /* --- Contract expiry reminder (30 days ahead, once) --- */
     foreach (rows("SELECT s.*, d.name client_name FROM contracts s JOIN clients d ON d.id=s.client_id WHERE s.is_reminded=0 AND s.end IS NOT NULL AND s.end <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND s.end >= CURDATE()") as $sz) {
         foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $ya) {
-            notify((int)$ya['id'], '⏰ Sözleşme bitiyor: ' . $sz['client_name'], '"' . $sz['title'] . '" sözleşmesi ' . format_date($sz['end']) . ' tarihinde sona eriyor.', 'client.php?id=' . $sz['client_id'], 'task');
+            notify((int)$ya['id'], '⏰ Sözleşme bitiyor: ' . $sz['client_name'], '"' . $sz['title'] . '" sözleşmesi ' . format_date($sz['end']) . ' tarihinde sona eriyor.', 'client.php?id=' . $sz['client_id'], 'gorev');
         }
         update_row('contracts', ['is_reminded' => 1], 'id=?', [$sz['id']]);
     }
@@ -762,8 +800,8 @@ function run_recurring_jobs(bool $force = false): int {
     return $count;
 }
 
-/* ---------------- Canlı senkron: durum özetleri ----------------
- * Açık sayfalar 10 sn'de bir bu hash'i kontrol eder; değiştiyse sayfa tazelenir.
+/* ---------------- Live sync: state digests ----------------
+ * Open pages check this hash every 10 s; if it changed, the page refreshes.
  */
 function live_hash_task(int $id): string {
     $g = row("SELECT status, lock_bypassed, bagimli_id, assignee_id, is_archived, title, due_date FROM tasks WHERE id=?", [$id]);
@@ -773,7 +811,7 @@ function live_hash_task(int $id): string {
     $reaction = val("SELECT COUNT(*) FROM comment_box_reactions t JOIN comments y ON y.id=t.comment_box_id WHERE y.ref_type='gorev' AND y.ref_id=?", [$id]);
     $ek = val("SELECT COUNT(*) FROM archive WHERE task_id=?", [$id]);
     $watcher = val("SELECT COUNT(*) FROM task_watchers WHERE task_id=?", [$id]);
-    // Bağımlı görevin durumu da kilidi etkiler
+    // The dependency task's status also affects the lock
     $bagimliStatus = $g && $g['bagimli_id'] ? val("SELECT status FROM tasks WHERE id=?", [$g['bagimli_id']]) : '';
     return md5(json_encode([$g, $steps, $check, $comment_box, $reaction, $ek, $watcher, $bagimliStatus]));
 }
@@ -782,31 +820,31 @@ function live_hash_list(): string {
     return md5((string)val("SELECT GROUP_CONCAT(CONCAT_WS(':',id,status,sort_order,is_archived,COALESCE(assignee_id,0)) ORDER BY id) FROM tasks"));
 }
 
-/** Kullanıcı 'yalnızca sorumlusu olduğum adımlar' tercihini açmış mı? */
+/** Has the user enabled the 'only steps I am responsible for' preference? */
 function only_own_steps(): bool {
     $t = json_decode(user()['notification_preferences'] ?? '', true);
     return is_array($t) && !empty($t['only_own_steps']);
 }
 
-/** Görev tamamlanınca bağlı içeriği 'onaylandı' durumuna taşır (yayınlanmadıysa) */
+/** When a task is completed, moves the linked content to 'approved' (unless already published) */
 function task_content_sync(int $taskId): void {
     $contentId = (int)val("SELECT content_id FROM tasks WHERE id=?", [$taskId]);
     if ($contentId) q("UPDATE contents SET status='onaylandi' WHERE id=? AND status NOT IN ('yayinlandi','onaylandi')", [$contentId]);
 }
 
-/* ---------------- Görev kilit kontrolleri ---------------- */
+/* ---------------- Task lock checks ---------------- */
 
-/** Görevin ilerlemesini engelleyen neden döner; engel yoksa null. */
+/** Returns the reason blocking the task from progressing; null if there is none. */
 function task_lock_reason(array $task, string $targetStatus): ?string {
-    if (!empty($task['lock_bypassed'])) return null; // yönetici kilidi devre dışı bırakmış
-    // Bağımlılık: bağlı görev bitmeden yapilacak'tan ileri gidemez
+    if (!empty($task['lock_bypassed'])) return null; // an admin has bypassed the lock
+    // Dependency: cannot move past 'yapilacak' until the linked task is finished
     if ($task['bagimli_id'] && $targetStatus !== 'yapilacak') {
         $bagimli = row("SELECT title, status FROM tasks WHERE id=?", [$task['bagimli_id']]);
         if ($bagimli && $bagimli['status'] !== 'tamamlandi') {
             return '"' . $bagimli['title'] . '" görevi tamamlanmadan bu görev ilerleyemez.';
         }
     }
-    // Durum kilidi: akış adımları bitmeden tamamlandı yapılamaz
+    // Status lock: cannot be marked completed until the workflow steps are done
     if ($targetStatus === 'tamamlandi') {
         $eksik = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND status!='tamam'", [$task['id']]);
         if ($eksik > 0) return "Akışta $eksik tamamlanmamış adım var. Önce adımları bitirin.";
@@ -820,7 +858,7 @@ function project_channel(int $projectId, string $type = 'project'): int {
     $project = row("SELECT name FROM projects WHERE id=?", [$projectId]);
     $name = $project['name'] ?? 'Proje';
     $channelId = insert('channels', ['name' => $name, 'type' => $type, 'project_id' => $projectId, 'created' => date('Y-m-d H:i:s')]);
-    // Ekip üyelerini otomatik ekle
+    // Auto-add team members
     foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm','ekip') AND is_active=1") as $u) {
         q("INSERT IGNORE INTO channel_members (channel_id, user_id) VALUES (?,?)", [$channelId, $u['id']]);
     }

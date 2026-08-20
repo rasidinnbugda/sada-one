@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Kişisel Çalışma Alanı
- * Notlar, kişisel yapılacaklar, yer imleri ve hızlı karalama — yalnızca sahibi görür.
+ * SADA One — Personal Workspace
+ * Notes, personal to-dos, bookmarks, and quick scratchpad — visible only to the owner.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -29,7 +29,7 @@ page_start('Alanım', 'my_space');
 
 <div class="izgara" style="grid-template-columns:1fr 320px">
     <div>
-        <!-- Notlar -->
+        <!-- Notes -->
         <?php if (!$notes): ?>
         <div class="kart orta" style="padding:36px">
             <div class="bos-ikon" style="margin-bottom:14px"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></div>
@@ -54,7 +54,7 @@ page_start('Alanım', 'my_space');
         </div>
         <?php endif; ?>
 
-        <!-- Hızlı karalama -->
+        <!-- Quick scratchpad -->
         <div class="kart mt-3">
             <div class="satir-esnek arasi mb-2">
                 <div class="kart-baslik"><?= icon('item', 16) ?> Hızlı Karalama</div>
@@ -65,7 +65,7 @@ page_start('Alanım', 'my_space');
     </div>
 
     <div>
-        <!-- Kişisel yapılacaklar -->
+        <!-- Personal to-dos -->
         <div class="kart mb-2">
             <div class="satir-esnek arasi mb-2">
                 <div class="kart-baslik" style="font-size:14px"><?= icon('approval', 15) ?> Yapılacaklarım</div>
@@ -87,7 +87,7 @@ page_start('Alanım', 'my_space');
             </form>
         </div>
 
-        <!-- Yer imleri -->
+        <!-- Bookmarks -->
         <div class="kart">
             <div class="satir-esnek arasi mb-2">
                 <div class="kart-baslik" style="font-size:14px"><?= icon('atac', 15) ?> Yer İmlerim</div>
@@ -106,7 +106,7 @@ page_start('Alanım', 'my_space');
     </div>
 </div>
 
-<!-- Not ekle/düzenle -->
+<!-- Add/edit note -->
 <div class="modal-katman" id="modalNot">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="notTitleTop">Yeni Not</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="not_save">
@@ -127,7 +127,7 @@ page_start('Alanım', 'my_space');
     </form></div>
 </div>
 
-<!-- Yer imi ekle -->
+<!-- Add bookmark -->
 <div class="modal-katman" id="modalLink">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yer İmi Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="link_add">
@@ -140,7 +140,7 @@ page_start('Alanım', 'my_space');
 </div>
 
 <script>
-/* Not color seçimi vurgusu */
+/* Note color selection highlight */
 document.querySelectorAll('.not-color').forEach(n => n.addEventListener('click', () => {
     document.querySelectorAll('.not-color').forEach(x => x.style.borderColor = 'transparent');
     n.style.borderColor = 'var(--text)';
@@ -162,9 +162,9 @@ function notEdit(n) {
     modalOpen('modalNot');
 }
 
-/* Kişisel yapılacaklar: yenilemesiz */
+/* Personal to-dos: without page reload */
 function isCounterUpdate() {
-    const open = document.querySelectorAll('#isListe .kontrol-oge:not(.tamam)').length;
+    const open = document.querySelectorAll('#isList .kontrol-oge:not(.tamam)').length;
     document.getElementById('isCounter').textContent = open + ' açık';
 }
 async function isAdd(e) {
@@ -190,7 +190,7 @@ async function isToggle(id, box) {
     else box.checked = !box.checked;
 }
 
-/* Karalama: 1,2 sn hareketsizlikte otomatik save */
+/* Scratchpad: auto-save after 1.2s of inactivity */
 const scratchpad = document.getElementById('scratchpadField');
 const scratchpadStatus = document.getElementById('scratchpadStatus');
 let scratchpadTime = null;

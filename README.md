@@ -1,6 +1,11 @@
 # SADA One
 
-Dijital ajanslar için PHP + MySQL tabanlı iş yönetim paneli. Tamamı Türkçe.
+Dijital ajanslar için PHP + MySQL tabanlı iş yönetim paneli. Arayüz Türkçe, kod tabanı İngilizce.
+
+> **v5.0 not:** Kod tabanı (dosya adları, veritabanı şeması, değişkenler, yorumlar) tamamen
+> İngilizce'ye taşındı. Eski (Türkçe şemalı) kurulumlar ilk sayfa açılışında kendini onarır:
+> şema otomatik olarak yeni adlara taşınır, veri kaybolmaz; eski sayfa adresleri 301 ile yönlenir.
+> Ayrıca PHP oturum kilidi erken bırakılarak çok sekmeli kullanımdaki takılma sorunu giderildi.
 
 ## Özellikler
 
@@ -17,7 +22,7 @@ Dijital ajanslar için PHP + MySQL tabanlı iş yönetim paneli. Tamamı Türkç
 ## Gereksinimler
 
 - PHP 8.1+ (PDO MySQL eklentisi ile)
-- MySQL 5.7+ / MariaDB 10.4+
+- MySQL 8.0+ / MariaDB 10.5+ (v5.0 şema taşıması `RENAME COLUMN` kullanır)
 - Paylaşımlı hosting yeterli (Hostinger üzerinde test edildi)
 
 ## Kurulum

@@ -1,8 +1,8 @@
 <?php
 /**
- * SADA One — Merkezi Şema Migrasyonu
- * Kurulum sihirbazı, guncelle.php ve panel içi güncelleyici aynı listeyi kullanır.
- * Her komut idempotenttir: "Duplicate/exists" hataları atlanır.
+ * SADA One — Central Schema Migration
+ * The install wizard, guncelle.php, and the in-panel updater all use the same list.
+ * Every command is idempotent: "Duplicate/exists" errors are skipped.
  */
 
 function migration_commands(): array {
@@ -15,15 +15,15 @@ function migration_commands(): array {
     "ALTER TABLE users ADD COLUMN permissions TEXT",
     "ALTER TABLE users ADD COLUMN notification_preferences TEXT",
     "ALTER TABLE users ADD COLUMN widgets TEXT",
-    // dosyalar
+    // client files
     "ALTER TABLE clients ADD COLUMN logo VARCHAR(255) DEFAULT NULL",
-    // gorevler
+    // tasks
     "ALTER TABLE tasks ADD COLUMN sort_order INT NOT NULL DEFAULT 0",
     "ALTER TABLE tasks ADD COLUMN bagimli_id INT DEFAULT NULL",
     "ALTER TABLE tasks ADD COLUMN lock_bypassed TINYINT(1) NOT NULL DEFAULT 0",
     "ALTER TABLE tasks ADD COLUMN `repeat` ENUM('yok','haftalik','aylik') NOT NULL DEFAULT 'yok'",
     "ALTER TABLE tasks ADD COLUMN last_repeat VARCHAR(10) DEFAULT NULL",
-    // yeni tablolar
+    // new tables
     "CREATE TABLE IF NOT EXISTS project_members (project_id INT NOT NULL, user_id INT NOT NULL, PRIMARY KEY (project_id, user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
     "CREATE TABLE IF NOT EXISTS client_members (client_id INT NOT NULL, user_id INT NOT NULL, PRIMARY KEY (client_id, user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
     "CREATE TABLE IF NOT EXISTS task_checklist (id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, name VARCHAR(200) NOT NULL, is_done TINYINT(1) NOT NULL DEFAULT 0, sort_order TINYINT NOT NULL DEFAULT 1, INDEX(task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
@@ -102,7 +102,7 @@ function migration_commands(): array {
     ];
 }
 
-/** Tüm migrasyon komutlarını çalıştırır; [durum, sql] çiftleri döner. durum: ok|atla|hata */
+/** Runs all migration commands; returns [status, sql] pairs. status: ok|atla|hata */
 function run_migrations(PDO $pdo): array {
     $results = [];
     // Legacy Turkish schemas are renamed to English first (no-op on fresh installs)

@@ -189,8 +189,171 @@
 }
 
 /* Tarih/saat gibi yerel kontrollerin tema uyumu */
-[data-theme="lime"], [data-theme="navy"], [data-theme="maroon"], [data-theme="gece"], [data-theme="koyu"] { color-scheme: dark; }
-[data-theme="lime-light"], [data-theme="navy-light"], [data-theme="maroon-light"], [data-theme="cream"], [data-theme="acik"] { color-scheme: light; }
+/* ============================================================
+   v5.0 AIRY THEMES — Liquid Glass / Glassmorphism / Claymorphism
+   ============================================================ */
+[data-theme="liquid-glass"] {
+    --marka: #8ad8ff;
+    --marka-2: #b3e6ff;
+    --marka-ink: #06222f;
+    --bg: #0a1220;
+    --bg-2: rgba(255, 255, 255, .04);
+    --surface: rgba(255, 255, 255, .07);
+    --surface-2: rgba(255, 255, 255, .10);
+    --surface-3: rgba(255, 255, 255, .15);
+    --border: rgba(255, 255, 255, .13);
+    --border-2: rgba(255, 255, 255, .24);
+    --text: #f2f7fc;
+    --text-2: #c4d2e0;
+    --muted: #8fa1b5;
+    --parlak: rgba(138, 216, 255, .13);
+    --golge: rgba(0, 0, 0, .5);
+    --ring: rgba(138, 216, 255, .35);
+}
+[data-theme="liquid-glass-light"] {
+    --marka: #0284c7;
+    --marka-2: #0369a1;
+    --marka-ink: #ffffff;
+    --bg: #dbe7f3;
+    --bg-2: rgba(255, 255, 255, .30);
+    --surface: rgba(255, 255, 255, .55);
+    --surface-2: rgba(255, 255, 255, .68);
+    --surface-3: rgba(255, 255, 255, .85);
+    --border: rgba(255, 255, 255, .65);
+    --border-2: rgba(2, 132, 199, .25);
+    --text: #14202e;
+    --text-2: #3d5165;
+    --muted: #6e8299;
+    --parlak: rgba(2, 132, 199, .10);
+    --golge: rgba(30, 60, 100, .25);
+    --ring: rgba(2, 132, 199, .28);
+}
+[data-theme="glass"] {
+    --marka: #c4b5fd;
+    --marka-2: #ddd1ff;
+    --marka-ink: #221540;
+    --bg: #171130;
+    --bg-2: rgba(255, 255, 255, .05);
+    --surface: rgba(255, 255, 255, .08);
+    --surface-2: rgba(255, 255, 255, .12);
+    --surface-3: rgba(255, 255, 255, .17);
+    --border: rgba(255, 255, 255, .14);
+    --border-2: rgba(255, 255, 255, .26);
+    --text: #f4f1fd;
+    --text-2: #cfc6ec;
+    --muted: #9a8fc4;
+    --parlak: rgba(196, 181, 253, .14);
+    --golge: rgba(10, 5, 30, .55);
+    --ring: rgba(196, 181, 253, .35);
+}
+[data-theme="glass-light"] {
+    --marka: #7c3aed;
+    --marka-2: #6d28d9;
+    --marka-ink: #ffffff;
+    --bg: #e6e1f7;
+    --bg-2: rgba(255, 255, 255, .28);
+    --surface: rgba(255, 255, 255, .50);
+    --surface-2: rgba(255, 255, 255, .65);
+    --surface-3: rgba(255, 255, 255, .82);
+    --border: rgba(255, 255, 255, .60);
+    --border-2: rgba(124, 58, 237, .25);
+    --text: #1e1633;
+    --text-2: #4a3f68;
+    --muted: #7d7398;
+    --parlak: rgba(124, 58, 237, .10);
+    --golge: rgba(60, 30, 120, .22);
+    --ring: rgba(124, 58, 237, .26);
+}
+[data-theme="clay"] {
+    --marka: #2563eb;
+    --marka-2: #1d4ed8;
+    --marka-ink: #ffffff;
+    --bg: #dce9f9;
+    --bg-2: #e8f1fb;
+    --surface: #f4f8fe;
+    --surface-2: #e9f1fb;
+    --surface-3: #dde9f8;
+    --border: rgba(37, 99, 235, .10);
+    --border-2: rgba(37, 99, 235, .20);
+    --text: #1b2a44;
+    --text-2: #45587a;
+    --muted: #7488a8;
+    --parlak: rgba(37, 99, 235, .10);
+    --golge: rgba(37, 99, 235, .22);
+    --ring: rgba(37, 99, 235, .25);
+}
+
+/* Colorful "wallpaper" backdrops the glass sits on */
+[data-theme="liquid-glass"] body {
+    background-image: radial-gradient(ellipse 60% 50% at 15% 0%, rgba(64, 145, 255, .35), transparent),
+        radial-gradient(ellipse 50% 60% at 90% 20%, rgba(190, 60, 90, .30), transparent),
+        radial-gradient(ellipse 70% 50% at 60% 110%, rgba(35, 200, 170, .22), transparent);
+    background-attachment: fixed;
+}
+[data-theme="liquid-glass-light"] body {
+    background-image: radial-gradient(ellipse 60% 55% at 10% 0%, rgba(125, 190, 255, .55), transparent),
+        radial-gradient(ellipse 55% 60% at 95% 15%, rgba(255, 150, 170, .40), transparent),
+        radial-gradient(ellipse 70% 55% at 55% 115%, rgba(140, 235, 205, .45), transparent);
+    background-attachment: fixed;
+}
+[data-theme="glass"] body {
+    background-image: radial-gradient(ellipse 65% 55% at 20% 5%, rgba(124, 58, 237, .45), transparent),
+        radial-gradient(ellipse 55% 60% at 90% 30%, rgba(56, 130, 246, .35), transparent),
+        radial-gradient(ellipse 70% 50% at 55% 115%, rgba(236, 72, 153, .28), transparent);
+    background-attachment: fixed;
+}
+[data-theme="glass-light"] body {
+    background-image: radial-gradient(ellipse 65% 55% at 15% 0%, rgba(167, 139, 250, .50), transparent),
+        radial-gradient(ellipse 55% 60% at 92% 25%, rgba(96, 165, 250, .45), transparent),
+        radial-gradient(ellipse 70% 55% at 55% 115%, rgba(244, 114, 182, .35), transparent);
+    background-attachment: fixed;
+}
+
+/* Frosted-glass surfaces (blur + saturation) */
+[data-theme="liquid-glass"] .kart, [data-theme="liquid-glass"] .kenar, [data-theme="liquid-glass"] .ustbar,
+[data-theme="liquid-glass"] .modal, [data-theme="liquid-glass"] .acilir-panel, [data-theme="liquid-glass"] .osec-panel,
+[data-theme="liquid-glass"] .stat-kart, [data-theme="liquid-glass"] .kanban-sutun, [data-theme="liquid-glass"] .dock-panel,
+[data-theme="liquid-glass-light"] .kart, [data-theme="liquid-glass-light"] .kenar, [data-theme="liquid-glass-light"] .ustbar,
+[data-theme="liquid-glass-light"] .modal, [data-theme="liquid-glass-light"] .acilir-panel, [data-theme="liquid-glass-light"] .osec-panel,
+[data-theme="liquid-glass-light"] .stat-kart, [data-theme="liquid-glass-light"] .kanban-sutun, [data-theme="liquid-glass-light"] .dock-panel,
+[data-theme="glass"] .kart, [data-theme="glass"] .kenar, [data-theme="glass"] .ustbar,
+[data-theme="glass"] .modal, [data-theme="glass"] .acilir-panel, [data-theme="glass"] .osec-panel,
+[data-theme="glass"] .stat-kart, [data-theme="glass"] .kanban-sutun, [data-theme="glass"] .dock-panel,
+[data-theme="glass-light"] .kart, [data-theme="glass-light"] .kenar, [data-theme="glass-light"] .ustbar,
+[data-theme="glass-light"] .modal, [data-theme="glass-light"] .acilir-panel, [data-theme="glass-light"] .osec-panel,
+[data-theme="glass-light"] .stat-kart, [data-theme="glass-light"] .kanban-sutun, [data-theme="glass-light"] .dock-panel {
+    backdrop-filter: blur(22px) saturate(1.5);
+    -webkit-backdrop-filter: blur(22px) saturate(1.5);
+}
+/* Liquid glass: extra-round, luminous edges */
+[data-theme="liquid-glass"] .kart, [data-theme="liquid-glass-light"] .kart,
+[data-theme="liquid-glass"] .stat-kart, [data-theme="liquid-glass-light"] .stat-kart {
+    border-radius: 22px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 8px 32px -12px var(--golge);
+}
+[data-theme="liquid-glass"] .modal, [data-theme="liquid-glass-light"] .modal { border-radius: 26px; }
+[data-theme="glass"] .kart, [data-theme="glass-light"] .kart {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15), 0 10px 36px -14px var(--golge);
+}
+/* Claymorphism: puffy, soft, double-shadow surfaces */
+[data-theme="clay"] .kart, [data-theme="clay"] .stat-kart, [data-theme="clay"] .kanban-sutun, [data-theme="clay"] .modal {
+    border: none;
+    border-radius: 24px;
+    box-shadow: 0 14px 28px -10px rgba(37, 99, 235, .18),
+        inset 0 -4px 8px rgba(37, 99, 235, .07),
+        inset 0 4px 8px rgba(255, 255, 255, .9);
+}
+[data-theme="clay"] .btn, [data-theme="clay"] .girdi, [data-theme="clay"] .secim, [data-theme="clay"] .metin-alani {
+    border-radius: 14px;
+    box-shadow: 0 4px 10px -4px rgba(37, 99, 235, .15), inset 0 2px 4px rgba(255, 255, 255, .8);
+}
+[data-theme="clay"] .btn-marka {
+    box-shadow: 0 8px 16px -6px rgba(37, 99, 235, .5), inset 0 2px 3px rgba(255, 255, 255, .35);
+}
+[data-theme="clay"] .kenar, [data-theme="clay"] .ustbar { border: none; box-shadow: 0 10px 24px -12px rgba(37, 99, 235, .2); }
+
+[data-theme="lime"], [data-theme="navy"], [data-theme="maroon"], [data-theme="gece"], [data-theme="koyu"], [data-theme="liquid-glass"], [data-theme="glass"] { color-scheme: dark; }
+[data-theme="lime-light"], [data-theme="navy-light"], [data-theme="maroon-light"], [data-theme="cream"], [data-theme="acik"], [data-theme="liquid-glass-light"], [data-theme="glass-light"], [data-theme="clay"] { color-scheme: light; }
 
 /* Durum renkleri (temadan bağımsız) */
 :root {

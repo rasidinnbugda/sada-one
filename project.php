@@ -28,7 +28,7 @@ $team = rows("SELECT id, name, color FROM users WHERE role IN ('yonetici','pm','
 $templates = rows("SELECT * FROM workflow_templates ORDER BY name");
 $projectMembers = rows("SELECT u.id, u.name, u.color, u.avatar, u.job_title FROM project_members pu JOIN users u ON u.id=pu.user_id WHERE pu.project_id=? AND u.is_active=1 ORDER BY u.name", [$id]);
 
-// İstasyon (SOP) verileri — yalnız ekip görür
+// Station (SOP) data — visible only to staff
 $budgetGor = permission('butce_gor');
 $checkList = is_staff() ? rows("SELECT k.*, u.name owner_name FROM project_checklist k LEFT JOIN users u ON u.id=k.owner_id WHERE k.project_id=? ORDER BY k.sort_order", [$id]) : [];
 $ekRequests = $budgetGor ? rows("SELECT t.*, u.name creator_name FROM project_ek_requests t LEFT JOIN users u ON u.id=t.created_by WHERE t.project_id=? ORDER BY t.id DESC", [$id]) : [];
@@ -47,8 +47,8 @@ page_start($project['name'], 'projects');
 <div class="sayfa-ust">
     <div>
         <div class="satir-esnek" style="gap:10px">
-            <span class="rozet rozet-tur"><?= PROJE_TURLERI[$project['type']] ?></span>
-            <?= badge($project['status'], PROJE_DURUMLARI) ?>
+            <span class="rozet rozet-tur"><?= PROJECT_TYPES[$project['type']] ?></span>
+            <?= badge($project['status'], PROJECT_STATUSES) ?>
         </div>
         <div class="sayfa-baslik mt-1"><?= e($project['name']) ?></div>
         <?php if ($project['pm_name']): ?><div class="sayfa-alt">Proje Yöneticisi: <?= e($project['pm_name']) ?></div><?php endif; ?>
@@ -75,7 +75,7 @@ page_start($project['name'], 'projects');
         <button class="sekme" data-sekme="activity">Aktivite</button>
     </div>
 
-    <!-- ÖZET -->
+    <!-- SUMMARY -->
     <div class="sekme-icerik aktif" id="sekme-ozet">
         <div class="stat-izgara">
             <div class="stat-kart"><div class="stat-deger"><?= $rate ?>%</div><div class="stat-etiket">Tamamlanma</div><div class="ilerleme mt-2"><div class="ilerleme-dolu" data-rate="<?= $rate ?>" style="width:0"></div></div></div>
@@ -90,7 +90,7 @@ page_start($project['name'], 'projects');
                 <div class="kart-baslik mb-2">Proje Bilgileri</div>
                 <div class="dikey mt-2" style="gap:12px">
                     <div class="satir-esnek arasi"><span class="hucre-alt">Dosya</span><span class="hucre-ana"><?= e($project['client_name']) ?></span></div>
-                    <div class="satir-esnek arasi"><span class="hucre-alt">Tür</span><span><?= PROJE_TURLERI[$project['type']] ?></span></div>
+                    <div class="satir-esnek arasi"><span class="hucre-alt">Tür</span><span><?= PROJECT_TYPES[$project['type']] ?></span></div>
                     <div class="satir-esnek arasi"><span class="hucre-alt">Başlangıç</span><span><?= format_date($project['start']) ?></span></div>
                     <div class="satir-esnek arasi"><span class="hucre-alt">Bitiş</span><span><?= format_date($project['end']) ?></span></div>
                     <?php if ($projectMembers): ?>
@@ -119,7 +119,7 @@ page_start($project['name'], 'projects');
         $completed_items = array_filter($tasks, fn($g) => $g['status'] === 'tamamlandi');
         $gorevPuanlari = array_column(rows("SELECT ref_id, rating FROM ratings WHERE ref_type='gorev' AND user_id=? AND project_id=?", [$u['id'], $id]), 'rating', 'ref_id');
         if ($completed_items): ?>
-    <!-- Müşteri: tamamlanan işleri değerlendir -->
+    <!-- Client: rate completed work -->
     <div class="kart mt-3" id="sekme-ozet-puanlama">
         <div class="kart-baslik mb-2"><?= icon('star', 16) ?> Tamamlanan İşleri Değerlendirin</div>
         <div class="hucre-alt mb-3">Görüşleriniz hizmet kalitemizi doğrudan şekillendirir.</div>
@@ -138,7 +138,7 @@ page_start($project['name'], 'projects');
     </div>
     <?php endif; endif; ?>
 
-    <!-- GÖREVLER -->
+    <!-- TASKS -->
     <div class="sekme-icerik" id="sekme-gorevler">
         <div class="satir-esnek arasi mb-2">
             <div class="metin-muted kucuk">Görevleri sürükleyerek durumlarını değiştirebilirsiniz</div>
@@ -148,7 +148,7 @@ page_start($project['name'], 'projects');
     </div>
 
     <?php if ($project['type'] === 'aylik'): ?>
-    <!-- DÖNEMLER -->
+    <!-- PERIODS -->
     <div class="sekme-icerik" id="sekme-donemler">
         <div class="satir-esnek arasi mb-3">
             <div class="kart-baslik">Aylık Dönemler</div>
@@ -169,7 +169,7 @@ page_start($project['name'], 'projects');
     </div>
     <?php endif; ?>
 
-    <!-- ONAYLAR -->
+    <!-- APPROVALS -->
     <div class="sekme-icerik" id="sekme-onaylar">
         <div class="satir-esnek arasi mb-3">
             <div class="kart-baslik">Onay Süreçleri</div>
@@ -181,7 +181,7 @@ page_start($project['name'], 'projects');
         <div class="kart mb-2">
             <div class="satir-esnek arasi">
                 <div style="min-width:0">
-                    <div class="satir-esnek" style="gap:9px"><span class="kalin"><?= e($o['title']) ?></span><?= badge($o['status'], ONAY_DURUMLARI) ?></div>
+                    <div class="satir-esnek" style="gap:9px"><span class="kalin"><?= e($o['title']) ?></span><?= badge($o['status'], APPROVAL_STATUSES) ?></div>
                     <?php if ($o['description']): ?><div class="hucre-alt mt-1"><?= e($o['description']) ?></div><?php endif; ?>
                     <div class="hucre-alt mt-1"><?= e($o['sender_name']) ?> · <?= time_ago($o['created']) ?><?php if ($o['archive_id']): $ar = row("SELECT * FROM archive WHERE id=?", [$o['archive_id']]); if ($ar): ?> · <a href="uploads/<?= e($ar['file_path']) ?>" target="_blank" style="color:var(--marka)"><?= icon('atac', 12) ?> <?= e($ar['name']) ?></a><?php endif; endif; ?></div>
                     <?php if ($o['reply_note']): ?><div class="mt-2" style="padding:10px 14px;background:var(--surface-2);border-radius:10px;font-size:13px"><b>Müşteri notu:</b> <?= nl2br(e($o['reply_note'])) ?></div><?php endif; ?>
@@ -197,7 +197,7 @@ page_start($project['name'], 'projects');
         <?php endforeach; endif; ?>
     </div>
 
-    <!-- İÇERİKLER -->
+    <!-- CONTENTS -->
     <div class="sekme-icerik" id="sekme-icerik">
         <div class="satir-esnek arasi mb-3">
             <div class="kart-baslik">İçerikler</div>
@@ -208,19 +208,19 @@ page_start($project['name'], 'projects');
         <?php else: ?>
         <div class="tablo-sar"><table class="tablo"><thead><tr><th>İçerik</th><th>Platform</th><th>Tarih</th><th>Durum</th></tr></thead><tbody>
             <?php foreach ($contents as $internal): ?>
-            <tr><td class="hucre-ana"><?= e($internal['title']) ?></td><td><?= platform_badges($internal['platform']) ?></td><td><?= format_date($internal['date']) ?></td><td><?= badge($internal['status'], ICERIK_DURUMLARI) ?></td></tr>
+            <tr><td class="hucre-ana"><?= e($internal['title']) ?></td><td><?= platform_badges($internal['platform']) ?></td><td><?= format_date($internal['date']) ?></td><td><?= badge($internal['status'], CONTENT_STATUSES) ?></td></tr>
             <?php endforeach; ?>
         </tbody></table></div>
         <?php endif; ?>
     </div>
 
-    <!-- TARTIŞMA -->
+    <!-- DISCUSSION -->
     <?php if (is_staff()): ?>
-    <!-- İSTASYON: SOP künye + bütçe + teknik kontrol + değerlendirme -->
+    <!-- STATION: SOP project brief + budget + technical checks + review -->
     <div class="sekme-icerik" id="sekme-istasyon">
         <div class="izgara izgara-2" style="align-items:start">
             <div class="dikey" style="gap:16px">
-                <!-- Künye -->
+                <!-- Project brief -->
                 <div class="kart">
                     <div class="kart-baslik mb-2">Proje Künyesi</div>
                     <form data-ajax="station_save" data-refresh="hayir">
@@ -228,7 +228,7 @@ page_start($project['name'], 'projects');
                         <input type="hidden" name="team_roles" id="st_roles">
                         <div class="dikey kucuk mb-2" style="gap:7px">
                             <div class="satir-esnek arasi"><span class="metin-muted">Müşteri / Marka</span><b><?= e($project['client_name']) ?></b></div>
-                            <div class="satir-esnek arasi"><span class="metin-muted">Proje Tipi</span><b><?= PROJE_TURLERI[$project['type']] ?? $project['type'] ?></b></div>
+                            <div class="satir-esnek arasi"><span class="metin-muted">Proje Tipi</span><b><?= PROJECT_TYPES[$project['type']] ?? $project['type'] ?></b></div>
                             <div class="satir-esnek arasi"><span class="metin-muted">Tarih Aralığı</span><b><?= $project['start'] ? format_date($project['start']) : '—' ?> → <?= $project['end'] ? format_date($project['end']) : '—' ?></b></div>
                         </div>
                         <div class="form-grup"><label class="form-etiket">Devralma Noktası</label><input name="handover" class="girdi" value="<?= e($project['handover'] ?? '') ?>" placeholder="Örn. Etkinliğe 2 hafta kala devralındı / Sıfırdan lansman" <?= permission('dosya_yonet') ? '' : 'disabled' ?>></div>
@@ -248,7 +248,7 @@ page_start($project['name'], 'projects');
                 </div>
 
                 <?php if ($budgetGor): ?>
-                <!-- Bütçe & Ek Talepler (sadece bütçe izni olanlara) -->
+                <!-- Budget & Extra Requests (only for those with budget permission) -->
                 <div class="kart" style="border-color:var(--uyari)">
                     <div class="satir-esnek arasi mb-2">
                         <div class="kart-baslik">Bütçe & Ek Talepler <span class="rozet r-bekliyor" style="padding:1px 8px">Kısıtlı görünüm</span></div>
@@ -282,7 +282,7 @@ page_start($project['name'], 'projects');
             </div>
 
             <div class="dikey" style="gap:16px">
-                <!-- Teknik Kontrol Listesi -->
+                <!-- Technical Checklist -->
                 <div class="kart">
                     <div class="satir-esnek arasi mb-2">
                         <div class="kart-baslik">Saha & Teknik Kontrol</div>
@@ -310,7 +310,7 @@ page_start($project['name'], 'projects');
                     </form>
                 </div>
 
-                <!-- Değerlendirme (Post-Mortem) -->
+                <!-- Review (Post-Mortem) -->
                 <div class="kart">
                     <div class="kart-baslik mb-2">Değerlendirme (Post-Mortem)</div>
                     <?php $reviewTypes = ['ic' => ['İç Değerlendirme (Ekip)', 'Neleri iyi yaptık? Nerede zaman/bütçe/enerji kaybı yaşandı? Bir sonraki projede neyi farklı yapmalıyız? Yaşanan aksilikler...'], 'dis' => ['Dış Değerlendirme (Kurum)', 'Müşteri memnuniyeti, alınan olumlu/olumsuz geri bildirimler...'], 'case_study' => ['Web Sitesi Case Study İçeriği', 'Projenin amacı, erişim/etkileşim metrikleri, öne çıkan görsel ve videolar...']];
@@ -331,11 +331,11 @@ page_start($project['name'], 'projects');
         <div class="kart">
             <div class="kart-baslik mb-2">Proje Tartışması</div>
             <div class="hucre-alt mb-3">Ekip ve müşteri bu alanda proje hakkında konuşabilir. @ yazarak birini etiketleyin.</div>
-            <?php comment_feed('project', $id); ?>
+            <?php comment_feed('proje', $id); ?>
         </div>
     </div>
 
-    <!-- ARŞİV -->
+    <!-- ARCHIVE -->
     <div class="sekme-icerik" id="sekme-arsiv">
         <div class="satir-esnek arasi mb-3">
             <div class="kart-baslik">Dosya Arşivi</div>
@@ -360,7 +360,7 @@ page_start($project['name'], 'projects');
         <?php endif; ?>
     </div>
 
-    <!-- AKTİVİTE -->
+    <!-- ACTIVITY -->
     <div class="sekme-icerik" id="sekme-aktivite">
         <div class="kart">
             <div class="kart-baslik mb-3">Proje Geçmişi</div>
@@ -373,11 +373,11 @@ page_start($project['name'], 'projects');
 </div>
 
 <?php
-// ---- Modallar ----
+// ---- Modals ----
 if (is_staff()) task_modal($id, $team, $templates, $periods);
 ?>
 
-<!-- Onaya gönder modalı -->
+<!-- Send-for-approval modal -->
 <div class="modal-katman" id="modalApproval">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Müşteri Onayına Gönder</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="onay_gonder" data-refresh="evet">
@@ -392,7 +392,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
     </form></div>
 </div>
 
-<!-- Dosya yükle modalı -->
+<!-- File upload modal -->
 <div class="modal-katman" id="modalUpload">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Dosya Yükle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="archive_upload" data-refresh="evet">
@@ -403,14 +403,14 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
 </div>
 
 <?php if ($project['type'] === 'aylik' && is_staff()): ?>
-<!-- Dönem aç modalı -->
+<!-- Open-period modal -->
 <div class="modal-katman" id="modalPeriod">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Dönem Aç</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="period_open" data-refresh="evet">
         <input type="hidden" name="project_id" value="<?= $id ?>">
         <div class="modal-govde">
             <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Ay</label><select name="month" class="secim"><?php foreach (AYLAR as $k => $v): ?><option value="<?= $k ?>" <?= $k == date('n') ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-grup"><label class="form-etiket">Ay</label><select name="month" class="secim"><?php foreach (MONTHS as $k => $v): ?><option value="<?= $k ?>" <?= $k == date('n') ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-grup"><label class="form-etiket">Yıl</label><select name="year" class="secim"><?php for ($y = date('Y') - 1; $y <= date('Y') + 1; $y++): ?><option value="<?= $y ?>" <?= $y == date('Y') ? 'selected' : '' ?>><?= $y ?></option><?php endfor; ?></select></div>
             </div>
             <div class="form-grup"><label class="form-etiket">Akış Şablonundan Görev Oluştur</label><select name="template_id" class="secim"><option value="">Boş dönem</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-ipucu">Seçilen şablonun adımları görev akışı olarak eklenir.</div></div>
@@ -423,7 +423,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
 <?php if (permission('dosya_yonet')):
 $clients = rows("SELECT id, name FROM clients WHERE status='aktif' ORDER BY name");
 $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is_active=1 ORDER BY name"); ?>
-<!-- Proje düzenle -->
+<!-- Edit project -->
 <div class="modal-katman" id="modalProjectDuzen">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Projeyi Düzenle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="project_save">
@@ -432,10 +432,10 @@ $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is
             <div class="form-grup"><label class="form-etiket">Proje Adı</label><input name="name" class="girdi" value="<?= e($project['name']) ?>" required></div>
             <div class="form-satir">
                 <div class="form-grup"><label class="form-etiket">Dosya</label><select name="client_id" class="secim"><?php foreach ($clients as $d): ?><option value="<?= $d['id'] ?>" <?= $d['id'] == $project['client_id'] ? 'selected' : '' ?>><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
-                <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" class="secim"><?php foreach (PROJE_TURLERI as $k => $v): ?><option value="<?= $k ?>" <?= $project['type'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" class="secim"><?php foreach (PROJECT_TYPES as $k => $v): ?><option value="<?= $k ?>" <?= $project['type'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
             </div>
             <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Durum</label><select name="status" class="secim"><?php foreach (PROJE_DURUMLARI as $k => $v): ?><option value="<?= $k ?>" <?= $project['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-grup"><label class="form-etiket">Durum</label><select name="status" class="secim"><?php foreach (PROJECT_STATUSES as $k => $v): ?><option value="<?= $k ?>" <?= $project['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-grup"><label class="form-etiket">PM</label><select name="pm_id" class="secim"><option value="">—</option><?php foreach ($pmler as $pm): ?><option value="<?= $pm['id'] ?>" <?= $pm['id'] == $project['pm_id'] ? 'selected' : '' ?>><?= e($pm['name']) ?></option><?php endforeach; ?></select></div>
             </div>
             <div class="form-satir">
@@ -456,7 +456,7 @@ $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is
 
 <?php rating_modal(); ?>
 
-<!-- Onay notu (revize) modalı -->
+<!-- Approval note (revision) modal -->
 <div class="modal-katman" id="modalApprovalNot">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Revize / Not Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="approval_reply">
@@ -470,7 +470,7 @@ function approvalNot(id, status) { document.getElementById('approvalNotId').valu
 </script>
 
 <?php if (is_staff()): ?>
-<!-- Ek talep modalı (bütçe izni) -->
+<!-- Extra request modal (budget permission) -->
 <?php if ($budgetGor): ?>
 <div class="modal-katman" id="modalEkRequest">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Ek Talep Kaydet</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
@@ -490,7 +490,7 @@ function approvalNot(id, status) { document.getElementById('approvalNotId').valu
 <?php endif; ?>
 
 <script>
-/* ---- İstasyon: team role dağılımı düzenleyici ---- */
+/* ---- Station: team role distribution editor ---- */
 const stTeam = <?= json_encode(array_map(fn($e2) => ['id' => $e2['id'], 'name' => $e2['name']], $team), JSON_UNESCAPED_UNICODE) ?>;
 const stRoles = <?= json_encode($teamRoles, JSON_UNESCAPED_UNICODE) ?: '[]' ?>;
 const istDuzenlenebilir = <?= permission('dosya_yonet') ? 'true' : 'false' ?>;
@@ -521,7 +521,7 @@ document.getElementById('stRoleList')?.closest('form')?.addEventListener('submit
 document.getElementById('stRoleList')?.addEventListener('input', stRoleWrite);
 document.getElementById('stRoleList')?.addEventListener('change', stRoleWrite);
 
-/* ---- İstasyon: check list ---- */
+/* ---- Station: checklist ---- */
 async function pkAdd(e) {
     e.preventDefault();
     const girdi = document.getElementById('pkNew');
@@ -549,7 +549,7 @@ async function pkOwner(id) {
     if (j.ok) location.reload();
 }
 
-/* ---- İstasyon: değerlendirme + ek request ---- */
+/* ---- Station: review + extra request ---- */
 async function reviewSave(type) {
     const j = await api('review_save', { project_id: <?= $id ?>, type, content: document.getElementById('review_' + type).value });
     if (j.ok) toast(j.message, 'basari');

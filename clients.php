@@ -5,7 +5,7 @@ require_once __DIR__ . '/includes/components.php';
 $u = require_login();
 
 if (is_customer()) {
-    // Müşteri: yalnızca erişebildiği dosyalar
+    // Customer: only the client files they can access
     [$in, $p] = in_clause(customer_client_ids());
     $clients = rows("SELECT d.*,
         (SELECT COUNT(*) FROM projects pr WHERE pr.client_id=d.id) project_count,
@@ -41,7 +41,7 @@ page_start(is_customer() ? 'Dosyalarım' : 'Dosyalar', 'clients');
     </div>
     <div class="pill-filtre" data-pill-grup="#dosyaIzgara .dosya-kart">
         <button class="pill aktif" data-setting_value="">Tümü</button>
-        <?php foreach (DOSYA_TURLERI as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
+        <?php foreach (CLIENT_TYPES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>
 </div>
 
@@ -55,10 +55,10 @@ page_start(is_customer() ? 'Dosyalarım' : 'Dosyalar', 'clients');
 <?php else: ?>
 <div class="izgara izgara-auto" id="clientIzgara">
     <?php foreach ($clients as $d): ?>
-    <a href="client.php?id=<?= $d['id'] ?>" class="kart kart-tik dosya-kart" data-filtre="<?= $d['type'] ?>" data-search="<?= e($d['name']) ?>">
+    <a href="client.php?id=<?= $d['id'] ?>" class="kart kart-tik dosya-kart" data-filter="<?= $d['type'] ?>" data-search="<?= e($d['name']) ?>">
         <div class="satir-esnek arasi mb-2">
             <?= client_logo($d, 40, 15) ?>
-            <?php if ($d['status'] === 'pasif'): ?><span class="rozet r-iptal">Pasif</span><?php else: ?><span class="rozet rozet-tur"><?= DOSYA_TURLERI[$d['type']] ?></span><?php endif; ?>
+            <?php if ($d['status'] === 'pasif'): ?><span class="rozet r-iptal">Pasif</span><?php else: ?><span class="rozet rozet-tur"><?= CLIENT_TYPES[$d['type']] ?></span><?php endif; ?>
         </div>
         <div class="kart-baslik" style="font-size:16px"><?= e($d['name']) ?></div>
         <?php if ($d['contact_name']): ?><div class="hucre-alt mt-1"><?= e($d['contact_name']) ?></div><?php endif; ?>
@@ -80,7 +80,7 @@ page_start(is_customer() ? 'Dosyalarım' : 'Dosyalar', 'clients');
             <div class="modal-govde">
                 <div class="form-satir">
                     <div class="form-grup"><label class="form-etiket">Dosya Adı <span class="zorunlu">*</span></label><input name="name" id="d_name" class="girdi" required></div>
-                    <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" id="d_type" class="secim"><?php foreach (DOSYA_TURLERI as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                    <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" id="d_type" class="secim"><?php foreach (CLIENT_TYPES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
                 </div>
                 <div class="form-grup">
                     <label class="form-etiket">Renk</label>
@@ -113,7 +113,7 @@ function clientFormSifirla() {
     document.getElementById('clientModalTitle').textContent = 'Yeni Dosya';
     colorHighlight();
 }
-// Renk seçim vurgusu
+// Color selection highlight
 function colorHighlight() {
     document.querySelectorAll('.color-radio').forEach(r => {
         r.nextElementSibling.style.borderColor = r.checked ? 'var(--text)' : 'transparent';

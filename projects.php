@@ -34,7 +34,7 @@ page_start(is_staff() ? 'Projeler' : 'Projelerim', 'projects');
     <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Proje ara..." data-search="#projeIzgara .proje-kart"></div>
     <div class="pill-filtre" data-pill-grup="#projeIzgara .proje-kart">
         <button class="pill aktif" data-setting_value="">Tümü</button>
-        <?php foreach (PROJE_TURLERI as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
+        <?php foreach (PROJECT_TYPES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>
 </div>
 
@@ -48,10 +48,10 @@ page_start(is_staff() ? 'Projeler' : 'Projelerim', 'projects');
 <div class="izgara izgara-auto" id="projectIzgara">
     <?php foreach ($projects as $p):
         $rate = $p['task_count'] ? round($p['is_done_count'] / $p['task_count'] * 100) : 0; ?>
-    <a href="project.php?id=<?= $p['id'] ?>" class="kart kart-tik proje-kart" data-filtre="<?= $p['type'] ?>" data-search="<?= e($p['name'] . ' ' . $p['client_name']) ?>">
+    <a href="project.php?id=<?= $p['id'] ?>" class="kart kart-tik proje-kart" data-filter="<?= $p['type'] ?>" data-search="<?= e($p['name'] . ' ' . $p['client_name']) ?>">
         <div class="satir-esnek arasi mb-2">
-            <span class="rozet rozet-tur"><?= PROJE_TURLERI[$p['type']] ?></span>
-            <?= badge($p['status'], PROJE_DURUMLARI) ?>
+            <span class="rozet rozet-tur"><?= PROJECT_TYPES[$p['type']] ?></span>
+            <?= badge($p['status'], PROJECT_STATUSES) ?>
         </div>
         <div class="kart-baslik" style="font-size:16px"><?= e($p['name']) ?></div>
         <div class="satir-esnek mt-1" style="gap:7px">
@@ -77,7 +77,7 @@ if (permission('dosya_yonet')) {
                 <div class="form-grup"><label class="form-etiket">Proje Adı <span class="zorunlu">*</span></label><input name="name" class="girdi" required></div>
                 <div class="form-satir">
                     <div class="form-grup"><label class="form-etiket">Dosya <span class="zorunlu">*</span></label><select name="client_id" class="secim" required><option value="">Seçin...</option><?php foreach ($clients as $d): ?><option value="<?= $d['id'] ?>"><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
-                    <div class="form-grup"><label class="form-etiket">Hizmet Türü</label><select name="type" class="secim"><?php foreach (PROJE_TURLERI as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                    <div class="form-grup"><label class="form-etiket">Hizmet Türü</label><select name="type" class="secim"><?php foreach (PROJECT_TYPES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
                 </div>
                 <div class="form-satir">
                     <div class="form-grup"><label class="form-etiket">Başlangıç</label><input type="date" name="start" class="girdi"></div>

@@ -11,7 +11,7 @@ $view = in_array($_GET['view'] ?? '', ['kanban', 'tablo']) ? $_GET['view'] : ($u
 
 $where_sql = $filtre === 'archive' ? "g.is_archived=1" : "g.is_archived=0";
 $params = [];
-// Stajyer yalnızca kendine atanan görevleri görür
+// Interns only see tasks assigned to them
 if (is_intern()) {
     $where_sql .= " AND (g.assignee_id=? OR EXISTS(SELECT 1 FROM task_assignees gas WHERE gas.task_id=g.id AND gas.user_id=?))";
     $params[] = $u['id']; $params[] = $u['id'];
@@ -38,7 +38,7 @@ $activeProject = $projectFiltre ? row("SELECT name FROM projects WHERE id=?", [$
 $team = rows("SELECT id, name, color FROM users WHERE role IN ('yonetici','pm','ekip') AND is_active=1 ORDER BY name");
 $templates = rows("SELECT * FROM workflow_templates ORDER BY name");
 
-// Sorumlusu olduğum aktif akış adımları
+// Active workflow steps I am responsible for
 $stepKosulSql = only_own_steps()
     ? "ga.owner_id=?"
     : "(ga.owner_id=? OR (ga.owner_id IS NULL AND (g.assignee_id=? OR EXISTS(SELECT 1 FROM task_assignees gat WHERE gat.task_id=g.id AND gat.user_id=?))))";
@@ -107,7 +107,7 @@ page_start('Görevler', 'tasks');
 <?php elseif ($view === 'kanban'): ?>
 <?php task_kanban($tasks, $projectFiltre); ?>
 
-<?php else: /* ---------- TABLO GÖRÜNÜMÜ ---------- */ ?>
+<?php else: /* ---------- TABLE VIEW ---------- */ ?>
 <div class="tablo-sar">
 <table class="tablo" id="taskTable">
     <thead><tr>
@@ -139,12 +139,12 @@ page_start('Görevler', 'tasks');
         </td>
         <td class="hucre-duzen">
             <select class="secim" data-old="<?= $gr['status'] ?>" onchange="hucreKaydet(this, <?= $gr['id'] ?>, 'durum')">
-                <?php foreach (GOREV_DURUMLARI as $k => $v): ?><option value="<?= $k ?>" <?= $gr['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
+                <?php foreach (TASK_STATUSES as $k => $v): ?><option value="<?= $k ?>" <?= $gr['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
             </select>
         </td>
         <td class="hucre-duzen">
             <select class="secim" data-old="<?= $gr['priority'] ?>" onchange="hucreKaydet(this, <?= $gr['id'] ?>, 'oncelik')">
-                <?php foreach (ONCELIKLER as $k => $v): ?><option value="<?= $k ?>" <?= $gr['priority'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
+                <?php foreach (PRIORITIES as $k => $v): ?><option value="<?= $k ?>" <?= $gr['priority'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
             </select>
         </td>
         <td class="hucre-duzen" data-sort="<?= e($gr['start_date'] ?? '9999') ?>">
@@ -172,7 +172,7 @@ page_start('Görevler', 'tasks');
 
 <?php task_modal($projectFiltre, $team, $templates); ?>
 <script>
-// Canlı sync: başka biri görev eklerse/taşırsa list tazelenir
+// Live sync: if someone else adds/moves a task, the list refreshes
 window.sadaLive = { context: 'list', hash: '<?= live_hash_list() ?>' };
 async function gorunumSec(g) {
     await api('view_preference', { gorunum: g });

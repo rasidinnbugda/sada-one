@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — İçerik Takvimi
- * İçerikler dosyaya (markaya) bağlıdır; proje opsiyoneldir. Çoklu platform desteklenir.
+ * SADA One — Content Calendar
+ * Contents are tied to a client file (brand); the project is optional. Multiple platforms are supported.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -12,7 +12,7 @@ $month = (int)($_GET['month'] ?? date('n'));
 if ($month < 1) { $month = 12; $year--; } if ($month > 12) { $month = 1; $year++; }
 $clientFiltre = (int)($_GET['client'] ?? 0);
 
-// Erişilebilir dosyalar
+// Accessible client files
 if (is_staff()) {
     $clients = rows("SELECT id, name FROM clients WHERE status='aktif' ORDER BY name");
 } else {
@@ -63,7 +63,7 @@ page_start('İçerik Takvimi', 'content');
     <div class="takvim-baslik-bar">
         <div class="satir-esnek" style="gap:8px">
             <a href="?month=<?= $month - 1 ?>&year=<?= $year ?>&client=<?= $clientFiltre ?>" class="ikon-eylem"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></a>
-            <div class="takvim-ay-ad"><?= AYLAR[$month] ?> <?= $year ?></div>
+            <div class="takvim-ay-ad"><?= MONTHS[$month] ?> <?= $year ?></div>
             <a href="?month=<?= $month + 1 ?>&year=<?= $year ?>&client=<?= $clientFiltre ?>" class="ikon-eylem"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></a>
         </div>
         <a href="?month=<?= date('n') ?>&year=<?= date('Y') ?>&client=<?= $clientFiltre ?>" class="btn btn-sm">Bugün</a>
@@ -86,7 +86,7 @@ page_start('İçerik Takvimi', 'content');
 </div>
 
 <div class="satir-esnek sarma mt-3" style="gap:16px;justify-content:center">
-    <?php foreach (ICERIK_DURUMLARI as $k => $v):
+    <?php foreach (CONTENT_STATUSES as $k => $v):
         $color = ['taslak' => 'var(--muted)', 'internal_approval' => 'var(--info)', 'customer_approval' => 'var(--warning)', 'revize' => 'var(--info)', 'onaylandi' => 'var(--basari)', 'yayinlandi' => 'var(--marka)'][$k]; ?>
     <span class="satir-esnek kucuk" style="gap:6px"><span class="etiket-nokta" style="background:<?= $color ?>"></span><?= $v ?></span>
     <?php endforeach; ?>
@@ -106,9 +106,9 @@ page_start('İçerik Takvimi', 'content');
                 <label class="form-etiket">Platformlar <span class="metin-muted" style="font-weight:400">(birden fazla seçilebilir)</span></label>
                 <input type="hidden" name="platforms" id="internal_platforms">
                 <div class="satir-esnek sarma" style="gap:6px">
-                    <?php foreach (PLATFORMLAR as $k => $v): ?>
+                    <?php foreach (PLATFORMS as $k => $v): ?>
                     <label class="satir-esnek kucuk" style="gap:7px;padding:7px 12px;background:var(--surface-2);border-radius:9px;cursor:pointer">
-                        <input type="checkbox" class="platform-kutu" value="<?= $k ?>" <?= $k === 'instagram' ? 'checked' : '' ?>> <?= icon(isset(IKONLAR[$k]) ? $k : 'diger', 14) ?> <?= $v ?>
+                        <input type="checkbox" class="platform-kutu" value="<?= $k ?>" <?= $k === 'instagram' ? 'checked' : '' ?>> <?= icon(isset(ICONS[$k]) ? $k : 'diger', 14) ?> <?= $v ?>
                     </label>
                     <?php endforeach; ?>
                 </div>
@@ -117,7 +117,7 @@ page_start('İçerik Takvimi', 'content');
                 <div class="form-grup"><label class="form-etiket">Tarih <span class="zorunlu">*</span></label><input type="date" name="date" class="girdi" required id="internal_date" value="<?= date('Y-m-d') ?>"></div>
                 <div class="form-grup"><label class="form-etiket">Saat</label><input type="time" name="time" class="girdi"></div>
             </div>
-            <div class="form-grup"><label class="form-etiket">Durum</label><select name="status" class="secim"><?php foreach (ICERIK_DURUMLARI as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+            <div class="form-grup"><label class="form-etiket">Durum</label><select name="status" class="secim"><?php foreach (CONTENT_STATUSES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
             <div class="form-grup"><label class="form-etiket">Açıklama / Metin</label><textarea name="description" class="metin-alani" placeholder="Gönderi metni, hashtag'ler..."></textarea></div>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Planla</button></div>
@@ -125,7 +125,7 @@ page_start('İçerik Takvimi', 'content');
 </div>
 <?php endif; ?>
 
-<!-- İçerik detay -->
+<!-- Content detail -->
 <div class="modal-katman" id="modalContentDetay">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="idTitle"></div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <div class="modal-govde" id="idBody"></div>
@@ -134,9 +134,9 @@ page_start('İçerik Takvimi', 'content');
 
 <script>
 const contents = <?= json_encode(array_column($tumContents, null, 'id'), JSON_UNESCAPED_UNICODE) ?>;
-const internalStatus = <?= json_encode(ICERIK_DURUMLARI, JSON_UNESCAPED_UNICODE) ?>;
-const platforms = <?= json_encode(PLATFORMLAR, JSON_UNESCAPED_UNICODE) ?>;
-const platformIcon = {}; // detay görünümünde yalnızca text tag kullanılır
+const internalStatus = <?= json_encode(CONTENT_STATUSES, JSON_UNESCAPED_UNICODE) ?>;
+const platforms = <?= json_encode(PLATFORMS, JSON_UNESCAPED_UNICODE) ?>;
+const platformIcon = {}; // the detail view uses text tags only
 const contentManager = <?= permission('icerik_yonet') ? 'true' : 'false' ?>;
 
 function contentAdd(date) { const el = document.getElementById('internal_date'); if (el) { el.value = date; modalOpen('modalContent'); } }
@@ -179,7 +179,7 @@ async function internalMove(id) {
     const j = await api('content_move', { id, date: tEl.dataset.setting_value ?? tEl.value, time: sEl.dataset.setting_value ?? sEl.value });
     if (j.ok) { toast(j.message, 'basari'); setTimeout(() => location.reload(), 600); }
 }
-// Sürükle-bırak: içeriği başka güne taşı
+// Drag and drop: move content to another day
 let surContent = null;
 document.querySelectorAll('.calendar-event[data-content]').forEach(chip => {
     chip.addEventListener('dragstart', e => { surContent = chip.dataset.content; e.stopPropagation(); });

@@ -1,7 +1,7 @@
 <?php
 /**
- * SADA One — Ekip Panosu
- * Kim ne üzerinde çalışıyor, kim boşta — anlık meşguliyet görünümü.
+ * SADA One — Team Board
+ * Who is working on what, who is idle — a live availability view.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -13,7 +13,7 @@ $members = rows("SELECT us.id, us.name, us.color, us.avatar, us.job_title, us.ro
     (SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z WHERE z.user_id=us.id AND z.date>=?) week_min
     FROM users us WHERE us.role IN ('yonetici','pm','ekip','finans') AND us.is_active=1 ORDER BY us.name", [$weekHead]);
 
-// Her üyenin devam eden görevleri (atanan_id VEYA çoklu atama üzerinden)
+// Each member's ongoing tasks (via assignee_id OR multi-assignment)
 foreach ($members as &$member) {
     $member['ongoing_edenler'] = rows("SELECT g.id, g.title, g.status, g.due_date, p.name project_name, d.color client_color
         FROM tasks g JOIN projects p ON p.id=g.project_id JOIN clients d ON d.id=p.client_id
@@ -45,7 +45,7 @@ page_start('Ekip', 'team');
                 <?= avatar($member, 44) ?>
                 <div>
                     <div class="kalin"><?= e($member['name']) ?></div>
-                    <div class="hucre-alt"><?= $member['job_title'] ? e($member['job_title']) : ROLLER[$member['role']] ?></div>
+                    <div class="hucre-alt"><?= $member['job_title'] ? e($member['job_title']) : ROLES[$member['role']] ?></div>
                 </div>
             </div>
             <?php if ($bosta): ?>
@@ -68,7 +68,7 @@ page_start('Ekip', 'team');
                     <span class="etiket-nokta" style="width:7px;height:7px;background:<?= e($dg['client_color']) ?>;flex-shrink:0"></span>
                     <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($dg['title']) ?></span>
                 </span>
-                <?= badge($dg['status'], GOREV_DURUMLARI) ?>
+                <?= badge($dg['status'], TASK_STATUSES) ?>
             </a>
             <?php endforeach; ?>
         </div>

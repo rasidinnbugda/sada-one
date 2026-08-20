@@ -18,7 +18,7 @@ $musteriler = rows("SELECT * FROM users WHERE client_id=? AND role='musteri'", [
 $archiveCount = (int)val("SELECT COUNT(*) FROM archive WHERE client_id=?", [$id]);
 $contracts = rows("SELECT s.*, a.file_path, a.name ek_name FROM contracts s LEFT JOIN archive a ON a.id=s.archive_id WHERE s.client_id=? ORDER BY s.end IS NULL, s.end", [$id]);
 
-// Sosyal medya hesapları + metrik geçmişi
+// Social media accounts + metric history
 $socialAccounts = rows("SELECT * FROM social_accounts WHERE client_id=? ORDER BY platform, username", [$id]);
 foreach ($socialAccounts as &$sh) {
     $sh['metrics'] = rows("SELECT * FROM social_metrics WHERE account_id=? ORDER BY date DESC LIMIT 10", [$sh['id']]);
@@ -38,7 +38,7 @@ page_start($client['name'], 'clients');
         <div>
             <div class="sayfa-baslik" style="font-size:24px"><?= e($client['name']) ?></div>
             <div class="satir-esnek mt-1" style="gap:8px">
-                <span class="rozet rozet-tur"><?= DOSYA_TURLERI[$client['type']] ?></span>
+                <span class="rozet rozet-tur"><?= CLIENT_TYPES[$client['type']] ?></span>
                 <?= badge($client['status'], ['is_active' => 'Aktif', 'pasif' => 'Pasif']) ?>
             </div>
         </div>
@@ -53,11 +53,11 @@ page_start($client['name'], 'clients');
 
 <div class="izgara" style="grid-template-columns:1fr 320px" id="clientDuzen">
     <div>
-        <!-- Projeler -->
+        <!-- Projects -->
         <div class="satir-esnek arasi mb-2"><div class="kart-baslik">Projeler (<?= count($projects) ?>)</div></div>
         <?php if (!$projects): ?>
         <div class="kart orta metin-muted kucuk" style="padding:30px">Bu dosyada henüz proje yok.</div>
-        <?php else: foreach (PROJE_TURLERI as $turK => $turV):
+        <?php else: foreach (PROJECT_TYPES as $turK => $turV):
             $grup = array_filter($projects, fn($p) => $p['type'] === $turK);
             if (!$grup) continue; ?>
         <div class="nav-bolum" style="padding:14px 0 8px"><?= $turV ?> Hizmetler</div>
@@ -67,7 +67,7 @@ page_start($client['name'], 'clients');
             <a href="project.php?id=<?= $p['id'] ?>" class="kart kart-tik" style="padding:16px">
                 <div class="satir-esnek arasi mb-2">
                     <div class="kart-baslik" style="font-size:15px"><?= e($p['name']) ?></div>
-                    <?= badge($p['status'], PROJE_DURUMLARI) ?>
+                    <?= badge($p['status'], PROJECT_STATUSES) ?>
                 </div>
                 <?php if ($p['pm_name']): ?><div class="hucre-alt">PM: <?= e($p['pm_name']) ?></div><?php endif; ?>
                 <div class="ilerleme mt-2"><div class="ilerleme-dolu" data-rate="<?= $rate ?>" style="width:0"></div></div>
@@ -77,7 +77,7 @@ page_start($client['name'], 'clients');
         </div>
         <?php endforeach; endif; ?>
 
-        <!-- Sosyal Medya Takibi -->
+        <!-- Social media tracking -->
         <div class="satir-esnek arasi mb-2 mt-3">
             <div class="kart-baslik"><?= icon('grafik', 16) ?> Sosyal Medya (<?= count($socialAccounts) ?>)</div>
             <?php if (permission('icerik_yonet')): ?><button class="btn btn-sm btn-marka" data-modal="modalSosyalHesap"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Hesap Ekle</button><?php endif; ?>
@@ -94,10 +94,10 @@ page_start($client['name'], 'clients');
             <div class="kart" style="padding:16px">
                 <div class="satir-esnek arasi">
                     <div class="satir-esnek" style="gap:10px;min-width:0">
-                        <span class="dosya-avatar" style="width:40px;height:40px;background:var(--parlak);color:var(--marka)"><?= icon(isset(IKONLAR[$sh['platform']]) ? $sh['platform'] : 'diger', 20) ?></span>
+                        <span class="dosya-avatar" style="width:40px;height:40px;background:var(--parlak);color:var(--marka)"><?= icon(isset(ICONS[$sh['platform']]) ? $sh['platform'] : 'diger', 20) ?></span>
                         <div style="min-width:0">
                             <div class="kalin kucuk"><?php if ($sh['url']): ?><a href="<?= e($sh['url']) ?>" target="_blank" style="color:var(--marka)">@<?= e(ltrim($sh['username'], '@')) ?></a><?php else: ?>@<?= e(ltrim($sh['username'], '@')) ?><?php endif; ?></div>
-                            <div class="hucre-alt"><?= PLATFORMLAR[$sh['platform']] ?? $sh['platform'] ?></div>
+                            <div class="hucre-alt"><?= PLATFORMS[$sh['platform']] ?? $sh['platform'] ?></div>
                         </div>
                     </div>
                     <?php if (permission('icerik_yonet')): ?>
@@ -117,7 +117,7 @@ page_start($client['name'], 'clients');
                 </div>
                 <?php endif; ?>
                 <?php if (count($sh['metrics']) > 1): ?>
-                <!-- Mini geçmiş grafiği (eski→yeni) -->
+                <!-- Mini history chart (old→new) -->
                 <div style="display:flex;gap:3px;align-items:flex-end;height:36px;margin-top:10px" title="Son <?= count($sh['metrics']) ?> kayıt">
                     <?php foreach (array_reverse($sh['metrics']) as $m): ?>
                     <div style="flex:1;background:var(--marka);opacity:.75;border-radius:3px 3px 0 0;height:<?= max(8, round((int)$m['followers'] / max(1, $maxFollowers) * 100)) ?>%" title="<?= format_date($m['date']) ?>: <?= number_format((int)$m['followers'], 0, ',', '.') ?>"></div>
@@ -135,7 +135,7 @@ page_start($client['name'], 'clients');
 
         <?php if (!$customerView):
             $infoNotes = rows("SELECT bn.*, us.name updater_name FROM client_notes bn LEFT JOIN users us ON us.id=bn.updated_by WHERE bn.client_id=? ORDER BY bn.sort_order", [$id]); ?>
-        <!-- Bilgi Bankası (yalnızca ekip) -->
+        <!-- Knowledge base (team only) -->
         <div class="satir-esnek arasi mb-2 mt-3">
             <div class="kart-baslik"><?= icon('document', 16) ?> Bilgi Bankası (<?= count($infoNotes) ?>)</div>
             <button class="btn btn-sm btn-marka" onclick="notNew()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><path d="M12 5v14M5 12h14"/></svg> Bölüm Ekle</button>
@@ -176,13 +176,13 @@ page_start($client['name'], 'clients');
 
     <div>
         <?php if ($customerView): ?>
-        <!-- Müşteri kısıtlı yan panel: yalnızca arşiv -->
+        <!-- Restricted customer side panel: archive only -->
         <a href="archive.php?client=<?= $id ?>" class="kart kart-tik satir-esnek arasi">
             <div class="satir-esnek" style="gap:10px"><svg width="20" fill="none" stroke="var(--marka)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/></svg><span class="kalin kucuk">Paylaşılan Dosyalar</span></div>
             <span class="rozet"><?= $archiveCount ?></span>
         </a>
         <?php else: ?>
-        <!-- İletişim -->
+        <!-- Contact -->
         <div class="kart mb-2">
             <div class="kart-baslik" style="font-size:14px" class="mb-2">İletişim</div>
             <div class="dikey mt-2" style="gap:12px">
@@ -193,7 +193,7 @@ page_start($client['name'], 'clients');
                 <?php if ($client['description']): ?><div><div class="hucre-alt">Açıklama</div><div class="kucuk metin-2"><?= nl2br(e($client['description'])) ?></div></div><?php endif; ?>
             </div>
         </div>
-        <!-- Sorumlu ekip -->
+        <!-- Responsible team -->
         <div class="kart mb-2">
             <div class="satir-esnek arasi mb-2"><div class="kart-baslik" style="font-size:14px">Sorumlu Ekip</div><?= member_avatars($clientMembers) ?></div>
             <?php if (!$clientMembers): ?><div class="metin-muted kucuk">Henüz üye atanmamış.<?php if (permission('dosya_yonet')): ?> Düzenle penceresinden ekleyin.<?php endif; ?></div>
@@ -201,7 +201,7 @@ page_start($client['name'], 'clients');
             <div class="satir-esnek mt-2" style="gap:10px"><?= avatar($du, 30) ?><div><div class="hucre-ana kucuk"><?= e($du['name']) ?></div><?php if ($du['job_title']): ?><div class="hucre-alt"><?= e($du['job_title']) ?></div><?php endif; ?></div></div>
             <?php endforeach; endif; ?>
         </div>
-        <!-- Müşteri erişimleri -->
+        <!-- Customer access -->
         <div class="kart mb-2">
             <div class="satir-esnek arasi mb-2"><div class="kart-baslik" style="font-size:14px">Müşteri Erişimi</div></div>
             <?php if (!$musteriler): ?>
@@ -212,7 +212,7 @@ page_start($client['name'], 'clients');
             <div class="satir-esnek mt-2" style="gap:10px"><?= avatar($m, 32) ?><div><div class="hucre-ana kucuk"><?= e($m['name']) ?></div><div class="hucre-alt"><?= e($m['email']) ?></div></div></div>
             <?php endforeach; endif; ?>
         </div>
-        <!-- Sözleşmeler -->
+        <!-- Contracts -->
         <div class="kart mb-2">
             <div class="satir-esnek arasi mb-2">
                 <div class="kart-baslik" style="font-size:14px">Sözleşmeler</div>
@@ -241,7 +241,7 @@ page_start($client['name'], 'clients');
         </a>
 
         <?php if (permission('dosya_yonet')): ?>
-        <!-- Sözleşme ekleme modalı -->
+        <!-- Add contract modal -->
         <div class="modal-katman" id="modalContract">
             <div class="modal"><div class="modal-ust"><div class="modal-baslik">Sözleşme Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
             <form data-ajax="contract_save">
@@ -260,12 +260,12 @@ page_start($client['name'], 'clients');
             </form></div>
         </div>
         <?php endif; ?>
-        <?php endif; /* /müşteri kısıtlı görünüm */ ?>
+        <?php endif; /* /restricted customer view */ ?>
     </div>
 </div>
 
 <?php
-// Proje modalı
+// Project modal
 $clients = rows("SELECT id, name FROM clients WHERE status='aktif' ORDER BY name");
 $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is_active=1 ORDER BY name");
 if (permission('dosya_yonet')):
@@ -277,7 +277,7 @@ if (permission('dosya_yonet')):
             <div class="modal-govde">
                 <div class="form-grup"><label class="form-etiket">Proje Adı <span class="zorunlu">*</span></label><input name="name" class="girdi" required></div>
                 <div class="form-satir">
-                    <div class="form-grup"><label class="form-etiket">Hizmet Türü</label><select name="type" class="secim"><?php foreach (PROJE_TURLERI as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                    <div class="form-grup"><label class="form-etiket">Hizmet Türü</label><select name="type" class="secim"><?php foreach (PROJECT_TYPES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
                     <div class="form-grup"><label class="form-etiket">Proje Yöneticisi</label><select name="pm_id" class="secim"><option value="">—</option><?php foreach ($pmler as $pm): ?><option value="<?= $pm['id'] ?>"><?= e($pm['name']) ?></option><?php endforeach; ?></select></div>
                 </div>
                 <div class="form-satir">
@@ -293,7 +293,7 @@ if (permission('dosya_yonet')):
     </div>
 </div>
 
-<!-- Dosya düzenle modalı -->
+<!-- Edit client file modal -->
 <div class="modal-katman" id="modalClientDuzen">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Dosyayı Düzenle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
         <form data-ajax="client_save">
@@ -301,7 +301,7 @@ if (permission('dosya_yonet')):
             <div class="modal-govde">
                 <div class="form-satir">
                     <div class="form-grup"><label class="form-etiket">Dosya Adı</label><input name="name" class="girdi" value="<?= e($client['name']) ?>" required></div>
-                    <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" class="secim"><?php foreach (DOSYA_TURLERI as $k => $v): ?><option value="<?= $k ?>" <?= $client['type'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+                    <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" class="secim"><?php foreach (CLIENT_TYPES as $k => $v): ?><option value="<?= $k ?>" <?= $client['type'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
                 </div>
                 <div class="form-grup"><label class="form-etiket">Renk</label><div class="satir-esnek sarma" id="renkSecim2"><?php foreach (['#b1fb01', '#182f5d', '#610714', '#f8f2cb', '#3b9df0', '#35c66b', '#f5a524', '#a58bf0'] as $r): ?><label style="cursor:pointer"><input type="radio" name="color" value="<?= $r ?>" <?= $r === $client['color'] ? 'checked' : '' ?> style="display:none" class="renk-radio2"><span class="etiket-nokta" style="width:28px;height:28px;background:<?= $r ?>;border:2px solid <?= $r === $client['color'] ? 'var(--text)' : 'transparent' ?>"></span></label><?php endforeach; ?></div></div>
                 <div class="form-grup"><label class="form-etiket">Logo <?= $client['logo'] ? '(mevcut logoyu değiştirir)' : '' ?></label><input type="file" name="logo" class="girdi" accept="image/*"></div>
@@ -329,17 +329,17 @@ document.getElementById('renkSecim2')?.addEventListener('change', () => {
     document.querySelectorAll('.color-radio2').forEach(r => r.nextElementSibling.style.borderColor = r.checked ? 'var(--text)' : 'transparent');
 });
 </script>
-<?php endif; /* /dosya_yonet modalları */ ?>
+<?php endif; /* /dosya_yonet modals */ ?>
 
 <?php if (permission('icerik_yonet')): ?>
-<!-- Sosyal hesap ekle -->
+<!-- Add social account -->
 <div class="modal-katman" id="modalSocialAccount">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Sosyal Medya Hesabı Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="social_account_add">
         <input type="hidden" name="client_id" value="<?= $id ?>">
         <div class="modal-govde">
             <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Platform</label><select name="platform" class="secim"><?php foreach (PLATFORMLAR as $k => $v): if ($k === 'diger') continue; ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-grup"><label class="form-etiket">Platform</label><select name="platform" class="secim"><?php foreach (PLATFORMS as $k => $v): if ($k === 'diger') continue; ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-grup"><label class="form-etiket">Kullanıcı Adı <span class="zorunlu">*</span></label><input name="username" class="girdi" required placeholder="@markaadi"></div>
             </div>
             <div class="form-grup"><label class="form-etiket">Profil Linki</label><input name="url" class="girdi" placeholder="instagram.com/markaadi"></div>
@@ -350,7 +350,7 @@ document.getElementById('renkSecim2')?.addEventListener('change', () => {
 <?php endif; ?>
 
 <?php if (is_staff()): ?>
-<!-- Metrik gir -->
+<!-- Enter metrics -->
 <div class="modal-katman" id="modalMetric">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="metricTitle">Veri Gir</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="social_metric_add">

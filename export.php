@@ -1,8 +1,8 @@
 <?php
 /**
- * SADA One — CSV Dışa Aktarım
+ * SADA One — CSV Export
  * tip=gorevler | finans | zaman
- * Excel'in Türkçe karakterleri doğru açması için UTF-8 BOM + noktalı virgül ayracı kullanılır.
+ * UTF-8 BOM + semicolon delimiter are used so Excel opens Turkish characters correctly.
  */
 require __DIR__ . '/includes/init.php';
 $u = require_staff();
@@ -13,7 +13,7 @@ function csv_send(string $clientName, array $basliklar, array $satirlar): void {
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="' . $clientName . '_' . date('Y-m-d') . '.csv"');
     $output = fopen('php://output', 'w');
-    fwrite($output, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel uyumu)
+    fwrite($output, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel compatibility)
     fputcsv($output, $basliklar, ';');
     foreach ($satirlar as $s) fputcsv($output, $s, ';');
     fclose($output);
@@ -26,7 +26,7 @@ case 'tasks':
         FROM tasks g JOIN projects p ON p.id=g.project_id JOIN clients d ON d.id=p.client_id LEFT JOIN users u ON u.id=g.assignee_id
         ORDER BY g.id DESC");
     csv_send('tasks', ['Görev', 'Proje', 'Dosya', 'Atanan', 'Durum', 'Öncelik', 'Son Tarih', 'Oluşturulma', 'Tamamlanma'],
-        array_map(fn($r) => [$r['title'], $r['project'], $r['client'], $r['assignee'] ?? '', GOREV_DURUMLARI[$r['status']], ONCELIKLER[$r['priority']], $r['due_date'] ?? '', substr($r['created'], 0, 10), $r['completion'] ? substr($r['completion'], 0, 10) : ''], $veriler));
+        array_map(fn($r) => [$r['title'], $r['project'], $r['client'], $r['assignee'] ?? '', TASK_STATUSES[$r['status']], PRIORITIES[$r['priority']], $r['due_date'] ?? '', substr($r['created'], 0, 10), $r['completion'] ? substr($r['completion'], 0, 10) : ''], $veriler));
 
 case 'finance':
     if (!permission('finans')) deny();

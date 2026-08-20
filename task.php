@@ -37,9 +37,9 @@ page_start($task['title'], 'tasks');
 <div class="sayfa-ust">
     <div>
         <div class="satir-esnek sarma" style="gap:9px">
-            <?= badge($task['status'], GOREV_DURUMLARI) ?>
-            <?= badge($task['priority'], ONCELIKLER, 'priority') ?>
-            <?php if ($task['repeat'] !== 'yok'): ?><span class="rozet rozet-tur"><?= icon('repeat', 12) ?> <?= TEKRARLAR[$task['repeat']] ?></span><?php endif; ?>
+            <?= badge($task['status'], TASK_STATUSES) ?>
+            <?= badge($task['priority'], PRIORITIES, 'priority') ?>
+            <?php if ($task['repeat'] !== 'yok'): ?><span class="rozet rozet-tur"><?= icon('repeat', 12) ?> <?= REPEAT_OPTIONS[$task['repeat']] ?></span><?php endif; ?>
             <?php if ($bagimli && $bagimli['status'] !== 'tamamlandi' && !$task['lock_bypassed']): ?>
             <span class="kilit-rozet" title="Bağlı olduğu görev tamamlanmadan ilerleyemez"><?= icon('lock', 12) ?> <a href="task.php?id=<?= $bagimli['id'] ?>" style="color:inherit;text-decoration:underline"><?= e(mb_substr($bagimli['title'], 0, 34)) ?></a> bekleniyor</span>
             <?php elseif ($task['lock_bypassed']): ?>
@@ -51,14 +51,14 @@ page_start($task['title'], 'tasks');
     </div>
     <div class="sayfa-ust-aksiyon">
         <select class="secim" style="width:auto;min-width:160px" id="statusPicker" onchange="statusChange(this.value)">
-            <?php foreach (GOREV_DURUMLARI as $k => $v): ?><option value="<?= $k ?>" <?= $task['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
+            <?php foreach (TASK_STATUSES as $k => $v): ?><option value="<?= $k ?>" <?= $task['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
         </select>
         <button class="btn" onclick="modalOpen('modalTaskDuzen')"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
     </div>
 </div>
 
 <?php if ($steps): ?>
-<!-- GÖREV AKIŞI RAYI -->
+<!-- TASK WORKFLOW RAIL -->
 <div class="kart mb-3">
     <div class="satir-esnek arasi mb-3"><div class="kart-baslik">İş Akışı</div><span class="metin-muted kucuk" id="stepCounter"><?= count(array_filter($steps, fn($a) => $a['status'] === 'tamam')) ?>/<?= count($steps) ?> adım tamamlandı</span></div>
     <div class="akis-ray">
@@ -85,7 +85,7 @@ page_start($task['title'], 'tasks');
             <div class="metin-2" style="white-space:pre-wrap"><?= $task['description'] ? e($task['description']) : '<span class="metin-muted kucuk">Açıklama eklenmemiş.</span>' ?></div>
         </div>
 
-        <!-- Kontrol Listesi -->
+        <!-- Checklist -->
         <div class="kart mb-3">
             <div class="satir-esnek arasi mb-2">
                 <div class="kart-baslik">Kontrol Listesi</div>
@@ -108,7 +108,7 @@ page_start($task['title'], 'tasks');
             </form>
         </div>
 
-        <!-- Ekler -->
+        <!-- Attachments -->
         <div class="kart mb-3">
             <div class="satir-esnek arasi mb-2">
                 <div class="kart-baslik">Ekler <?php if ($attachments): ?><span class="rozet" style="padding:1px 8px"><?= count($attachments) ?></span><?php endif; ?></div>
@@ -143,7 +143,7 @@ page_start($task['title'], 'tasks');
 
         <div class="kart">
             <div class="kart-baslik mb-2">Yorumlar</div>
-            <?php comment_feed('task', $id); ?>
+            <?php comment_feed('gorev', $id); ?>
         </div>
     </div>
 
@@ -169,20 +169,20 @@ page_start($task['title'], 'tasks');
         <?php if ($task['content_id']):
             $bagliContent = row("SELECT * FROM contents WHERE id=?", [$task['content_id']]);
             if ($bagliContent): ?>
-        <!-- Bağlı içerik -->
+        <!-- Linked content -->
         <div class="kart mb-2">
             <div class="kart-baslik mb-2" style="font-size:14px"><?= icon('calendar', 15) ?> Bağlı İçerik</div>
             <div class="kucuk kalin"><?= e($bagliContent['title']) ?></div>
             <div class="satir-esnek sarma mt-1" style="gap:5px"><?= platform_badges($bagliContent['platform']) ?></div>
             <div class="satir-esnek arasi mt-2">
                 <span class="hucre-alt">Yayın: <?= format_date($bagliContent['date']) ?></span>
-                <?= badge($bagliContent['status'], ICERIK_DURUMLARI) ?>
+                <?= badge($bagliContent['status'], CONTENT_STATUSES) ?>
             </div>
             <a href="content-calendar.php?month=<?= date('n', strtotime($bagliContent['date'])) ?>&year=<?= date('Y', strtotime($bagliContent['date'])) ?>" class="mini-btn mt-2" style="display:inline-block">İçerik takviminde gör →</a>
         </div>
         <?php endif; endif; ?>
 
-        <!-- İzleyiciler -->
+        <!-- Watchers -->
         <div class="kart mb-2">
             <div class="satir-esnek arasi mb-2">
                 <div class="kart-baslik" style="font-size:14px">İzleyiciler</div>
@@ -204,7 +204,7 @@ page_start($task['title'], 'tasks');
             <?php endforeach; endif; ?>
         </div>
 
-        <!-- Zaman takibi -->
+        <!-- Time tracking -->
         <div class="kart">
             <div class="satir-esnek arasi mb-2"><div class="kart-baslik" style="font-size:14px">Zaman Takibi</div><button class="btn btn-sm" data-modal="modalZaman"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div>
             <div class="orta" style="padding:8px 0"><div class="stat-deger" style="font-size:26px"><?= format_minutes($totalMin) ?></div><div class="hucre-alt">toplam kayıtlı süre</div></div>
@@ -217,7 +217,7 @@ page_start($task['title'], 'tasks');
     </div>
 </div>
 
-<!-- Drive linki ekle -->
+<!-- Add Drive link -->
 <div class="modal-katman" id="modalDriveLink">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Drive Linki Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="archive_link_add">
@@ -230,7 +230,7 @@ page_start($task['title'], 'tasks');
     </form></div>
 </div>
 
-<!-- Modallar -->
+<!-- Modals -->
 <div class="modal-katman" id="modalTime">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Zaman Kaydı Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="time_add" data-refresh="evet">
@@ -265,14 +265,14 @@ page_start($task['title'], 'tasks');
                     <?php endforeach; ?>
                 </div>
             </div>
-            <div class="form-grup"><label class="form-etiket">Öncelik</label><select name="priority" class="secim"><?php foreach (ONCELIKLER as $k => $v): ?><option value="<?= $k ?>" <?= $task['priority'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+            <div class="form-grup"><label class="form-etiket">Öncelik</label><select name="priority" class="secim"><?php foreach (PRIORITIES as $k => $v): ?><option value="<?= $k ?>" <?= $task['priority'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
             <div class="form-satir">
                 <div class="form-grup"><label class="form-etiket">Başlangıç Tarihi</label><input type="date" name="start_date" class="girdi" value="<?= e($task['start_date']) ?>"></div>
                 <div class="form-grup"><label class="form-etiket">Son Tarih</label><input type="date" name="due_date" class="girdi" value="<?= e($task['due_date']) ?>"></div>
             </div>
             <div class="form-satir">
                 <div class="form-grup"><label class="form-etiket">Tahmini Süre (saat)</label><input name="estimated_time" class="girdi" value="<?= $task['estimated_minutes'] ? round($task['estimated_minutes'] / 60, 1) : '' ?>" placeholder="Örn. 4,5"></div>
-                <div class="form-grup"><label class="form-etiket">Tekrar</label><select name="repeat" class="secim"><?php foreach (TEKRARLAR as $k => $v): ?><option value="<?= $k ?>" <?= $task['repeat'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-grup"><label class="form-etiket">Tekrar</label><select name="repeat" class="secim"><?php foreach (REPEAT_OPTIONS as $k => $v): ?><option value="<?= $k ?>" <?= $task['repeat'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
             </div>
             <div class="form-grup"><label class="form-etiket">Etiketler</label><input name="tags" class="girdi" value="<?= e($task['tags']) ?>" placeholder="video, instagram, acil-revize (virgülle ayırın)"></div>
             <div class="form-grup"><label class="form-etiket">Bağlı Olduğu Görev</label><select name="bagimli_id" class="secim"><option value="">— Bağımsız</option><?php foreach ($projectTasks as $pg): ?><option value="<?= $pg['id'] ?>" <?= $pg['id'] == $task['bagimli_id'] ? 'selected' : '' ?>><?= e($pg['title']) ?></option><?php endforeach; ?></select><div class="form-ipucu">Seçilen görev tamamlanmadan bu görev ilerleyemez.</div></div>
@@ -293,7 +293,7 @@ page_start($task['title'], 'tasks');
     </form></div>
 </div>
 
-<!-- Adım sorumlu atama -->
+<!-- Step owner assignment -->
 <div class="modal-katman" id="modalStepOwner">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Adım Sorumlusu</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
     <form data-ajax="step_owner" data-refresh="evet">
@@ -304,18 +304,18 @@ page_start($task['title'], 'tasks');
 </div>
 
 <script>
-// Canlı sync: başka biri bu görevi değiştirirse page tazelenir
+// Live sync: if someone else changes this task, the page refreshes
 window.sadaLive = { context: 'task', id: <?= $id ?>, hash: '<?= live_hash_task($id) ?>' };
 const CHECK_SVG = '<svg width="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>';
 
 async function durumDegistir(durum) {
     const j = await api('task_status', { id: <?= $id ?>, status });
     if (j.ok) { toast('Durum güncellendi', 'basari'); liveRefresh(); setTimeout(() => location.reload(), 450); }
-    else setTimeout(() => location.reload(), 1600); // lock reddettiyse old değere dön
+    else setTimeout(() => location.reload(), 1600); // if the lock rejected it, revert to the old value
 }
 function stepOwner(id) { document.getElementById('stepOwnerId').value = id; modalOpen('modalStepOwner'); }
 
-/* Akış nameımı: yenilemesiz güncelleme */
+/* Workflow step: update without a page reload */
 async function stepComplete(id) {
     const j = await api('step_complete', { id });
     if (!j.ok) return;
@@ -328,16 +328,16 @@ async function stepComplete(id) {
         el.querySelector('.workflow-yuvarlak').innerHTML = a.status === 'tamam' ? CHECK_SVG : el.dataset.sort_order;
     });
     document.getElementById('stepCounter').textContent = j.is_done_adet + '/' + j.total + ' adım tamamlandı';
-    // Görev tamamlandıysa status seçicisini ve rozeti eşitle
+    // If the task is completed, sync the status picker and badge
     const picker = document.getElementById('statusPicker');
     if (picker && picker.value !== j.task_status) { picker.value = j.task_status; toast('Görev durumu: ' + j.task_status_tag, 'basari', 2400); }
     liveRefresh();
 }
 
-/* Kontrol list: yenilemesiz güncelleme */
+/* Checklist: update without a page reload */
 function checkSummary() {
-    const hepsi = document.querySelectorAll('#kontrolListe .kontrol-oge').length;
-    const is_done = document.querySelectorAll('#kontrolListe .kontrol-oge.tamam').length;
+    const hepsi = document.querySelectorAll('#checkList .kontrol-oge').length;
+    const is_done = document.querySelectorAll('#checkList .kontrol-oge.tamam').length;
     document.getElementById('checkCounter').textContent = hepsi ? is_done + '/' + hepsi : '';
     const bar = document.getElementById('checkBar');
     bar.parentElement.style.display = hepsi ? '' : 'none';
