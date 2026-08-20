@@ -158,8 +158,8 @@ function icerikGoster(id) {
     for (const k in icDurum) durumSecim += `<option value="${k}" ${ic.durum === k ? 'selected' : ''}>${icDurum[k]}</option>`;
     durumSecim += `</select>`;
     let h = `<div class="dikey" style="gap:12px">
-        <div class="satir-esnek arasi"><span class="hucre-alt">Dosya</span><span class="kucuk kalin">${ic.dosya_ad || '—'}</span></div>
-        ${ic.proje_ad ? `<div class="satir-esnek arasi"><span class="hucre-alt">Proje</span><span class="kucuk">${ic.proje_ad}</span></div>` : ''}
+        <div class="satir-esnek arasi"><span class="hucre-alt">Dosya</span><span class="kucuk kalin">${esc(ic.dosya_ad || '—')}</span></div>
+        ${ic.proje_ad ? `<div class="satir-esnek arasi"><span class="hucre-alt">Proje</span><span class="kucuk">${esc(ic.proje_ad)}</span></div>` : ''}
         <div class="satir-esnek arasi"><span class="hucre-alt">Platformlar</span><span class="kucuk">${platformListe}</span></div>
         <div class="satir-esnek arasi"><span class="hucre-alt">Tarih</span><span class="kucuk">${new Date(ic.tarih).toLocaleDateString('tr-TR', { dateStyle: 'long' })}${ic.saat ? ' ' + ic.saat.slice(0, 5) : ''}</span></div>
         <div><div class="hucre-alt mb-2">Durum</div>${durumSecim}</div>`;

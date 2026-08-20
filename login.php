@@ -4,7 +4,10 @@ require __DIR__ . '/includes/init.php';
 if (user()) { header('Location: index.php'); exit; }
 
 $hata = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// CSRF check: the login form is a state-changing request too (login CSRF)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) {
+    $hata = 'Oturum doğrulaması başarısız. Sayfayı yenileyip tekrar deneyin.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $eposta = mb_strtolower(trim($_POST['eposta'] ?? ''));
     $sifre = $_POST['sifre'] ?? '';
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
@@ -17,8 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $u = row("SELECT * FROM users WHERE eposta=? AND aktif=1", [$eposta]);
         if ($u && password_verify($sifre, $u['sifre'])) {
             insert('giris_denemeleri', ['eposta' => $eposta, 'ip' => $ip, 'basarili' => 1, 'created' => date('Y-m-d H:i:s')]);
+            @session_start(); // reopen: init releases the lock early
             session_regenerate_id(true);
             $_SESSION['uid'] = $u['id'];
+            session_write_close();
             guncelle('users', ['son_giris' => date('Y-m-d H:i:s')], 'id=?', [$u['id']]);
             header('Location: index.php');
             exit;
@@ -65,6 +70,7 @@ $siteAdi = ayar('site_adi', 'SADA One');
         </div>
         <?php endif; ?>
         <form method="post">
+            <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
             <div class="form-grup">
                 <label class="form-etiket">E-posta</label>
                 <input type="email" name="eposta" class="girdi" required autofocus value="<?= e($_POST['eposta'] ?? '') ?>" placeholder="ornek@sada.com">

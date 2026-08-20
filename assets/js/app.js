@@ -154,6 +154,9 @@
         }
     });
 
+    /* ---------- HTML escape helper for template literals (XSS guard) ---------- */
+    window.esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
     /* ---------- Gezinme ilerleme çubuğu: tık anında görünür, sayfa değişince biter ---------- */
     document.addEventListener('click', e => {
         const a = e.target.closest('a[href]');

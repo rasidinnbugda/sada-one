@@ -215,7 +215,7 @@ const benimId = <?= $u['id'] ?>;
 function balonEkle(m) {
     const d = document.createElement('div');
     d.className = 'mesaj-balon' + (m.benim ? ' benim' : '');
-    d.innerHTML = `<div class="mesaj-gonderen">${m.ad}</div><div>${m.mesaj.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div><div class="mesaj-zaman">${m.zaman}</div>`;
+    d.innerHTML = `<div class="mesaj-gonderen">${esc(m.ad)}</div><div>${m.mesaj.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div><div class="mesaj-zaman">${m.zaman}</div>`;
     govde.appendChild(d);
     govde.scrollTop = govde.scrollHeight;
 }

@@ -9,8 +9,26 @@ ini_set('session.use_strict_mode', '1');
 ini_set('session.cookie_samesite', 'Lax');
 if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ini_set('session.cookie_secure', '1');
 session_start();
+// Ensure the CSRF token exists, then RELEASE THE SESSION LOCK immediately.
+// PHP holds an exclusive lock on the session file for the whole request by default;
+// with live-sync polling and multiple tabs this makes requests queue behind each
+// other and pages appear "stuck" in one browser while working in another.
+// $_SESSION stays readable after the close; the rare writes reopen it explicitly.
+if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(20));
+session_write_close();
+
+/** Reopen the session briefly for a write, then release the lock again. */
+function session_write(callable $fn): void {
+    @session_start();
+    $fn();
+    session_write_close();
+}
 mb_internal_encoding('UTF-8');
 date_default_timezone_set('Europe/Istanbul');
+// Personalized pages must never be cached by proxies/CDN (Hostinger cache, LiteSpeed):
+// a cached page from user A could otherwise be served to user B, or a stale page
+// could make the site look "stuck" in one browser while fresh in another.
+if (!headers_sent()) header('Cache-Control: no-store, max-age=0');
 
 define('ROOT', dirname(__DIR__));
 define('BASE_URL', rtrim(dirname($_SERVER['SCRIPT_NAME']) === '/' ? '' : str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/'));

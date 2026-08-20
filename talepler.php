@@ -99,7 +99,7 @@ function talepFormAc(id) {
     f.alanlar.forEach(a => {
         const zorunlu = a.zorunlu == 1 ? ' required' : '';
         const yildiz = a.zorunlu == 1 ? ' <span class="zorunlu">*</span>' : '';
-        h += `<div class="form-grup"><label class="form-etiket">${a.etiket}${yildiz}</label>`;
+        h += `<div class="form-grup"><label class="form-etiket">${esc(a.etiket)}${yildiz}</label>`;
         if (a.tip === 'uzun_metin') h += `<textarea name="alan_${a.id}" class="metin-alani"${zorunlu}></textarea>`;
         else if (a.tip === 'secim') { h += `<select name="alan_${a.id}" class="secim"${zorunlu}>`; (a.secenekler||'').split('\n').forEach(s => { if(s.trim()) h += `<option>${s.trim()}</option>`; }); h += `</select>`; }
         else if (a.tip === 'tarih') h += `<input type="date" name="alan_${a.id}" class="girdi"${zorunlu}>`;

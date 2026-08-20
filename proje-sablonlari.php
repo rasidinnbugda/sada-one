@@ -81,7 +81,7 @@ function psGorevEkle(g = {}) {
     div.className = 'satir-esnek ps-satir';
     div.style.gap = '8px';
     let akisOps = '<option value="0">Akışsız</option>';
-    psAkislar.forEach(a => akisOps += `<option value="${a.id}" ${g.akis_id == a.id ? 'selected' : ''}>${a.ad}</option>`);
+    psAkislar.forEach(a => akisOps += `<option value="${a.id}" ${g.akis_id == a.id ? 'selected' : ''}>${esc(a.ad)}</option>`);
     let oncOps = '';
     for (const k in psOncelikler) oncOps += `<option value="${k}" ${(g.oncelik || 'normal') === k ? 'selected' : ''}>${psOncelikler[k]}</option>`;
     div.innerHTML = `<input class="girdi ps-baslik" placeholder="Görev başlığı" style="flex:2" value="${(g.baslik || '').replace(/"/g, '&quot;')}">

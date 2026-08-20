@@ -238,10 +238,10 @@ function etkinlikGoster(id) {
         <div class="satir-esnek arasi"><span class="hucre-alt">Tür</span><span class="rozet rozet-tur">${turAd[e.tur]}</span></div>
         <div class="satir-esnek arasi"><span class="hucre-alt">Başlangıç</span><span class="kucuk kalin">${new Date(e.baslangic.replace(' ', 'T')).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })}</span></div>`;
     if (e.bitis) h += `<div class="satir-esnek arasi"><span class="hucre-alt">Bitiş</span><span class="kucuk kalin">${new Date(e.bitis.replace(' ', 'T')).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })}</span></div>`;
-    if (e.yer) h += `<div class="satir-esnek arasi"><span class="hucre-alt">Yer</span><span class="kucuk">${e.yer}</span></div>`;
-    if (e.dosya_ad) h += `<div class="satir-esnek arasi"><span class="hucre-alt">Dosya</span><span class="kucuk kalin">${e.dosya_ad}</span></div>`;
-    if (e.proje_ad) h += `<div class="satir-esnek arasi"><span class="hucre-alt">Proje</span><span class="kucuk">${e.proje_ad}</span></div>`;
-    if (e.katilimcilar) h += `<div><div class="hucre-alt mb-2">Katılımcılar</div><div class="kucuk">${e.katilimcilar}</div></div>`;
+    if (e.yer) h += `<div class="satir-esnek arasi"><span class="hucre-alt">Yer</span><span class="kucuk">${esc(e.yer)}</span></div>`;
+    if (e.dosya_ad) h += `<div class="satir-esnek arasi"><span class="hucre-alt">Dosya</span><span class="kucuk kalin">${esc(e.dosya_ad)}</span></div>`;
+    if (e.proje_ad) h += `<div class="satir-esnek arasi"><span class="hucre-alt">Proje</span><span class="kucuk">${esc(e.proje_ad)}</span></div>`;
+    if (e.katilimcilar) h += `<div><div class="hucre-alt mb-2">Katılımcılar</div><div class="kucuk">${esc(e.katilimcilar)}</div></div>`;
     if (e.ekipmanlar && e.ekipmanlar.length) {
         h += `<div><div class="satir-esnek arasi mb-2"><span class="hucre-alt">Ekipmanlar (${e.ekipmanlar.length})</span>`;
         const disarida = e.ekipmanlar.some(k => k.durum === 'cekimde');
@@ -249,7 +249,7 @@ function etkinlikGoster(id) {
         h += `</div>`;
         e.ekipmanlar.forEach(k => {
             const rozet = k.durum === 'cekimde' ? '<span class="rozet r-bekliyor">Çekimde</span>' : '<span class="rozet r-onaylandi">Stüdyoda</span>';
-            h += `<div class="satir-esnek arasi kucuk" style="padding:6px 10px;background:var(--surface-2);border-radius:8px;margin-bottom:4px"><span>${k.kod ? k.kod + ' — ' : ''}${k.ad}</span>${rozet}</div>`;
+            h += `<div class="satir-esnek arasi kucuk" style="padding:6px 10px;background:var(--surface-2);border-radius:8px;margin-bottom:4px"><span>${esc(k.kod ? k.kod + ' — ' : '')}${esc(k.ad)}</span>${rozet}</div>`;
         });
         h += `</div>`;
     }
