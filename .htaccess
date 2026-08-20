@@ -40,3 +40,44 @@ AddDefaultCharset UTF-8
     ExpiresByType image/png "access plus 30 days"
     ExpiresByType image/jpeg "access plus 30 days"
 </IfModule>
+
+# v5.0: old Turkish page URLs redirect to the English ones (works in any subfolder)
+RedirectMatch 301 ^(.*)/akislar\.php$ $1/workflows.php
+RedirectMatch 301 ^(.*)/alanim\.php$ $1/my-space.php
+RedirectMatch 301 ^(.*)/arsiv\.php$ $1/archive.php
+RedirectMatch 301 ^(.*)/ayarlar\.php$ $1/settings.php
+RedirectMatch 301 ^(.*)/aylik\-raporlar\.php$ $1/monthly-reports.php
+RedirectMatch 301 ^(.*)/belge\.php$ $1/document.php
+RedirectMatch 301 ^(.*)/cekim\-listesi\.php$ $1/shoot-list.php
+RedirectMatch 301 ^(.*)/dosya\.php$ $1/client.php
+RedirectMatch 301 ^(.*)/dosyalar\.php$ $1/clients.php
+RedirectMatch 301 ^(.*)/duyurular\.php$ $1/announcements.php
+RedirectMatch 301 ^(.*)/ekip\.php$ $1/team.php
+RedirectMatch 301 ^(.*)/ekipman\.php$ $1/equipment.php
+RedirectMatch 301 ^(.*)/ekstre\.php$ $1/statement.php
+RedirectMatch 301 ^(.*)/fikirler\.php$ $1/ideas.php
+RedirectMatch 301 ^(.*)/finans\.php$ $1/finance.php
+RedirectMatch 301 ^(.*)/form\-sablonlari\.php$ $1/form-templates.php
+RedirectMatch 301 ^(.*)/gelisim\.php$ $1/growth.php
+RedirectMatch 301 ^(.*)/gorev\.php$ $1/task.php
+RedirectMatch 301 ^(.*)/gorevler\.php$ $1/tasks.php
+RedirectMatch 301 ^(.*)/guncelle\.php$ $1/migrate.php
+RedirectMatch 301 ^(.*)/guncelleme\.php$ $1/updater.php
+RedirectMatch 301 ^(.*)/havuz\.php$ $1/talent-pool.php
+RedirectMatch 301 ^(.*)/icerik\-takvimi\.php$ $1/content-calendar.php
+RedirectMatch 301 ^(.*)/kullanicilar\.php$ $1/users.php
+RedirectMatch 301 ^(.*)/mesajlar\.php$ $1/messages.php
+RedirectMatch 301 ^(.*)/onaylar\.php$ $1/approvals.php
+RedirectMatch 301 ^(.*)/profil\.php$ $1/profile.php
+RedirectMatch 301 ^(.*)/proje\-sablonlari\.php$ $1/project-templates.php
+RedirectMatch 301 ^(.*)/proje\.php$ $1/project.php
+RedirectMatch 301 ^(.*)/projeler\.php$ $1/projects.php
+RedirectMatch 301 ^(.*)/randevular\.php$ $1/appointments.php
+RedirectMatch 301 ^(.*)/rapor\.php$ $1/report.php
+RedirectMatch 301 ^(.*)/raporlar\.php$ $1/reports.php
+RedirectMatch 301 ^(.*)/takvim\.php$ $1/calendar.php
+RedirectMatch 301 ^(.*)/talep\.php$ $1/request.php
+RedirectMatch 301 ^(.*)/talepler\.php$ $1/requests.php
+RedirectMatch 301 ^(.*)/toplantilar\.php$ $1/meetings.php
+RedirectMatch 301 ^(.*)/yonetici\-takip\.php$ $1/manager-tracking.php
+RedirectMatch 301 ^(.*)/zaman\-cizelgesi\.php$ $1/timeline.php

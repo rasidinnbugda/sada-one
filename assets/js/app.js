@@ -10,74 +10,74 @@
     const $ = (s, k = document) => k.querySelector(s);
     const $$ = (s, k = document) => Array.from(k.querySelectorAll(s));
 
-    window.api = async function (eylem, veri = {}) {
+    window.api = async function (action, data = {}) {
         const fd = new FormData();
-        fd.append('eylem', eylem);
+        fd.append('action', action);
         fd.append('csrf', CSRF);
-        for (const k in veri) {
-            if (veri[k] instanceof File || veri[k] instanceof Blob) fd.append(k, veri[k]);
-            else if (Array.isArray(veri[k])) fd.append(k, JSON.stringify(veri[k]));
-            else fd.append(k, veri[k] ?? '');
+        for (const k in data) {
+            if (data[k] instanceof File || data[k] instanceof Blob) fd.append(k, data[k]);
+            else if (Array.isArray(data[k])) fd.append(k, JSON.stringify(data[k]));
+            else fd.append(k, data[k] ?? '');
         }
         try {
             const r = await fetch('ajax.php', { method: 'POST', body: fd });
             const j = await r.json();
-            if (!j.ok && j.hata) toast(j.hata, 'hata');
+            if (!j.ok && j.error) toast(j.error, 'hata');
             return j;
         } catch (e) {
             toast('Bağlantı hatası. Tekrar deneyin.', 'hata');
-            return { ok: false, hata: 'network' };
+            return { ok: false, error: 'network' };
         }
     };
 
     /* ---------- Toast ---------- */
-    window.toast = function (mesaj, tur = 'bilgi', sure = 3800) {
-        const alan = $('#toastAlan');
-        if (!alan) return;
+    window.toast = function (message, type = 'info', sure = 3800) {
+        const field = $('#toastField');
+        if (!field) return;
         const el = document.createElement('div');
-        el.className = 'toast ' + tur;
-        const ikonlar = {
+        el.className = 'toast ' + type;
+        const icons = {
             basari: '<path d="M9 12l2 2 4-4m5.6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
-            hata: '<path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/>',
-            bilgi: '<path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>'
+            error: '<path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/>',
+            info: '<path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>'
         };
-        el.innerHTML = `<svg class="toast-ikon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">${ikonlar[tur] || ikonlar.bilgi}</svg><span>${mesaj}</span>`;
-        alan.appendChild(el);
+        el.innerHTML = `<svg class="toast-ikon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">${icons[type] || icons.info}</svg><span>${message}</span>`;
+        field.appendChild(el);
         setTimeout(() => { el.classList.add('cikis'); setTimeout(() => el.remove(), 300); }, sure);
     };
 
     /* ---------- Modal ---------- */
-    window.modalAc = function (id) {
+    window.modalOpen = function (id) {
         const m = document.getElementById(id);
-        if (m) { m.classList.add('acik'); document.body.style.overflow = 'hidden'; const ilk = m.querySelector('input,textarea,select'); if (ilk) setTimeout(() => ilk.focus(), 120); }
+        if (m) { m.classList.add('acik'); document.body.style.overflow = 'hidden'; const first = m.querySelector('input,textarea,select'); if (first) setTimeout(() => first.focus(), 120); }
     };
-    window.modalKapat = function (el) {
+    window.modalClose = function (el) {
         const m = el?.closest ? el.closest('.modal-katman') : document.getElementById(el);
         if (m) { m.classList.remove('acik'); document.body.style.overflow = ''; }
     };
     document.addEventListener('click', e => {
-        if (e.target.classList?.contains('modal-katman')) modalKapat(e.target);
+        if (e.target.classList?.contains('modal-katman')) modalClose(e.target);
         const acan = e.target.closest('[data-modal]');
-        if (acan) { e.preventDefault(); modalAc(acan.dataset.modal); }
-        const kapatan = e.target.closest('[data-modal-kapat]');
-        if (kapatan) { e.preventDefault(); modalKapat(kapatan); }
+        if (acan) { e.preventDefault(); modalOpen(acan.dataset.modal); }
+        const kapatan = e.target.closest('[data-modal-close]');
+        if (kapatan) { e.preventDefault(); modalClose(kapatan); }
     });
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') { const a = $('.modal-katman.acik'); if (a) modalKapat(a); }
+        if (e.key === 'Escape') { const a = $('.modal-katman.open'); if (a) modalClose(a); }
     });
 
     /* ---------- Açılır menü (dropdown) ---------- */
     document.addEventListener('click', e => {
         const btn = e.target.closest('[data-acilir-btn]');
-        const acikOlan = $$('.acilir.acik');
+        const openOlan = $$('.acilir.open');
         if (btn) {
             const grup = btn.closest('.acilir');
-            const zatenAcik = grup.classList.contains('acik');
-            acikOlan.forEach(a => a.classList.remove('acik'));
-            if (!zatenAcik) grup.classList.add('acik');
+            const zatenOpen = grup.classList.contains('acik');
+            openOlan.forEach(a => a.classList.remove('acik'));
+            if (!zatenOpen) grup.classList.add('acik');
             e.stopPropagation();
         } else if (!e.target.closest('.acilir-panel')) {
-            acikOlan.forEach(a => a.classList.remove('acik'));
+            openOlan.forEach(a => a.classList.remove('acik'));
         }
     });
 
@@ -87,13 +87,13 @@
         if (!sekme) return;
         const kap = sekme.closest('.sekme-kap') || document;
         $$('[data-sekme]', kap).forEach(s => s.classList.remove('aktif'));
-        $$('.sekme-icerik', kap).forEach(s => s.classList.remove('aktif'));
+        $$('.sekme-content', kap).forEach(s => s.classList.remove('aktif'));
         sekme.classList.add('aktif');
-        const hedef = $('#sekme-' + sekme.dataset.sekme, kap);
-        if (hedef) hedef.classList.add('aktif');
+        const target = $('#sekme-' + sekme.dataset.sekme, kap);
+        if (target) target.classList.add('aktif');
         if (history.replaceState) history.replaceState(null, '', '#' + sekme.dataset.sekme);
     });
-    // URL hash ile sekme aç
+    // URL hash with sekme aç
     if (location.hash) {
         const s = $(`[data-sekme="${location.hash.slice(1)}"]`);
         if (s) s.click();
@@ -101,56 +101,56 @@
 
     /* ---------- Nav grupları: aç/kapa + hatırla ---------- */
     $$('.nav-grup').forEach(grup => {
-        const anahtar = 'navGrup_' + grup.dataset.navGrup;
-        // Kayıtlı durum (aktif sayfa içeren grup her zaman açık)
+        const setting_key = 'navGrup_' + grup.dataset.navGrup;
+        // Kayıtlı status (is_active page içeren grup her time açık)
         if (!grup.classList.contains('aktif-grup')) {
-            const kayit = localStorage.getItem(anahtar);
-            if (kayit === 'acik') grup.classList.add('acik');
+            const entry = localStorage.getItem(setting_key);
+            if (entry === 'acik') grup.classList.add('acik');
         }
         grup.querySelector('[data-grup-btn]').addEventListener('click', () => {
             grup.classList.toggle('acik');
-            localStorage.setItem(anahtar, grup.classList.contains('acik') ? 'acik' : 'kapali');
+            localStorage.setItem(setting_key, grup.classList.contains('acik') ? 'acik' : 'kapali');
         });
     });
 
     /* ---------- Kenar çubuğu (mobil) ---------- */
-    const kenar = $('#kenar'), karartma = $('[data-karartma]');
-    $('[data-kenar-ac]')?.addEventListener('click', () => { kenar.classList.add('acik'); karartma.classList.add('acik'); });
-    const kenarKapat = () => { kenar?.classList.remove('acik'); karartma?.classList.remove('acik'); };
-    $('[data-kenar-kapat]')?.addEventListener('click', kenarKapat);
-    karartma?.addEventListener('click', kenarKapat);
+    const sidebar = $('#sidebar'), karartma = $('[data-karartma]');
+    $('[data-sidebar-open]')?.addEventListener('click', () => { sidebar.classList.add('acik'); karartma.classList.add('acik'); });
+    const sidebarClose = () => { sidebar?.classList.remove('acik'); karartma?.classList.remove('acik'); };
+    $('[data-sidebar-close]')?.addEventListener('click', sidebarClose);
+    karartma?.addEventListener('click', sidebarClose);
 
     /* ---------- Tema değiştirme ---------- */
-    $$('.tema-nokta').forEach(nokta => {
+    $$('.theme-nokta').forEach(nokta => {
         nokta.addEventListener('click', async () => {
-            const tema = nokta.dataset.tema;
-            document.documentElement.setAttribute('data-theme', tema);
-            $$('.tema-nokta').forEach(n => n.classList.toggle('secili', n === nokta));
-            await api('tema_degistir', { tema });
+            const theme = nokta.dataset.theme;
+            document.documentElement.setAttribute('data-theme', theme);
+            $$('.theme-nokta').forEach(n => n.classList.toggle('secili', n === nokta));
+            await api('theme_change', { theme });
         });
     });
 
     /* ---------- Bildirimler ---------- */
     document.addEventListener('click', async e => {
-        const oku = e.target.closest('[data-tumunu-oku]');
-        if (oku) {
+        const read = e.target.closest('[data-all-read]');
+        if (read) {
             e.preventDefault(); e.stopPropagation();
-            await api('bildirim_tumunu_oku');
-            $$('.bildirim-oge.yeni').forEach(b => b.classList.remove('yeni'));
-            $('#bildirimSayac')?.remove();
-            oku.remove();
+            await api('notification_all_read');
+            $$('.notification-oge.new').forEach(b => b.classList.remove('yeni'));
+            $('#notificationCounter')?.remove();
+            read.remove();
         }
-        const bildirimSil = e.target.closest('[data-bildirim-sil]');
-        if (bildirimSil) {
+        const notificationDelete = e.target.closest('[data-notification-delete]');
+        if (notificationDelete) {
             e.preventDefault(); e.stopPropagation();
-            const oge = bildirimSil.closest('[data-bildirim]');
-            await api('bildirim_sil', { id: oge.dataset.bildirim });
+            const oge = notificationDelete.closest('[data-notification]');
+            await api('notification_delete', { id: oge.dataset.notification });
             oge.remove();
             return;
         }
-        const bldrm = e.target.closest('[data-bildirim]');
+        const bldrm = e.target.closest('[data-notification]');
         if (bldrm && bldrm.classList.contains('yeni')) {
-            api('bildirim_oku', { id: bldrm.dataset.bildirim });
+            api('notification_read', { id: bldrm.dataset.notification });
         }
     });
 
@@ -317,11 +317,11 @@
             const idler = Array.from(liste.querySelectorAll('.kanban-kart')).map(k => k.dataset.gorev);
             const j = await api('gorev_sirala', { id: gorevId, durum: yeniDurum, idler });
             if (j.ok) {
-                if (yeniDurum !== eskiDurum) toast('Görev "' + sutun.querySelector('.kanban-baslik').textContent + '" durumuna taşındı', 'basari', 2200);
+                if (yeniDurum !== eskiDurum) toast('Görev "' + sutun.querySelector('.kanban-title').textContent + '" durumuna taşındı', 'basari', 2200);
             } else {
                 // Kilit vb. reddedildi: kartı eski sütununa geri koy
                 kart.dataset.durum = eskiDurum;
-                const eskiListe = $(`.kanban-sutun[data-durum="${eskiDurum}"] .kanban-liste`);
+                const eskiListe = $(`.kanban-sutun[data-durum="${oldStatus}"] .kanban-liste`);
                 if (eskiListe) eskiListe.appendChild(kart);
                 guncelleKanbanSayilar();
             }
@@ -350,19 +350,19 @@
                 const ikonlar = { 'Dosyalar': '📁', 'Projeler': '📋', 'Görevler': '✅', 'İçerikler': '📅', 'Talepler': '💬' };
                 for (const grup in j.sonuclar) {
                     if (!j.sonuclar[grup].length) continue;
-                    h += `<div class="arama-grup">${ikonlar[grup] || ''} ${grup}</div>`;
+                    h += `<div class="search-grup">${ikonlar[grup] || ''} ${grup}</div>`;
                     j.sonuclar[grup].forEach(s => {
-                        h += `<a href="${s.link}" class="arama-oge"><span>${s.ad.replace(/</g, '&lt;')}</span><span class="hucre-alt">${s.alt || ''}</span></a>`;
+                        h += `<a href="${s.link}" class="search-oge"><span>${s.ad.replace(/</g, '&lt;')}</span><span class="hucre-bottom">${s.alt || ''}</span></a>`;
                     });
                 }
                 panel.innerHTML = h || '<div class="bos-mini">Sonuç bulunamadı</div>';
-                panel.classList.add('acik');
+                panel.classList.add('open');
             }, 280);
         });
         document.addEventListener('click', e => {
-            if (!e.target.closest('.arama-global')) panel.classList.remove('acik');
+            if (!e.target.closest('.search-global')) panel.classList.remove('open');
         });
-        aramaGirdi.addEventListener('keydown', e => { if (e.key === 'Escape') panel.classList.remove('acik'); });
+        aramaGirdi.addEventListener('keydown', e => { if (e.key === 'Escape') panel.classList.remove('open'); });
     }
 
     /* ---------- @Mention autocomplete ---------- */
@@ -387,7 +387,7 @@
             eslesen.forEach((k, i) => {
                 const b = document.createElement('button');
                 b.type = 'button';
-                b.className = 'mention-oge' + (i === 0 ? ' aktif' : '');
+                b.className = 'mention-oge' + (i === 0 ? ' is_active' : '');
                 b.textContent = '@ ' + k.ad;
                 b.addEventListener('mousedown', e => { e.preventDefault(); sec(k); });
                 acilir.appendChild(b);
@@ -400,70 +400,70 @@
             const yeniKadar = kadar.replace(/@[^\s@]{0,25}$/, '@' + kisi.ad + ' ');
             ta.value = yeniKadar + sonrasi;
             ta.selectionStart = ta.selectionEnd = yeniKadar.length;
-            // id'yi gizli alana ekle
+            // id'yi gizli alana add
             const gizli = (ta.closest('form') || kap).querySelector('.mention-idler');
             if (gizli) {
                 const mevcut = gizli.value ? JSON.parse(gizli.value) : [];
-                if (!mevcut.includes(kisi.id)) mevcut.push(kisi.id);
+                if (!mevcut.includes(person.id)) mevcut.push(person.id);
                 gizli.value = JSON.stringify(mevcut);
             }
-            kapat();
+            close();
             ta.focus();
         }
         ta.addEventListener('input', () => {
-            const sorgu = sorguBul();
-            if (sorgu === null) { kapat(); return; }
-            goster(sorgu);
+            const query = queryFind();
+            if (query === null) { close(); return; }
+            show(query);
         });
         ta.addEventListener('keydown', e => {
             if (!acilir) return;
             const ogeler = acilir.querySelectorAll('.mention-oge');
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
-                aktifIndex = (aktifIndex + (e.key === 'ArrowDown' ? 1 : -1) + ogeler.length) % ogeler.length;
-                ogeler.forEach((o, i) => o.classList.toggle('aktif', i === aktifIndex));
+                activeIndex = (activeIndex + (e.key === 'ArrowDown' ? 1 : -1) + ogeler.length) % ogeler.length;
+                ogeler.forEach((o, i) => o.classList.toggle('aktif', i === activeIndex));
             } else if (e.key === 'Enter' || e.key === 'Tab') {
                 e.preventDefault();
-                sec(eslesen[aktifIndex]);
-            } else if (e.key === 'Escape') kapat();
+                sec(eslesen[activeIndex]);
+            } else if (e.key === 'Escape') close();
         });
-        ta.addEventListener('blur', () => setTimeout(kapat, 180));
+        ta.addEventListener('blur', () => setTimeout(close, 180));
     }
-    $$('textarea[data-mention]').forEach(mentionKur);
-    window.sadaMentionKur = mentionKur;
+    $$('textarea[data-mention]').forEach(mentionSetup);
+    window.sadaMentionSetup = mentionSetup;
 
-    /* ---------- Görev tablosu: sütun sıralama ---------- */
+    /* ---------- Görev table: sütun sıralama ---------- */
     document.addEventListener('click', e => {
         const th = e.target.closest('th.siralanir');
         if (!th) return;
-        const tablo = th.closest('table');
-        const tbody = tablo.querySelector('tbody');
+        const table = th.closest('table');
+        const tbody = table.querySelector('tbody');
         const index = Array.from(th.parentElement.children).indexOf(th);
         const yon = th.dataset.yon === 'asc' ? 'desc' : 'asc';
-        tablo.querySelectorAll('th.siralanir').forEach(t => { delete t.dataset.yon; const i = t.querySelector('.sira-isaret'); if (i) i.textContent = '↕'; });
+        table.querySelectorAll('th.siralanir').forEach(t => { delete t.dataset.yon; const i = t.querySelector('.sira-isaret'); if (i) i.textContent = '↕'; });
         th.dataset.yon = yon;
         const isaret = th.querySelector('.sira-isaret'); if (isaret) isaret.textContent = yon === 'asc' ? '↑' : '↓';
         const satirlar = Array.from(tbody.querySelectorAll('tr'));
         satirlar.sort((a, b) => {
-            const av = (a.children[index]?.dataset.sirala ?? a.children[index]?.textContent ?? '').trim();
-            const bv = (b.children[index]?.dataset.sirala ?? b.children[index]?.textContent ?? '').trim();
+            const av = (a.children[index]?.dataset.sort ?? a.children[index]?.textContent ?? '').trim();
+            const bv = (b.children[index]?.dataset.sort ?? b.children[index]?.textContent ?? '').trim();
             const an = parseFloat(av), bn = parseFloat(bv);
-            const sonuc = (!isNaN(an) && !isNaN(bn)) ? an - bn : av.localeCompare(bv, 'tr');
-            return yon === 'asc' ? sonuc : -sonuc;
+            const result = (!isNaN(an) && !isNaN(bn)) ? an - bn : av.localeCompare(bv, 'tr');
+            return yon === 'asc' ? result : -result;
         });
         satirlar.forEach(s => tbody.appendChild(s));
     });
 
-    /* ---------- Görev tablosu: hücre içi düzenleme ---------- */
-    window.hucreKaydet = async function (el, id, alan) {
-        const j = await api('gorev_alan', { id, alan, deger: el.value });
+    /* ---------- Görev table: hücre içi düzenleme ---------- */
+    window.hucreKaydet = async function (el, id, field) {
+        const j = await api('gorev_alan', { id, field, setting_value: el.value });
         if (j.ok) {
             const hucre = el.closest('td');
             hucre.classList.remove('hucre-kaydedildi');
             void hucre.offsetWidth; // animasyonu tetikle
             hucre.classList.add('hucre-kaydedildi');
-        } else if (el.dataset.eski !== undefined) {
-            el.value = el.dataset.eski; // kilit reddettiyse geri al
+        } else if (el.dataset.old !== undefined) {
+            el.value = el.dataset.old; // lock reddettiyse geri take
         }
     };
 
@@ -472,12 +472,12 @@
         const ok = e.target.closest('[data-sira-yon]');
         if (!ok) return;
         e.preventDefault();
-        const satir = ok.closest('[data-siralanabilir]');
-        if (!satir) return;
-        if (ok.dataset.siraYon === 'yukari' && satir.previousElementSibling) {
-            satir.parentElement.insertBefore(satir, satir.previousElementSibling);
-        } else if (ok.dataset.siraYon === 'asagi' && satir.nextElementSibling) {
-            satir.parentElement.insertBefore(satir.nextElementSibling, satir);
+        const row_item = ok.closest('[data-siralanabilir]');
+        if (!row_item) return;
+        if (ok.dataset.positionYon === 'yukari' && row_item.previousElementSibling) {
+            row_item.parentElement.insertBefore(row_item, row_item.previousElementSibling);
+        } else if (ok.dataset.positionYon === 'asagi' && row_item.nextElementSibling) {
+            row_item.parentElement.insertBefore(row_item.nextElementSibling, row_item);
         }
     });
 
@@ -485,9 +485,9 @@
     $$('[data-arama]').forEach(input => {
         input.addEventListener('input', () => {
             const q = input.value.toLowerCase().trim();
-            $$(input.dataset.arama).forEach(oge => {
-                const metin = oge.dataset.ara || oge.textContent;
-                oge.style.display = metin.toLowerCase().includes(q) ? '' : 'none';
+            $$(input.dataset.search).forEach(oge => {
+                const text = oge.dataset.search || oge.textContent;
+                oge.style.display = text.toLowerCase().includes(q) ? '' : 'none';
             });
         });
     });
@@ -499,54 +499,54 @@
             if (!pill) return;
             $$('.pill', grup).forEach(p => p.classList.remove('aktif'));
             pill.classList.add('aktif');
-            const deger = pill.dataset.deger;
-            const hedef = grup.dataset.pillGrup;
-            $$(hedef).forEach(oge => {
-                oge.style.display = (deger === '' || oge.dataset.filtre === deger) ? '' : 'none';
+            const setting_value = pill.dataset.setting_value;
+            const target = grup.dataset.pillGrup;
+            $$(target).forEach(oge => {
+                oge.style.display = (setting_value === '' || oge.dataset.filtre === setting_value) ? '' : 'none';
             });
         });
     });
 
     /* ---------- İlerleme çubuğu animasyonu ---------- */
     setTimeout(() => {
-        $$('.ilerleme-dolu[data-oran]').forEach(el => { el.style.width = el.dataset.oran + '%'; });
+        $$('.ilerleme-dolu[data-oran]').forEach(el => { el.style.width = el.dataset.rate + '%'; });
     }, 200);
 
     /* ---------- Sayaç animasyonu ---------- */
     $$('[data-sayac]').forEach(el => {
-        const hedef = parseFloat(el.dataset.sayac);
-        if (isNaN(hedef)) return;
+        const target = parseFloat(el.dataset.counter);
+        if (isNaN(target)) return;
         let mevcut = 0;
-        const adim = hedef / 32;
-        const zamanlayici = setInterval(() => {
-            mevcut += adim;
-            if (mevcut >= hedef) { mevcut = hedef; clearInterval(zamanlayici); }
-            el.textContent = Number.isInteger(hedef) ? Math.round(mevcut) : mevcut.toFixed(1);
+        const step = target / 32;
+        const timer = setInterval(() => {
+            mevcut += step;
+            if (mevcut >= target) { mevcut = target; clearInterval(timer); }
+            el.textContent = Number.isInteger(target) ? Math.round(mevcut) : mevcut.toFixed(1);
         }, 22);
     });
 
     /* ---------- Mesajlaşmada en alta kaydır ---------- */
-    const sohbetGovde = $('.sohbet-govde');
-    if (sohbetGovde) sohbetGovde.scrollTop = sohbetGovde.scrollHeight;
+    const sohbetBody = $('.sohbet-govde');
+    if (sohbetBody) sohbetBody.scrollTop = sohbetBody.scrollHeight;
 
-    /* ---------- Canlı senkron: 10 sn'de bir değişiklik kontrolü ----------
+    /* ---------- Canlı sync: 10 sn'de bir değişiklik kontrolü ----------
        Sayfa window.sadaCanli = {baglam, id, hash} tanımlarsa etkinleşir.
        Kullanıcı yazarken veya modal açıkken tazeleme ertelenir. */
     window.canliYenile = async function () {
         if (!window.sadaCanli) return;
-        const j = await api('canli_durum', { baglam: sadaCanli.baglam, id: sadaCanli.id || 0 });
+        const j = await api('live_status', { baglam: sadaCanli.baglam, id: sadaCanli.id || 0 });
         if (j.ok) sadaCanli.hash = j.hash;
     };
     function mesgulMu() {
         const a = document.activeElement;
         if (a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT' || a.tagName === 'SELECT')) return true;
-        if ($('.modal-katman.acik') || $('.mention-acilir') || $('.kanban-kart.suruklenuyor')) return true;
+        if ($('.modal-katman.open') || $('.mention-acilir') || $('.kanban-card.suruklenuyor')) return true;
         return false;
     }
     setInterval(async () => {
         if (!window.sadaCanli || document.hidden || mesgulMu()) return;
         try {
-            const j = await api('canli_durum', { baglam: sadaCanli.baglam, id: sadaCanli.id || 0 });
+            const j = await api('live_status', { baglam: sadaCanli.baglam, id: sadaCanli.id || 0 });
             if (j.ok && j.hash !== sadaCanli.hash) {
                 sadaCanli.hash = j.hash;
                 location.reload();
@@ -579,13 +579,13 @@
 
     /* ---------- Özel SELECT ---------- */
     window.ozelSelectKur = function (kapsam) {
-        (kapsam || document).querySelectorAll('select.secim:not([data-osec]):not(.native-kal)').forEach(sel => {
+        (kapsam || document).querySelectorAll('select.select:not([data-osec]):not(.native-kal)').forEach(sel => {
             sel.dataset.osec = '1';
             const ozgunStil = sel.getAttribute('style') || '';
             sel.style.display = 'none';
             const tetik = document.createElement('button');
             tetik.type = 'button';
-            tetik.className = 'secim osec-tetik';
+            tetik.className = 'select osec-tetik';
             if (ozgunStil) tetik.style.cssText += ozgunStil;
             const yaz = () => { tetik.textContent = sel.selectedOptions[0]?.textContent.trim() || 'Seçin...'; };
             yaz();
@@ -605,11 +605,11 @@
                     panel.appendChild(ara);
                 }
                 const liste = document.createElement('div');
-                liste.className = 'osec-liste';
+                liste.className = 'osec-list';
                 ops.forEach(op => {
                     const b = document.createElement('button');
                     b.type = 'button';
-                    b.className = 'osec-oge' + (op.selected ? ' secili' : '');
+                    b.className = 'osec-oge' + (op.selected ? ' selected' : '');
                     b.textContent = op.textContent.trim() || '—';
                     b.addEventListener('click', () => {
                         sel.value = op.value;
@@ -626,7 +626,7 @@
     };
 
     /* ---------- Özel TARİH / TARİH-SAAT / SAAT ---------- */
-    function tarihYaz(v) { // "YYYY-MM-DD" → "8 Temmuz 2026"
+    function dateWrite(v) { // "YYYY-MM-DD" → "8 Temmuz 2026"
         if (!v) return '';
         const [y, m, g] = v.split('-').map(Number);
         return g + ' ' + AYLAR_TR[m - 1] + ' ' + y;
@@ -640,7 +640,7 @@
             panel.innerHTML = '';
             const ust = document.createElement('div');
             ust.className = 'otarih-ust';
-            ust.innerHTML = `<button type="button" class="sira-ok" data-y="-1">‹</button><b>${AYLAR_TR[ga]} ${gy}</b><button type="button" class="sira-ok" data-y="1">›</button>`;
+            ust.innerHTML = `<button type="button" class="sort_order-ok" data-y="-1">‹</button><b>${AYLAR_TR[ga]} ${gy}</b><button type="button" class="sort_order-ok" data-y="1">›</button>`;
             ust.querySelectorAll('[data-y]').forEach(b => b.addEventListener('click', () => {
                 ga += +b.dataset.y; if (ga < 0) { ga = 11; gy--; } if (ga > 11) { ga = 0; gy++; }
                 ciz();
@@ -657,37 +657,37 @@
                 const v = `${gy}-${String(ga + 1).padStart(2, '0')}-${String(g).padStart(2, '0')}`;
                 const b = document.createElement('button');
                 b.type = 'button';
-                b.className = 'otarih-gun' + (v === secili ? ' secili' : '') + (v === bugunStr ? ' bugun' : '');
+                b.className = 'otarih-gun' + (v === selected ? ' secili' : '') + (v === todayStr ? ' bugun' : '');
                 if (minStr && v < minStr.slice(0, 10)) b.disabled = true;
                 b.textContent = g;
                 b.addEventListener('click', () => onSec(v));
                 izgara.appendChild(b);
             }
             panel.appendChild(izgara);
-            const alt = document.createElement('div');
-            alt.className = 'otarih-alt';
-            const bugunBtn = document.createElement('button');
-            bugunBtn.type = 'button'; bugunBtn.className = 'mini-btn'; bugunBtn.textContent = 'Bugün';
-            bugunBtn.addEventListener('click', () => onSec(bugunStr));
-            const temizle = document.createElement('button');
-            temizle.type = 'button'; temizle.className = 'mini-btn'; temizle.style.color = 'var(--tehlike)'; temizle.textContent = 'Temizle';
-            temizle.addEventListener('click', () => onSec(''));
-            alt.append(bugunBtn, temizle);
-            panel.appendChild(alt);
+            const bottom = document.createElement('div');
+            bottom.className = 'otarih-alt';
+            const todayBtn = document.createElement('button');
+            todayBtn.type = 'button'; todayBtn.className = 'mini-btn'; todayBtn.textContent = 'Bugün';
+            todayBtn.addEventListener('click', () => onSec(todayStr));
+            const clear = document.createElement('button');
+            clear.type = 'button'; clear.className = 'mini-btn'; clear.style.color = 'var(--tehlike)'; clear.textContent = 'Temizle';
+            clear.addEventListener('click', () => onSec(''));
+            bottom.append(todayBtn, clear);
+            panel.appendChild(bottom);
         }
         ciz();
         return panel;
     }
-    function saatListesi(seciliSaat, onSec) {
-        const kutu = document.createElement('div');
-        kutu.className = 'osaat-liste';
-        // Serbest saat girişi: istenen dakika yazılabilir
+    function timeList(selectedTime, onSec) {
+        const box = document.createElement('div');
+        box.className = 'osaat-liste';
+        // Serbest time girişi: istenen minutes writeılabilir
         const serbest = document.createElement('input');
         serbest.className = 'girdi osaat-serbest';
         serbest.placeholder = 'SS:DD yaz';
-        serbest.value = seciliSaat || '';
+        serbest.value = selectedTime || '';
         serbest.maxLength = 5;
-        const uygula = () => {
+        const apply = () => {
             let v = serbest.value.trim().replace('.', ':').replace(',', ':');
             if (/^\d{1,2}:?\d{2}$/.test(v)) {
                 if (!v.includes(':')) v = v.slice(0, -2) + ':' + v.slice(-2);
@@ -696,31 +696,31 @@
             }
             serbest.style.borderColor = 'var(--tehlike)';
         };
-        serbest.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); uygula(); } });
+        serbest.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } });
         serbest.addEventListener('input', () => serbest.style.borderColor = '');
-        const uygulaBtn = document.createElement('button');
-        uygulaBtn.type = 'button'; uygulaBtn.className = 'btn btn-sm btn-marka'; uygulaBtn.textContent = '✓';
-        uygulaBtn.addEventListener('click', uygula);
+        const applyBtn = document.createElement('button');
+        applyBtn.type = 'button'; applyBtn.className = 'btn btn-sm btn-marka'; applyBtn.textContent = '✓';
+        applyBtn.addEventListener('click', apply);
         const serbestSar = document.createElement('div');
         serbestSar.className = 'osaat-serbest-sar';
-        serbestSar.append(serbest, uygulaBtn);
-        kutu.appendChild(serbestSar);
-        for (let s = 0; s < 24; s++) for (const dk of [0, 30]) {
-            const v = String(s).padStart(2, '0') + ':' + String(dk).padStart(2, '0');
+        serbestSar.append(serbest, applyBtn);
+        box.appendChild(serbestSar);
+        for (let s = 0; s < 24; s++) for (const min of [0, 30]) {
+            const v = String(s).padStart(2, '0') + ':' + String(min).padStart(2, '0');
             const b = document.createElement('button');
             b.type = 'button';
-            b.className = 'osec-oge' + (v === seciliSaat ? ' secili' : '');
+            b.className = 'osec-oge' + (v === selectedTime ? ' secili' : '');
             b.textContent = v;
             b.addEventListener('click', () => onSec(v));
-            kutu.appendChild(b);
+            box.appendChild(b);
         }
-        return kutu;
+        return box;
     }
-    window.ozelTarihKur = function (kapsam) {
-        (kapsam || document).querySelectorAll('input[type=date]:not([data-osec]), input[type=datetime-local]:not([data-osec]), input[type=time]:not([data-osec])').forEach(inp => {
+    window.ozelDateSetup = function (scope) {
+        (scope || document).querySelectorAll('input[type=date]:not([data-osec]), input[type=datetime-local]:not([data-osec]), input[type=time]:not([data-osec])').forEach(inp => {
             if (inp.classList.contains('native-kal')) return;
             inp.dataset.osec = '1';
-            const tur = inp.type;
+            const type = inp.type;
             inp.type = 'text';
             inp.readOnly = true;
             inp.classList.add('osec-tetik');
@@ -728,31 +728,31 @@
             const gercek = document.createElement('input');
             gercek.type = 'hidden'; gercek.name = inp.name; inp.name = '';
             gercek.value = inp.value;
-            if (inp.required) { inp.dataset.zorunlu = '1'; }
+            if (inp.required) { inp.dataset.is_required = '1'; }
             inp.insertAdjacentElement('afterend', gercek);
-            const goster = () => {
+            const show = () => {
                 const v = gercek.value;
-                inp.dataset.deger = v;
+                inp.dataset.setting_value = v;
                 if (!v) { inp.value = ''; return; }
-                if (tur === 'time') inp.value = v.slice(0, 5);
-                else if (tur === 'date') inp.value = tarihYaz(v);
-                else inp.value = tarihYaz(v.slice(0, 10)) + ', ' + v.slice(11, 16);
+                if (type === 'time') inp.value = v.slice(0, 5);
+                else if (type === 'date') inp.value = dateWrite(v);
+                else inp.value = dateWrite(v.slice(0, 10)) + ', ' + v.slice(11, 16);
             };
-            goster();
+            show();
             inp.addEventListener('click', () => {
                 const min = inp.getAttribute('min') || '';
-                if (tur === 'time') {
+                if (type === 'time') {
                     const panel = document.createElement('div');
-                    panel.appendChild(saatListesi(gercek.value.slice(0, 5), v => { gercek.value = v; goster(); gercek.dispatchEvent(new Event('change', { bubbles: true })); panelKapat(); }));
-                    panelAc(inp, panel);
-                    panel.querySelector('.secili')?.scrollIntoView({ block: 'center' });
+                    panel.appendChild(timeList(gercek.value.slice(0, 5), v => { gercek.value = v; show(); gercek.dispatchEvent(new Event('change', { bubbles: true })); panelClose(); }));
+                    panelOpen(inp, panel);
+                    panel.querySelector('.selected')?.scrollIntoView({ block: 'center' });
                     return;
                 }
-                if (tur === 'date') {
-                    panelAc(inp, takvimPanel(gercek.value, min, v => { gercek.value = v; goster(); gercek.dispatchEvent(new Event('change', { bubbles: true })); panelKapat(); }));
+                if (type === 'date') {
+                    panelOpen(inp, calendarPanel(gercek.value, min, v => { gercek.value = v; show(); gercek.dispatchEvent(new Event('change', { bubbles: true })); panelClose(); }));
                     return;
                 }
-                // datetime-local: takvim + saat yan yana
+                // datetime-local: calendar + time yan yana
                 const panel = document.createElement('div');
                 panel.className = 'otarih-cift';
                 let tSecim = gercek.value ? gercek.value.slice(0, 10) : '';
@@ -760,17 +760,17 @@
                 const bitir = () => {
                     if (!tSecim) { gercek.value = ''; }
                     else gercek.value = tSecim + 'T' + (sSecim || '10:00');
-                    goster(); gercek.dispatchEvent(new Event('change', { bubbles: true })); panelKapat();
+                    show(); gercek.dispatchEvent(new Event('change', { bubbles: true })); panelClose();
                 };
-                const tak = takvimPanel(tSecim, min, v => { if (!v) { tSecim = ''; bitir(); return; } tSecim = v; tak.querySelectorAll('.otarih-gun').forEach(g => g.classList.remove('secili')); bitir(); });
-                const saat = saatListesi(sSecim, v => { sSecim = v; if (tSecim) bitir(); else { saat.querySelectorAll('.secili').forEach(x => x.classList.remove('secili')); } });
-                panel.append(tak, saat);
-                panelAc(inp, panel);
-                saat.querySelector('.secili')?.scrollIntoView({ block: 'center' });
+                const tak = calendarPanel(tSecim, min, v => { if (!v) { tSecim = ''; bitir(); return; } tSecim = v; tak.querySelectorAll('.otarih-day').forEach(g => g.classList.remove('secili')); bitir(); });
+                const time = timeList(sSecim, v => { sSecim = v; if (tSecim) bitir(); else { time.querySelectorAll('.selected').forEach(x => x.classList.remove('secili')); } });
+                panel.append(tak, time);
+                panelOpen(inp, panel);
+                time.querySelector('.selected')?.scrollIntoView({ block: 'center' });
             });
         });
     };
-    try { ozelSelectKur(); ozelTarihKur(); } catch (e) { console.error('Seçici hatası:', e); }
-    window.ozelSeciciYenile = () => { ozelSelectKur(); ozelTarihKur(); };
+    try { ozelSelectSetup(); ozelDateSetup(); } catch (e) { console.error('Seçici hatası:', e); }
+    window.ozelPickerRefresh = () => { ozelSelectSetup(); ozelDateSetup(); };
 
 })();

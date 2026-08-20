@@ -5,76 +5,76 @@
  * Hostinger için: smtp.hostinger.com, port 465 (SSL).
  */
 
-function eposta_gonder(string $alici, string $konu, string $metin): bool {
-    $siteAdi = ayar('site_adi', 'SADA One');
-    $gonderen = ayar('smtp_gonderen') ?: ayar('smtp_kullanici');
+function send_email(string $alici, string $topic, string $text): bool {
+    $siteName = setting('site_adi', 'SADA One');
+    $sender = setting('smtp_gonderen') ?: setting('smtp_kullanici');
 
     $html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a0f1e;border-radius:16px;overflow:hidden">'
         . '<div style="padding:24px 28px;border-bottom:1px solid rgba(248,242,203,.1)">'
         . '<span style="font-size:20px;font-weight:800;letter-spacing:2px;color:#f2f4f8">SADA<span style="color:#b1fb01">.</span></span></div>'
         . '<div style="padding:28px;color:#c9cede;font-size:14px;line-height:1.7">'
-        . '<h2 style="color:#f2f4f8;font-size:17px;margin:0 0 12px">' . htmlspecialchars($konu) . '</h2>'
-        . nl2br(htmlspecialchars($metin))
+        . '<h2 style="color:#f2f4f8;font-size:17px;margin:0 0 12px">' . htmlspecialchars($topic) . '</h2>'
+        . nl2br(htmlspecialchars($text))
         . '</div><div style="padding:16px 28px;border-top:1px solid rgba(248,242,203,.1);color:#8b93ab;font-size:12px">'
-        . htmlspecialchars($siteAdi) . ' Yönetim Sistemi — bu e-posta otomatik gönderilmiştir.</div></div>';
+        . htmlspecialchars($siteName) . ' Yönetim Sistemi — bu e-posta otomatik gönderilmiştir.</div></div>';
 
-    if (ayar('smtp_aktif') !== '1' || !ayar('smtp_host') || !$gonderen) {
+    if (setting('smtp_aktif') !== '1' || !setting('smtp_host') || !$sender) {
         // mail() ile dene
         $basliklar = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n";
-        if ($gonderen) $basliklar .= "From: $siteAdi <$gonderen>\r\n";
-        return @mail($alici, '=?UTF-8?B?' . base64_encode($konu) . '?=', $html, $basliklar);
+        if ($sender) $basliklar .= "From: $siteName <$sender>\r\n";
+        return @mail($alici, '=?UTF-8?B?' . base64_encode($topic) . '?=', $html, $basliklar);
     }
 
-    return smtp_gonder($alici, $konu, $html, $gonderen, $siteAdi);
+    return smtp_send($alici, $topic, $html, $sender, $siteName);
 }
 
-function smtp_gonder(string $alici, string $konu, string $html, string $gonderen, string $gonderAd): bool {
-    $host = ayar('smtp_host');
-    $port = (int)ayar('smtp_port', '465');
-    $kullanici = ayar('smtp_kullanici');
-    $sifre = ayar('smtp_sifre');
+function smtp_send(string $alici, string $topic, string $html, string $sender, string $sendName): bool {
+    $host = setting('smtp_host');
+    $port = (int)setting('smtp_port', '465');
+    $user = setting('smtp_kullanici');
+    $password = setting('smtp_sifre');
 
     $adres = ($port === 465 ? 'ssl://' : '') . $host;
     $sock = @fsockopen($adres, $port, $errno, $errstr, 10);
     if (!$sock) return false;
 
-    $oku = function () use ($sock) {
-        $veri = '';
-        while ($satir = fgets($sock, 515)) {
-            $veri .= $satir;
-            if (isset($satir[3]) && $satir[3] === ' ') break;
+    $read = function () use ($sock) {
+        $data = '';
+        while ($row_item = fgets($sock, 515)) {
+            $data .= $row_item;
+            if (isset($row_item[3]) && $row_item[3] === ' ') break;
         }
-        return $veri;
+        return $data;
     };
-    $gonder = function ($komut) use ($sock, $oku) {
+    $send = function ($komut) use ($sock, $read) {
         fwrite($sock, $komut . "\r\n");
-        return $oku();
+        return $read();
     };
 
     try {
-        $oku();
-        $gonder('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+        $read();
+        $send('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
         if ($port === 587) { // STARTTLS
-            $gonder('STARTTLS');
+            $send('STARTTLS');
             stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
-            $gonder('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+            $send('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
         }
-        $gonder('AUTH LOGIN');
-        $gonder(base64_encode($kullanici));
-        $cevap = $gonder(base64_encode($sifre));
-        if (strpos($cevap, '235') !== 0) { fclose($sock); return false; }
-        $gonder("MAIL FROM:<$gonderen>");
-        $gonder("RCPT TO:<$alici>");
-        $gonder('DATA');
-        $mesaj = "From: =?UTF-8?B?" . base64_encode($gonderAd) . "?= <$gonderen>\r\n"
+        $send('AUTH LOGIN');
+        $send(base64_encode($user));
+        $reply = $send(base64_encode($password));
+        if (strpos($reply, '235') !== 0) { fclose($sock); return false; }
+        $send("MAIL FROM:<$sender>");
+        $send("RCPT TO:<$alici>");
+        $send('DATA');
+        $message = "From: =?UTF-8?B?" . base64_encode($sendName) . "?= <$sender>\r\n"
             . "To: <$alici>\r\n"
-            . "Subject: =?UTF-8?B?" . base64_encode($konu) . "?=\r\n"
+            . "Subject: =?UTF-8?B?" . base64_encode($topic) . "?=\r\n"
             . "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n"
             . $html . "\r\n.";
-        $cevap = $gonder($mesaj);
-        $gonder('QUIT');
+        $reply = $send($message);
+        $send('QUIT');
         fclose($sock);
-        return strpos($cevap, '250') === 0;
+        return strpos($reply, '250') === 0;
     } catch (Throwable $e) {
         @fclose($sock);
         return false;

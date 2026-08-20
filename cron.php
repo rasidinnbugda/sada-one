@@ -9,17 +9,17 @@ require __DIR__ . '/includes/init.php';
 
 // Basit koruma: ?anahtar= parametresi site adıyla eşleşmeli (CLI'dan çağrılırsa kontrol yok)
 if (php_sapi_name() !== 'cli') {
-    $anahtar = $_GET['anahtar'] ?? '';
-    if ($anahtar !== ayar('site_adi', 'SADA One')) {
+    $setting_key = $_GET['setting_key'] ?? '';
+    if ($setting_key !== setting('site_adi', 'SADA One')) {
         http_response_code(403);
-        die('Yetkisiz. ?anahtar=SITE_ADI parametresi gerekli.');
+        die('Yetkisiz. ?setting_key=SITE_ADI parametresi gerekli.');
     }
 }
 
-$sayi = tekrar_kontrol(true);
+$count = run_recurring_jobs(true);
 
 // Vadesi geçen "bekliyor" finans kayıtlarını "gecikti" yap
-q("UPDATE odemeler SET durum='gecikti' WHERE durum='bekliyor' AND tarih < CURDATE()");
+q("UPDATE payments SET status='gecikti' WHERE status='bekliyor' AND date < CURDATE()");
 
 header('Content-Type: application/json; charset=utf-8');
-echo json_encode(['ok' => true, 'tekrarlayan_gorev' => $sayi, 'zaman' => date('Y-m-d H:i:s')], JSON_UNESCAPED_UNICODE);
+echo json_encode(['ok' => true, 'repeating_task' => $count, 'time' => date('Y-m-d H:i:s')], JSON_UNESCAPED_UNICODE);

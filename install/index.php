@@ -18,8 +18,8 @@ if (file_exists($configPath)) {
     }
 }
 
-$adim = isset($_GET['adim']) ? (int)$_GET['adim'] : 1;
-$hata = '';
+$step = isset($_GET['step']) ? (int)$_GET['step'] : 1;
+$error = '';
 
 /* ---------- Adım 1: Gereksinim kontrolü ---------- */
 $gereksinimler = [
@@ -34,7 +34,7 @@ $gereksinimler = [
 $gereksinimTamam = !in_array(false, $gereksinimler, true);
 
 /* ---------- Adım 2: Veritabanı bağlantısı ---------- */
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $adim === 2) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
     $dbHost = trim($_POST['db_host'] ?? 'localhost');
     $dbName = trim($_POST['db_name'] ?? '');
     $dbUser = trim($_POST['db_user'] ?? '');
@@ -43,36 +43,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $adim === 2) {
         $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4", $dbUser, $dbPass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         ]);
-        $_SESSION['kurulum_db'] = ['host' => $dbHost, 'name' => $dbName, 'user' => $dbUser, 'pass' => $dbPass];
-        header('Location: ?adim=3');
+        $_SESSION['install_db'] = ['host' => $dbHost, 'name' => $dbName, 'user' => $dbUser, 'pass' => $dbPass];
+        header('Location: ?step=3');
         exit;
     } catch (PDOException $e) {
-        $hata = 'Veritabanına bağlanılamadı: ' . $e->getMessage();
+        $error = 'Veritabanına bağlanılamadı: ' . $e->getMessage();
     }
 }
 
 /* ---------- Adım 3: Site + yönetici → kurulumu çalıştır ---------- */
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $adim === 3) {
-    if (empty($_SESSION['kurulum_db'])) { header('Location: ?adim=2'); exit; }
-    $siteAdi   = trim($_POST['site_adi'] ?? 'SADA One');
-    $adminAd   = trim($_POST['admin_ad'] ?? '');
-    $adminMail = trim($_POST['admin_eposta'] ?? '');
-    $adminSifre = $_POST['admin_sifre'] ?? '';
-    $adminSifre2 = $_POST['admin_sifre2'] ?? '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
+    if (empty($_SESSION['install_db'])) { header('Location: ?step=2'); exit; }
+    $siteName   = trim($_POST['site_name'] ?? 'SADA One');
+    $adminAd   = trim($_POST['admin_name'] ?? '');
+    $adminMail = trim($_POST['admin_email'] ?? '');
+    $adminSifre = $_POST['admin_password'] ?? '';
+    $adminSifre2 = $_POST['admin_password2'] ?? '';
 
     if ($adminAd === '' || !filter_var($adminMail, FILTER_VALIDATE_EMAIL)) {
-        $hata = 'Ad ve geçerli bir e-posta adresi girin.';
+        $error = 'Ad ve geçerli bir e-posta adresi girin.';
     } elseif (strlen($adminSifre) < 6) {
-        $hata = 'Şifre en az 6 karakter olmalı.';
+        $error = 'Şifre en az 6 karakter olmalı.';
     } elseif ($adminSifre !== $adminSifre2) {
-        $hata = 'Şifreler eşleşmiyor.';
+        $error = 'Şifreler eşleşmiyor.';
     } else {
-        $db = $_SESSION['kurulum_db'];
+        $db = $_SESSION['install_db'];
         try {
             $pdo = new PDO("mysql:host={$db['host']};dbname={$db['name']};charset=utf8mb4", $db['user'], $db['pass'], [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             ]);
-            kurulum_calistir($pdo, $siteAdi, $adminAd, $adminMail, $adminSifre);
+            install_run($pdo, $siteName, $adminAd, $adminMail, $adminSifre);
 
             $configIcerik = "<?php\nreturn [\n"
                 . "    'db_host' => " . var_export($db['host'], true) . ",\n"
@@ -82,589 +82,589 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $adim === 3) {
                 . "    'installed' => true,\n"
                 . "];\n";
             if (file_put_contents($configPath, $configIcerik) === false) {
-                $hata = 'config.php yazılamadı. Ana dizin izinlerini kontrol edin.';
+                $error = 'config.php yazılamadı. Ana dizin izinlerini kontrol edin.';
             } else {
-                unset($_SESSION['kurulum_db']);
-                header('Location: ?adim=4');
+                unset($_SESSION['install_db']);
+                header('Location: ?step=4');
                 exit;
             }
         } catch (PDOException $e) {
-            $hata = 'Kurulum hatası: ' . $e->getMessage();
+            $error = 'Kurulum hatası: ' . $e->getMessage();
         }
     }
 }
 
 /* ---------- Şema + başlangıç verileri ---------- */
-function kurulum_calistir(PDO $pdo, $siteAdi, $adminAd, $adminMail, $adminSifre) {
+function install_run(PDO $pdo, $siteName, $adminAd, $adminMail, $adminSifre) {
     $sql = <<<'SQL'
 CREATE TABLE IF NOT EXISTS settings (
-    anahtar VARCHAR(64) PRIMARY KEY,
-    deger TEXT
+    setting_key VARCHAR(64) PRIMARY KEY,
+    setting_value TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ad VARCHAR(100) NOT NULL,
-    eposta VARCHAR(150) NOT NULL UNIQUE,
-    sifre VARCHAR(255) NOT NULL,
-    rol ENUM('yonetici','pm','ekip','finans','stajyer','musteri') NOT NULL DEFAULT 'ekip',
-    unvan VARCHAR(100) DEFAULT NULL,
-    dosya_id INT DEFAULT NULL,
-    tema VARCHAR(20) NOT NULL DEFAULT 'lime',
-    renk VARCHAR(7) NOT NULL DEFAULT '#182f5d',
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('yonetici','pm','ekip','finans','stajyer','musteri') NOT NULL DEFAULT 'ekip',
+    job_title VARCHAR(100) DEFAULT NULL,
+    client_id INT DEFAULT NULL,
+    theme VARCHAR(20) NOT NULL DEFAULT 'lime',
+    color VARCHAR(7) NOT NULL DEFAULT '#182f5d',
     avatar VARCHAR(255) DEFAULT NULL,
-    gorev_gorunum VARCHAR(10) NOT NULL DEFAULT 'kanban',
-    maas DECIMAL(12,2) NOT NULL DEFAULT 0,
-    haftalik_kapasite SMALLINT NOT NULL DEFAULT 45,
-    izinler TEXT,
-    bildirim_tercihleri TEXT,
-    widgetler TEXT,
-    karalama MEDIUMTEXT,
-    gorulen_surum VARCHAR(10) DEFAULT NULL,
-    aktif TINYINT(1) NOT NULL DEFAULT 1,
-    son_giris DATETIME DEFAULT NULL,
+    task_view VARCHAR(10) NOT NULL DEFAULT 'kanban',
+    salary DECIMAL(12,2) NOT NULL DEFAULT 0,
+    weekly_capacity SMALLINT NOT NULL DEFAULT 45,
+    permissions TEXT,
+    notification_preferences TEXT,
+    widgets TEXT,
+    scratchpad MEDIUMTEXT,
+    seen_version VARCHAR(10) DEFAULT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    last_login DATETIME DEFAULT NULL,
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS dosyalar (
+CREATE TABLE IF NOT EXISTS clients (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ad VARCHAR(150) NOT NULL,
-    tur ENUM('marka','sirket','stk') NOT NULL DEFAULT 'marka',
-    renk VARCHAR(7) NOT NULL DEFAULT '#182f5d',
+    name VARCHAR(150) NOT NULL,
+    type ENUM('marka','sirket','stk') NOT NULL DEFAULT 'marka',
+    color VARCHAR(7) NOT NULL DEFAULT '#182f5d',
     logo VARCHAR(255) DEFAULT NULL,
-    aciklama TEXT,
-    iletisim_ad VARCHAR(100) DEFAULT NULL,
-    iletisim_eposta VARCHAR(150) DEFAULT NULL,
-    iletisim_tel VARCHAR(30) DEFAULT NULL,
-    durum ENUM('aktif','pasif') NOT NULL DEFAULT 'aktif',
+    description TEXT,
+    contact_name VARCHAR(100) DEFAULT NULL,
+    contact_email VARCHAR(150) DEFAULT NULL,
+    contact_phone VARCHAR(30) DEFAULT NULL,
+    status ENUM('aktif','pasif') NOT NULL DEFAULT 'aktif',
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS projeler (
+CREATE TABLE IF NOT EXISTS projects (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    dosya_id INT NOT NULL,
-    ad VARCHAR(200) NOT NULL,
-    tur ENUM('aylik','donemsel','tek') NOT NULL DEFAULT 'aylik',
-    aciklama TEXT,
-    durum ENUM('aktif','beklemede','tamamlandi','iptal') NOT NULL DEFAULT 'aktif',
-    baslangic DATE DEFAULT NULL,
-    bitis DATE DEFAULT NULL,
+    client_id INT NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    type ENUM('aylik','donemsel','tek') NOT NULL DEFAULT 'aylik',
+    description TEXT,
+    status ENUM('aktif','beklemede','tamamlandi','iptal') NOT NULL DEFAULT 'aktif',
+    start DATE DEFAULT NULL,
+    `end` DATE DEFAULT NULL,
     pm_id INT DEFAULT NULL,
-    sozlesme_tutari DECIMAL(12,2) NOT NULL DEFAULT 0,
+    contract_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
     created DATETIME NOT NULL,
-    INDEX(dosya_id)
+    INDEX(client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS donemler (
+CREATE TABLE IF NOT EXISTS periods (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    proje_id INT NOT NULL,
-    yil SMALLINT NOT NULL,
-    ay TINYINT NOT NULL,
-    durum ENUM('acik','kapali') NOT NULL DEFAULT 'acik',
+    project_id INT NOT NULL,
+    year SMALLINT NOT NULL,
+    month TINYINT NOT NULL,
+    status ENUM('acik','kapali') NOT NULL DEFAULT 'acik',
     created DATETIME NOT NULL,
-    UNIQUE KEY uniq_donem (proje_id, yil, ay)
+    UNIQUE KEY uniq_period (project_id, year, month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS akis_sablonlari (
+CREATE TABLE IF NOT EXISTS workflow_templates (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ad VARCHAR(120) NOT NULL,
-    aciklama VARCHAR(255) DEFAULT NULL,
+    name VARCHAR(120) NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS sablon_adimlari (
+CREATE TABLE IF NOT EXISTS template_steps (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    sablon_id INT NOT NULL,
-    sira TINYINT NOT NULL DEFAULT 1,
-    ad VARCHAR(120) NOT NULL,
-    INDEX(sablon_id)
+    template_id INT NOT NULL,
+    sort_order TINYINT NOT NULL DEFAULT 1,
+    name VARCHAR(120) NOT NULL,
+    INDEX(template_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS gorevler (
+CREATE TABLE IF NOT EXISTS tasks (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    proje_id INT NOT NULL,
-    donem_id INT DEFAULT NULL,
-    baslik VARCHAR(200) NOT NULL,
-    aciklama TEXT,
-    atanan_id INT DEFAULT NULL,
-    olusturan_id INT NOT NULL,
-    oncelik ENUM('dusuk','normal','yuksek','acil') NOT NULL DEFAULT 'normal',
-    durum ENUM('yapilacak','devam','incelemede','onayda','tamamlandi') NOT NULL DEFAULT 'yapilacak',
-    son_tarih DATE DEFAULT NULL,
-    tamamlanma DATETIME DEFAULT NULL,
-    sira INT NOT NULL DEFAULT 0,
+    project_id INT NOT NULL,
+    period_id INT DEFAULT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    assignee_id INT DEFAULT NULL,
+    created_by INT NOT NULL,
+    priority ENUM('dusuk','normal','yuksek','acil') NOT NULL DEFAULT 'normal',
+    status ENUM('yapilacak','devam','incelemede','onayda','tamamlandi') NOT NULL DEFAULT 'yapilacak',
+    due_date DATE DEFAULT NULL,
+    completion DATETIME DEFAULT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
     bagimli_id INT DEFAULT NULL,
-    kilit_acik TINYINT(1) NOT NULL DEFAULT 0,
-    tekrar ENUM('yok','haftalik','aylik') NOT NULL DEFAULT 'yok',
-    son_tekrar VARCHAR(10) DEFAULT NULL,
-    etiketler VARCHAR(255) DEFAULT NULL,
-    tahmini_dakika INT NOT NULL DEFAULT 0,
-    baslangic_tarihi DATE DEFAULT NULL,
-    arsivlendi TINYINT(1) NOT NULL DEFAULT 0,
-    icerik_id INT DEFAULT NULL,
+    lock_bypassed TINYINT(1) NOT NULL DEFAULT 0,
+    `repeat` ENUM('yok','haftalik','aylik') NOT NULL DEFAULT 'yok',
+    last_repeat VARCHAR(10) DEFAULT NULL,
+    tags VARCHAR(255) DEFAULT NULL,
+    estimated_minutes INT NOT NULL DEFAULT 0,
+    start_date DATE DEFAULT NULL,
+    is_archived TINYINT(1) NOT NULL DEFAULT 0,
+    content_id INT DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(proje_id), INDEX(atanan_id), INDEX(donem_id)
+    INDEX(project_id), INDEX(assignee_id), INDEX(period_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS proje_uyeleri (
-    proje_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS project_members (
+    project_id INT NOT NULL,
     user_id INT NOT NULL,
-    PRIMARY KEY (proje_id, user_id)
+    PRIMARY KEY (project_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS dosya_uyeleri (
-    dosya_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS client_members (
+    client_id INT NOT NULL,
     user_id INT NOT NULL,
-    PRIMARY KEY (dosya_id, user_id)
+    PRIMARY KEY (client_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS gorev_kontrol (
+CREATE TABLE IF NOT EXISTS task_checklist (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    gorev_id INT NOT NULL,
-    ad VARCHAR(200) NOT NULL,
-    tamam TINYINT(1) NOT NULL DEFAULT 0,
-    sira TINYINT NOT NULL DEFAULT 1,
-    INDEX(gorev_id)
+    task_id INT NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    is_done TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order TINYINT NOT NULL DEFAULT 1,
+    INDEX(task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS gorev_adimlari (
+CREATE TABLE IF NOT EXISTS task_steps (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    gorev_id INT NOT NULL,
-    sira TINYINT NOT NULL DEFAULT 1,
-    ad VARCHAR(120) NOT NULL,
-    sorumlu_id INT DEFAULT NULL,
-    durum ENUM('bekliyor','aktif','tamam') NOT NULL DEFAULT 'bekliyor',
-    tamam_tarih DATETIME DEFAULT NULL,
-    INDEX(gorev_id)
+    task_id INT NOT NULL,
+    sort_order TINYINT NOT NULL DEFAULT 1,
+    name VARCHAR(120) NOT NULL,
+    owner_id INT DEFAULT NULL,
+    status ENUM('bekliyor','aktif','tamam') NOT NULL DEFAULT 'bekliyor',
+    done_date DATETIME DEFAULT NULL,
+    INDEX(task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS yorumlar (
+CREATE TABLE IF NOT EXISTS comments (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ref_tur VARCHAR(20) NOT NULL,
+    ref_type VARCHAR(20) NOT NULL,
     ref_id INT NOT NULL,
     user_id INT NOT NULL,
-    mesaj TEXT NOT NULL,
+    message TEXT NOT NULL,
     parent_id INT DEFAULT NULL,
-    arsiv_id INT DEFAULT NULL,
-    duzenlendi TINYINT(1) NOT NULL DEFAULT 0,
+    archive_id INT DEFAULT NULL,
+    is_edited TINYINT(1) NOT NULL DEFAULT 0,
     created DATETIME NOT NULL,
-    INDEX(ref_tur, ref_id)
+    INDEX(ref_type, ref_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS yorum_tepkiler (
-    yorum_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS comment_box_reactions (
+    comment_box_id INT NOT NULL,
     user_id INT NOT NULL,
     emoji VARCHAR(8) NOT NULL,
-    PRIMARY KEY (yorum_id, user_id, emoji)
+    PRIMARY KEY (comment_box_id, user_id, emoji)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS gorev_izleyiciler (
-    gorev_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS task_watchers (
+    task_id INT NOT NULL,
     user_id INT NOT NULL,
-    PRIMARY KEY (gorev_id, user_id)
+    PRIMARY KEY (task_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS gorev_atananlar (
-    gorev_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS task_assignees (
+    task_id INT NOT NULL,
     user_id INT NOT NULL,
-    PRIMARY KEY (gorev_id, user_id)
+    PRIMARY KEY (task_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS giderler (
+CREATE TABLE IF NOT EXISTS expenses (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    tur ENUM('maas','kira','abonelik','ekipman','vergi','diger') NOT NULL DEFAULT 'diger',
-    baslik VARCHAR(200) NOT NULL,
-    tutar DECIMAL(12,2) NOT NULL DEFAULT 0,
-    tarih DATE NOT NULL,
-    durum ENUM('bekliyor','odendi') NOT NULL DEFAULT 'bekliyor',
-    tekrar ENUM('yok','aylik') NOT NULL DEFAULT 'yok',
-    son_tekrar VARCHAR(10) DEFAULT NULL,
+    type ENUM('maas','kira','abonelik','ekipman','vergi','diger') NOT NULL DEFAULT 'diger',
+    title VARCHAR(200) NOT NULL,
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    date DATE NOT NULL,
+    status ENUM('bekliyor','odendi') NOT NULL DEFAULT 'bekliyor',
+    `repeat` ENUM('yok','aylik') NOT NULL DEFAULT 'yok',
+    last_repeat VARCHAR(10) DEFAULT NULL,
     user_id INT DEFAULT NULL,
-    aciklama VARCHAR(255) DEFAULT NULL,
+    description VARCHAR(255) DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(tarih)
+    INDEX(date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS duyurular (
+CREATE TABLE IF NOT EXISTS announcements (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    baslik VARCHAR(200) NOT NULL,
-    metin TEXT,
-    onemli TINYINT(1) NOT NULL DEFAULT 0,
-    olusturan_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    text TEXT,
+    is_important TINYINT(1) NOT NULL DEFAULT 0,
+    created_by INT NOT NULL,
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS duyuru_okuyanlar (
-    duyuru_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS announcement_readers (
+    announcement_id INT NOT NULL,
     user_id INT NOT NULL,
-    PRIMARY KEY (duyuru_id, user_id)
+    PRIMARY KEY (announcement_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS giris_denemeleri (
+CREATE TABLE IF NOT EXISTS login_attempts (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    eposta VARCHAR(150) NOT NULL,
+    email VARCHAR(150) NOT NULL,
     ip VARCHAR(45) DEFAULT NULL,
-    basarili TINYINT(1) NOT NULL DEFAULT 0,
+    is_success TINYINT(1) NOT NULL DEFAULT 0,
     created DATETIME NOT NULL,
-    INDEX(eposta, created)
+    INDEX(email, created)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS ekipmanlar (
+CREATE TABLE IF NOT EXISTS equipment (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    kod VARCHAR(20) DEFAULT NULL,
-    ad VARCHAR(150) NOT NULL,
-    kategori ENUM('kamera','lens','sd_kart','tripod','isik','ses','drone','aksesuar','diger') NOT NULL DEFAULT 'diger',
-    foto VARCHAR(255) DEFAULT NULL,
-    durum ENUM('studyoda','zimmette','cekimde','arizali','bakimda') NOT NULL DEFAULT 'studyoda',
-    zimmet_user_id INT DEFAULT NULL,
-    zimmet_etkinlik_id INT DEFAULT NULL,
-    ariza_notu VARCHAR(255) DEFAULT NULL,
-    satin_alma DATE DEFAULT NULL,
-    fiyat DECIMAL(12,2) NOT NULL DEFAULT 0,
-    sd_durum ENUM('bos','dolu','aktarildi') DEFAULT NULL,
-    sd_icerik VARCHAR(255) DEFAULT NULL,
+    code VARCHAR(20) DEFAULT NULL,
+    name VARCHAR(150) NOT NULL,
+    category ENUM('kamera','lens','sd_kart','tripod','isik','ses','drone','aksesuar','diger') NOT NULL DEFAULT 'diger',
+    photo VARCHAR(255) DEFAULT NULL,
+    status ENUM('studyoda','zimmette','cekimde','arizali','bakimda') NOT NULL DEFAULT 'studyoda',
+    custody_user_id INT DEFAULT NULL,
+    custody_event_id INT DEFAULT NULL,
+    fault_note VARCHAR(255) DEFAULT NULL,
+    purchase_date DATE DEFAULT NULL,
+    price DECIMAL(12,2) NOT NULL DEFAULT 0,
+    sd_status ENUM('bos','dolu','aktarildi') DEFAULT NULL,
+    sd_content VARCHAR(255) DEFAULT NULL,
     sd_drive_link VARCHAR(255) DEFAULT NULL,
-    aciklama VARCHAR(255) DEFAULT NULL,
+    description VARCHAR(255) DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(kategori), INDEX(durum)
+    INDEX(category), INDEX(status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS ekipman_hareketleri (
+CREATE TABLE IF NOT EXISTS equipment_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ekipman_id INT NOT NULL,
+    equipment_id INT NOT NULL,
     user_id INT NOT NULL,
-    hedef_user_id INT DEFAULT NULL,
-    etkinlik_id INT DEFAULT NULL,
-    tur VARCHAR(20) NOT NULL,
-    aciklama VARCHAR(500) DEFAULT NULL,
+    target_user_id INT DEFAULT NULL,
+    event_id INT DEFAULT NULL,
+    type VARCHAR(20) NOT NULL,
+    description VARCHAR(500) DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(ekipman_id)
+    INDEX(equipment_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS etkinlik_ekipmanlari (
-    etkinlik_id INT NOT NULL,
-    ekipman_id INT NOT NULL,
-    PRIMARY KEY (etkinlik_id, ekipman_id)
+CREATE TABLE IF NOT EXISTS event_equipment (
+    event_id INT NOT NULL,
+    equipment_id INT NOT NULL,
+    PRIMARY KEY (event_id, equipment_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS sozlesmeler (
+CREATE TABLE IF NOT EXISTS contracts (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    dosya_id INT NOT NULL,
-    baslik VARCHAR(200) NOT NULL,
-    baslangic DATE DEFAULT NULL,
-    bitis DATE DEFAULT NULL,
-    tutar DECIMAL(12,2) NOT NULL DEFAULT 0,
-    arsiv_id INT DEFAULT NULL,
-    aciklama VARCHAR(255) DEFAULT NULL,
-    hatirlatildi TINYINT(1) NOT NULL DEFAULT 0,
+    client_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    start DATE DEFAULT NULL,
+    `end` DATE DEFAULT NULL,
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    archive_id INT DEFAULT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    is_reminded TINYINT(1) NOT NULL DEFAULT 0,
     created DATETIME NOT NULL,
-    INDEX(dosya_id)
+    INDEX(client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS zaman_kayitlari (
+CREATE TABLE IF NOT EXISTS time_entries (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    gorev_id INT NOT NULL,
+    task_id INT NOT NULL,
     user_id INT NOT NULL,
-    dakika INT NOT NULL DEFAULT 0,
-    tarih DATE NOT NULL,
-    aciklama VARCHAR(255) DEFAULT NULL,
+    minutes INT NOT NULL DEFAULT 0,
+    date DATE NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(gorev_id), INDEX(user_id)
+    INDEX(task_id), INDEX(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS arsiv (
+CREATE TABLE IF NOT EXISTS archive (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    dosya_id INT DEFAULT NULL,
-    proje_id INT DEFAULT NULL,
-    gorev_id INT DEFAULT NULL,
-    ad VARCHAR(200) NOT NULL,
-    dosya_yolu VARCHAR(255) NOT NULL,
-    boyut INT NOT NULL DEFAULT 0,
-    uzanti VARCHAR(10) DEFAULT NULL,
+    client_id INT DEFAULT NULL,
+    project_id INT DEFAULT NULL,
+    task_id INT DEFAULT NULL,
+    name VARCHAR(200) NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    size INT NOT NULL DEFAULT 0,
+    extension VARCHAR(10) DEFAULT NULL,
     url VARCHAR(500) DEFAULT NULL,
-    yukleyen_id INT NOT NULL,
+    uploader_id INT NOT NULL,
     created DATETIME NOT NULL,
-    INDEX(dosya_id), INDEX(proje_id)
+    INDEX(client_id), INDEX(project_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS icerikler (
+CREATE TABLE IF NOT EXISTS contents (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    dosya_id INT DEFAULT NULL,
-    proje_id INT DEFAULT NULL,
-    baslik VARCHAR(200) NOT NULL,
-    aciklama TEXT,
+    client_id INT DEFAULT NULL,
+    project_id INT DEFAULT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
     platform VARCHAR(120) NOT NULL DEFAULT 'instagram',
-    tarih DATE NOT NULL,
-    saat TIME DEFAULT NULL,
-    durum ENUM('taslak','ic_onay','musteri_onay','revize','onaylandi','yayinlandi') NOT NULL DEFAULT 'taslak',
-    olusturan_id INT NOT NULL,
+    date DATE NOT NULL,
+    time TIME DEFAULT NULL,
+    status ENUM('taslak','ic_onay','musteri_onay','revize','onaylandi','yayinlandi') NOT NULL DEFAULT 'taslak',
+    created_by INT NOT NULL,
     created DATETIME NOT NULL,
-    INDEX(dosya_id), INDEX(proje_id), INDEX(tarih)
+    INDEX(client_id), INDEX(project_id), INDEX(date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS proje_sablonlari (
+CREATE TABLE IF NOT EXISTS project_templates (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ad VARCHAR(150) NOT NULL,
-    aciklama VARCHAR(255) DEFAULT NULL,
-    gorevler TEXT,
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    tasks TEXT,
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS dosya_notlari (
+CREATE TABLE IF NOT EXISTS client_notes (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    dosya_id INT NOT NULL,
-    baslik VARCHAR(150) NOT NULL,
-    metin TEXT,
-    sira INT NOT NULL DEFAULT 0,
-    guncelleyen_id INT DEFAULT NULL,
-    guncelleme DATETIME DEFAULT NULL,
+    client_id INT NOT NULL,
+    title VARCHAR(150) NOT NULL,
+    text TEXT,
+    sort_order INT NOT NULL DEFAULT 0,
+    updated_by INT DEFAULT NULL,
+    `update` DATETIME DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(dosya_id)
+    INDEX(client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS belgeler (
+CREATE TABLE IF NOT EXISTS documents (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    tur ENUM('teklif','fatura') NOT NULL DEFAULT 'teklif',
-    no VARCHAR(20) NOT NULL,
-    dosya_id INT DEFAULT NULL,
-    baslik VARCHAR(200) NOT NULL,
-    kalemler TEXT,
-    kdv_oran TINYINT NOT NULL DEFAULT 20,
-    durum ENUM('taslak','gonderildi','onaylandi','reddedildi') NOT NULL DEFAULT 'taslak',
-    gecerlilik DATE DEFAULT NULL,
-    notlar VARCHAR(500) DEFAULT NULL,
-    olusturan_id INT NOT NULL,
+    type ENUM('teklif','fatura') NOT NULL DEFAULT 'teklif',
+    doc_no VARCHAR(20) NOT NULL,
+    client_id INT DEFAULT NULL,
+    title VARCHAR(200) NOT NULL,
+    items TEXT,
+    vat_rate TINYINT NOT NULL DEFAULT 20,
+    status ENUM('taslak','gonderildi','onaylandi','reddedildi') NOT NULL DEFAULT 'taslak',
+    valid_until DATE DEFAULT NULL,
+    notes VARCHAR(500) DEFAULT NULL,
+    created_by INT NOT NULL,
     created DATETIME NOT NULL,
-    INDEX(dosya_id)
+    INDEX(client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS sosyal_hesaplar (
+CREATE TABLE IF NOT EXISTS social_accounts (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    dosya_id INT NOT NULL,
+    client_id INT NOT NULL,
     platform VARCHAR(20) NOT NULL DEFAULT 'instagram',
-    kullanici_adi VARCHAR(100) NOT NULL,
+    username VARCHAR(100) NOT NULL,
     url VARCHAR(255) DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(dosya_id)
+    INDEX(client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS sosyal_metrikler (
+CREATE TABLE IF NOT EXISTS social_metrics (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    hesap_id INT NOT NULL,
-    tarih DATE NOT NULL,
-    takipci INT NOT NULL DEFAULT 0,
-    gonderi INT DEFAULT NULL,
-    etkilesim INT DEFAULT NULL,
-    girilen_id INT DEFAULT NULL,
+    account_id INT NOT NULL,
+    date DATE NOT NULL,
+    followers INT NOT NULL DEFAULT 0,
+    post INT DEFAULT NULL,
+    engagement INT DEFAULT NULL,
+    entered_by INT DEFAULT NULL,
     created DATETIME NOT NULL,
-    UNIQUE KEY uniq_metrik (hesap_id, tarih)
+    UNIQUE KEY uniq_metric (account_id, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS etkinlikler (
+CREATE TABLE IF NOT EXISTS events (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    dosya_id INT DEFAULT NULL,
-    proje_id INT DEFAULT NULL,
-    baslik VARCHAR(200) NOT NULL,
-    tur ENUM('cekim','toplanti','teslim','diger') NOT NULL DEFAULT 'cekim',
-    baslangic DATETIME NOT NULL,
-    bitis DATETIME DEFAULT NULL,
-    yer VARCHAR(200) DEFAULT NULL,
-    aciklama TEXT,
-    katilimcilar VARCHAR(255) DEFAULT NULL,
+    client_id INT DEFAULT NULL,
+    project_id INT DEFAULT NULL,
+    title VARCHAR(200) NOT NULL,
+    type ENUM('cekim','toplanti','teslim','diger') NOT NULL DEFAULT 'cekim',
+    start DATETIME NOT NULL,
+    `end` DATETIME DEFAULT NULL,
+    place VARCHAR(200) DEFAULT NULL,
+    description TEXT,
+    participants VARCHAR(255) DEFAULT NULL,
     online_link VARCHAR(255) DEFAULT NULL,
-    hatirlatildi TINYINT(1) NOT NULL DEFAULT 0,
-    olusturan_id INT NOT NULL,
+    is_reminded TINYINT(1) NOT NULL DEFAULT 0,
+    created_by INT NOT NULL,
     created DATETIME NOT NULL,
-    INDEX(baslangic)
+    INDEX(start)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS etkinlik_katilimcilari (
-    etkinlik_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS event_participants (
+    event_id INT NOT NULL,
     user_id INT NOT NULL,
-    PRIMARY KEY (etkinlik_id, user_id)
+    PRIMARY KEY (event_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS kisisel_notlar (
+CREATE TABLE IF NOT EXISTS personal_notes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    baslik VARCHAR(150) DEFAULT NULL,
-    metin TEXT,
-    renk VARCHAR(20) NOT NULL DEFAULT 'varsayilan',
+    title VARCHAR(150) DEFAULT NULL,
+    text TEXT,
+    color VARCHAR(20) NOT NULL DEFAULT 'varsayilan',
     created DATETIME NOT NULL,
-    guncelleme DATETIME DEFAULT NULL,
+    `update` DATETIME DEFAULT NULL,
     INDEX(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS kisisel_isler (
+CREATE TABLE IF NOT EXISTS personal_todos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    ad VARCHAR(255) NOT NULL,
-    tamam TINYINT(1) NOT NULL DEFAULT 0,
-    sira INT NOT NULL DEFAULT 0,
+    name VARCHAR(255) NOT NULL,
+    is_done TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT NOT NULL DEFAULT 0,
     INDEX(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS musteri_dosyalari (
+CREATE TABLE IF NOT EXISTS customer_clients (
     user_id INT NOT NULL,
-    dosya_id INT NOT NULL,
-    PRIMARY KEY (user_id, dosya_id)
+    client_id INT NOT NULL,
+    PRIMARY KEY (user_id, client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS puanlar (
+CREATE TABLE IF NOT EXISTS ratings (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ref_tur ENUM('gorev','onay') NOT NULL,
+    ref_type ENUM('gorev','onay') NOT NULL,
     ref_id INT NOT NULL,
-    proje_id INT NOT NULL,
+    project_id INT NOT NULL,
     user_id INT NOT NULL,
-    puan TINYINT NOT NULL,
-    yorum VARCHAR(500) DEFAULT NULL,
+    rating TINYINT NOT NULL,
+    comment_box VARCHAR(500) DEFAULT NULL,
     created DATETIME NOT NULL,
-    UNIQUE KEY uniq_puan (ref_tur, ref_id, user_id),
-    INDEX(proje_id)
+    UNIQUE KEY uniq_rating (ref_type, ref_id, user_id),
+    INDEX(project_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS randevular (
+CREATE TABLE IF NOT EXISTS appointments (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    musteri_id INT NOT NULL,
-    dosya_id INT DEFAULT NULL,
-    konu VARCHAR(200) NOT NULL,
-    tarih DATETIME NOT NULL,
-    online_istek TINYINT(1) NOT NULL DEFAULT 0,
-    notlar VARCHAR(500) DEFAULT NULL,
-    durum ENUM('bekliyor','onaylandi','alternatif','reddedildi') NOT NULL DEFAULT 'bekliyor',
-    alternatif_tarih DATETIME DEFAULT NULL,
+    customer_id INT NOT NULL,
+    client_id INT DEFAULT NULL,
+    topic VARCHAR(200) NOT NULL,
+    date DATETIME NOT NULL,
+    online_request TINYINT(1) NOT NULL DEFAULT 0,
+    notes VARCHAR(500) DEFAULT NULL,
+    status ENUM('bekliyor','onaylandi','alternatif','reddedildi') NOT NULL DEFAULT 'bekliyor',
+    alternative_date DATETIME DEFAULT NULL,
     online_link VARCHAR(255) DEFAULT NULL,
-    etkinlik_id INT DEFAULT NULL,
-    cevap_notu VARCHAR(255) DEFAULT NULL,
+    event_id INT DEFAULT NULL,
+    reply_note VARCHAR(255) DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(musteri_id), INDEX(durum)
+    INDEX(customer_id), INDEX(status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS kisisel_linkler (
+CREATE TABLE IF NOT EXISTS personal_links (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    ad VARCHAR(150) NOT NULL,
+    name VARCHAR(150) NOT NULL,
     url VARCHAR(500) NOT NULL,
     INDEX(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS onaylar (
+CREATE TABLE IF NOT EXISTS approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    proje_id INT NOT NULL,
-    baslik VARCHAR(200) NOT NULL,
-    aciklama TEXT,
-    arsiv_id INT DEFAULT NULL,
+    project_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    archive_id INT DEFAULT NULL,
     drive_link VARCHAR(500) DEFAULT NULL,
-    icerik_id INT DEFAULT NULL,
-    gorev_id INT DEFAULT NULL,
-    durum ENUM('bekliyor','onaylandi','revize','reddedildi') NOT NULL DEFAULT 'bekliyor',
-    gonderen_id INT NOT NULL,
-    cevap_notu TEXT,
-    cevap_tarih DATETIME DEFAULT NULL,
-    cevaplayan_id INT DEFAULT NULL,
+    content_id INT DEFAULT NULL,
+    task_id INT DEFAULT NULL,
+    status ENUM('bekliyor','onaylandi','revize','reddedildi') NOT NULL DEFAULT 'bekliyor',
+    sender_id INT NOT NULL,
+    reply_note TEXT,
+    reply_date DATETIME DEFAULT NULL,
+    responder_id INT DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(proje_id), INDEX(durum)
+    INDEX(project_id), INDEX(status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS kanallar (
+CREATE TABLE IF NOT EXISTS channels (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ad VARCHAR(120) NOT NULL,
-    tur ENUM('genel','proje','ozel','musteri') NOT NULL DEFAULT 'genel',
-    proje_id INT DEFAULT NULL,
-    simge VARCHAR(8) DEFAULT NULL,
+    name VARCHAR(120) NOT NULL,
+    type ENUM('genel','proje','ozel','musteri') NOT NULL DEFAULT 'genel',
+    project_id INT DEFAULT NULL,
+    icon VARCHAR(8) DEFAULT NULL,
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS kanal_uyeleri (
-    kanal_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS channel_members (
+    channel_id INT NOT NULL,
     user_id INT NOT NULL,
-    son_okuma DATETIME DEFAULT NULL,
-    arsiv TINYINT(1) NOT NULL DEFAULT 0,
-    PRIMARY KEY (kanal_id, user_id)
+    last_read DATETIME DEFAULT NULL,
+    archive TINYINT(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (channel_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS mesajlar (
+CREATE TABLE IF NOT EXISTS messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    kanal_id INT NOT NULL,
+    channel_id INT NOT NULL,
     user_id INT NOT NULL,
-    mesaj TEXT NOT NULL,
+    message TEXT NOT NULL,
     created DATETIME NOT NULL,
-    INDEX(kanal_id)
+    INDEX(channel_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS form_sablonlari (
+CREATE TABLE IF NOT EXISTS form_templates (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ad VARCHAR(150) NOT NULL,
-    aciklama VARCHAR(255) DEFAULT NULL,
-    aktif TINYINT(1) NOT NULL DEFAULT 1,
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS form_alanlari (
+CREATE TABLE IF NOT EXISTS form_fields (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    sablon_id INT NOT NULL,
-    sira TINYINT NOT NULL DEFAULT 1,
-    etiket VARCHAR(150) NOT NULL,
-    tip ENUM('metin','uzun_metin','secim','tarih','sayi','dosya') NOT NULL DEFAULT 'metin',
-    secenekler TEXT,
-    zorunlu TINYINT(1) NOT NULL DEFAULT 1,
-    INDEX(sablon_id)
+    template_id INT NOT NULL,
+    sort_order TINYINT NOT NULL DEFAULT 1,
+    tag VARCHAR(150) NOT NULL,
+    type ENUM('metin','uzun_metin','secim','tarih','sayi','dosya') NOT NULL DEFAULT 'metin',
+    options TEXT,
+    is_required TINYINT(1) NOT NULL DEFAULT 1,
+    INDEX(template_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS talepler (
+CREATE TABLE IF NOT EXISTS requests (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    sablon_id INT NOT NULL,
-    dosya_id INT DEFAULT NULL,
-    proje_id INT DEFAULT NULL,
-    gonderen_id INT NOT NULL,
-    baslik VARCHAR(200) NOT NULL,
-    durum ENUM('yeni','inceleniyor','gorev_olusturuldu','tamamlandi','reddedildi') NOT NULL DEFAULT 'yeni',
-    atanan_id INT DEFAULT NULL,
-    gorev_id INT DEFAULT NULL,
+    template_id INT NOT NULL,
+    client_id INT DEFAULT NULL,
+    project_id INT DEFAULT NULL,
+    sender_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    status ENUM('yeni','inceleniyor','gorev_olusturuldu','tamamlandi','reddedildi') NOT NULL DEFAULT 'yeni',
+    assignee_id INT DEFAULT NULL,
+    task_id INT DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(durum)
+    INDEX(status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS talep_cevaplari (
+CREATE TABLE IF NOT EXISTS request_replies (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    talep_id INT NOT NULL,
-    alan_id INT NOT NULL,
-    deger TEXT,
-    INDEX(talep_id)
+    request_id INT NOT NULL,
+    field_id INT NOT NULL,
+    setting_value TEXT,
+    INDEX(request_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS odemeler (
+CREATE TABLE IF NOT EXISTS payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    proje_id INT NOT NULL,
-    tur ENUM('fatura','tahsilat') NOT NULL DEFAULT 'fatura',
-    baslik VARCHAR(200) NOT NULL,
-    tutar DECIMAL(12,2) NOT NULL DEFAULT 0,
-    tarih DATE NOT NULL,
-    durum ENUM('bekliyor','odendi','gecikti') NOT NULL DEFAULT 'bekliyor',
-    aciklama VARCHAR(255) DEFAULT NULL,
+    project_id INT NOT NULL,
+    type ENUM('fatura','tahsilat') NOT NULL DEFAULT 'fatura',
+    title VARCHAR(200) NOT NULL,
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    date DATE NOT NULL,
+    status ENUM('bekliyor','odendi','gecikti') NOT NULL DEFAULT 'bekliyor',
+    description VARCHAR(255) DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(proje_id)
+    INDEX(project_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS aktiviteler (
+CREATE TABLE IF NOT EXISTS activities (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    ref_tur VARCHAR(20) DEFAULT NULL,
+    ref_type VARCHAR(20) DEFAULT NULL,
     ref_id INT DEFAULT NULL,
-    aciklama VARCHAR(255) NOT NULL,
+    description VARCHAR(255) NOT NULL,
     created DATETIME NOT NULL,
-    INDEX(ref_tur, ref_id)
+    INDEX(ref_type, ref_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS bildirimler (
+CREATE TABLE IF NOT EXISTS notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    baslik VARCHAR(150) NOT NULL,
-    mesaj VARCHAR(255) DEFAULT NULL,
+    title VARCHAR(150) NOT NULL,
+    message VARCHAR(255) DEFAULT NULL,
     link VARCHAR(255) DEFAULT NULL,
-    okundu TINYINT(1) NOT NULL DEFAULT 0,
+    is_read TINYINT(1) NOT NULL DEFAULT 0,
     created DATETIME NOT NULL,
-    INDEX(user_id, okundu)
+    INDEX(user_id, is_read)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 SQL;
 
@@ -676,42 +676,42 @@ SQL;
     $now = date('Y-m-d H:i:s');
 
     // Yönetici hesabı
-    $st = $pdo->prepare("INSERT INTO users (ad, eposta, sifre, rol, unvan, tema, renk, aktif, created) VALUES (?, ?, ?, 'yonetici', 'Kurucu', 'lime', '#b1fb01', 1, ?)");
+    $st = $pdo->prepare("INSERT INTO users (name, email, password, role, job_title, theme, color, is_active, created) VALUES (?, ?, ?, 'yonetici', 'Kurucu', 'lime', '#b1fb01', 1, ?)");
     $st->execute([$adminAd, $adminMail, password_hash($adminSifre, PASSWORD_DEFAULT), $now]);
     $adminId = (int)$pdo->lastInsertId();
 
     // Ayarlar
-    $ayarlar = [
-        'site_adi' => $siteAdi,
-        'varsayilan_tema' => 'lime',
-        'smtp_aktif' => '0',
+    $settings = [
+        'site_name' => $siteName,
+        'default_theme' => 'lime',
+        'smtp_is_active' => '0',
         'smtp_host' => 'smtp.hostinger.com',
         'smtp_port' => '465',
-        'smtp_kullanici' => '',
-        'smtp_sifre' => '',
-        'smtp_gonderen' => '',
-        'eposta_bildirim' => '1',
+        'smtp_user' => '',
+        'smtp_password' => '',
+        'smtp_sender' => '',
+        'email_notification' => '1',
     ];
-    $st = $pdo->prepare("INSERT IGNORE INTO settings (anahtar, deger) VALUES (?, ?)");
-    foreach ($ayarlar as $k => $v) $st->execute([$k, $v]);
+    $st = $pdo->prepare("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
+    foreach ($settings as $k => $v) $st->execute([$k, $v]);
 
     // Varsayılan akış şablonları
-    $akislar = [
+    $workflows = [
         ['Sosyal Medya İçerik Üretimi', 'Aylık düzenli içerik üretim akışı', ['Brief & Konsept', 'Tasarım / Üretim', 'İç Onay', 'Müşteri Onayı', 'Yayın / Planlama']],
         ['Video Prodüksiyon', 'Çekim ve kurgu süreci', ['Senaryo & Plan', 'Çekim', 'Kurgu', 'İç Onay', 'Müşteri Onayı', 'Teslim']],
         ['Web Sitesi Projesi', 'Web sitesi yapım akışı', ['Analiz & Brief', 'Tasarım', 'Geliştirme', 'İçerik Girişi', 'Test', 'Yayına Alma']],
         ['Grafik Tasarım', 'Tek seferlik tasarım işleri', ['Brief', 'Tasarım', 'Revizyon', 'Müşteri Onayı', 'Teslim']],
     ];
-    $stA = $pdo->prepare("INSERT INTO akis_sablonlari (ad, aciklama, created) VALUES (?, ?, ?)");
-    $stB = $pdo->prepare("INSERT INTO sablon_adimlari (sablon_id, sira, ad) VALUES (?, ?, ?)");
-    foreach ($akislar as $a) {
+    $stA = $pdo->prepare("INSERT INTO workflow_templates (name, description, created) VALUES (?, ?, ?)");
+    $stB = $pdo->prepare("INSERT INTO template_steps (template_id, sort_order, name) VALUES (?, ?, ?)");
+    foreach ($workflows as $a) {
         $stA->execute([$a[0], $a[1], $now]);
         $sid = (int)$pdo->lastInsertId();
-        foreach ($a[2] as $i => $adimAd) $stB->execute([$sid, $i + 1, $adimAd]);
+        foreach ($a[2] as $i => $stepName) $stB->execute([$sid, $i + 1, $stepName]);
     }
 
     // Hazır talep form şablonları
-    $formlar = [
+    $forms = [
         ['Yeni İş Talebi', 'Yeni bir iş veya proje talebi iletin', [
             ['Talep konusu', 'metin', null], ['Detaylı açıklama', 'uzun_metin', null],
             ['İstenen teslim tarihi', 'tarih', null], ['Öncelik', 'secim', "Normal\nYüksek\nAcil"],
@@ -728,22 +728,22 @@ SQL;
             ['Konu', 'metin', null], ['Açıklama', 'uzun_metin', null],
         ]],
     ];
-    $stF = $pdo->prepare("INSERT INTO form_sablonlari (ad, aciklama, aktif, created) VALUES (?, ?, 1, ?)");
-    $stFa = $pdo->prepare("INSERT INTO form_alanlari (sablon_id, sira, etiket, tip, secenekler, zorunlu) VALUES (?, ?, ?, ?, ?, 1)");
-    foreach ($formlar as $f) {
+    $stF = $pdo->prepare("INSERT INTO form_templates (name, description, is_active, created) VALUES (?, ?, 1, ?)");
+    $stFa = $pdo->prepare("INSERT INTO form_fields (template_id, sort_order, tag, type, options, is_required) VALUES (?, ?, ?, ?, ?, 1)");
+    foreach ($forms as $f) {
         $stF->execute([$f[0], $f[1], $now]);
         $fid = (int)$pdo->lastInsertId();
-        foreach ($f[2] as $i => $alan) $stFa->execute([$fid, $i + 1, $alan[0], $alan[1], $alan[2]]);
+        foreach ($f[2] as $i => $field) $stFa->execute([$fid, $i + 1, $field[0], $field[1], $field[2]]);
     }
 
     // Merkezi migrasyon: sonradan eklenen tüm şema değişikliklerini uygula
-    require_once dirname(__DIR__) . '/includes/migrasyon.php';
-    migrasyon_calistir($pdo);
+    require_once dirname(__DIR__) . '/includes/migration.php';
+    run_migrations($pdo);
 
     // Genel kanal + yöneticiyi üye yap
-    $pdo->prepare("INSERT INTO kanallar (ad, tur, created) VALUES ('Genel', 'genel', ?)")->execute([$now]);
-    $kanalId = (int)$pdo->lastInsertId();
-    $pdo->prepare("INSERT INTO kanal_uyeleri (kanal_id, user_id) VALUES (?, ?)")->execute([$kanalId, $adminId]);
+    $pdo->prepare("INSERT INTO channels (name, type, created) VALUES ('Genel', 'genel', ?)")->execute([$now]);
+    $channelId = (int)$pdo->lastInsertId();
+    $pdo->prepare("INSERT INTO channel_members (channel_id, user_id) VALUES (?, ?)")->execute([$channelId, $adminId]);
 }
 
 $adimBasliklari = [1 => 'Gereksinimler', 2 => 'Veritabanı', 3 => 'Site & Yönetici', 4 => 'Tamamlandı'];
@@ -796,29 +796,29 @@ input:focus { outline:none; border-color:var(--lime); box-shadow:0 0 0 3px rgba(
 <body>
 <div class="kutu">
     <div class="logo">SADA<span>.</span></div>
-    <div class="altbaslik">Ajans Yönetim Sistemi — Kurulum Sihirbazı · Adım <?= $adim ?>/4: <?= $adimBasliklari[$adim] ?></div>
+    <div class="altbaslik">Ajans Yönetim Sistemi — Kurulum Sihirbazı · Adım <?= $step ?>/4: <?= $adimBasliklari[$step] ?></div>
     <div class="adimlar">
-        <?php for ($i = 1; $i <= 4; $i++): ?><div class="adim-nokta <?= $i <= $adim ? 'tamam' : '' ?>"></div><?php endfor; ?>
+        <?php for ($i = 1; $i <= 4; $i++): ?><div class="adim-nokta <?= $i <= $step ? 'tamam' : '' ?>"></div><?php endfor; ?>
     </div>
     <div class="panel">
-    <?php if ($hata): ?><div class="hata"><?= htmlspecialchars($hata) ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="hata"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
-    <?php if ($adim === 1): ?>
+    <?php if ($step === 1): ?>
         <h1>Sistem Gereksinimleri</h1>
         <p class="aciklama">Sunucunuzun gereksinimleri karşılayıp karşılamadığını kontrol ediyoruz.</p>
-        <?php foreach ($gereksinimler as $ad => $ok): ?>
-            <div class="gereksinim"><span><?= $ad ?></span><span class="rozet <?= $ok ? 'ok' : 'no' ?>"><?= $ok ? 'Uygun' : 'Eksik' ?></span></div>
+        <?php foreach ($gereksinimler as $name => $ok): ?>
+            <div class="gereksinim"><span><?= $name ?></span><span class="rozet <?= $ok ? 'ok' : 'doc_no' ?>"><?= $ok ? 'Uygun' : 'Eksik' ?></span></div>
         <?php endforeach; ?>
         <div style="margin-top:24px; text-align:right">
-            <?php if ($gereksinimTamam): ?><a class="btn" href="?adim=2">Devam Et →</a>
+            <?php if ($gereksinimTamam): ?><a class="btn" href="?step=2">Devam Et →</a>
             <?php else: ?><button class="btn" disabled>Eksikleri giderin</button><?php endif; ?>
         </div>
 
-    <?php elseif ($adim === 2): ?>
+    <?php elseif ($step === 2): ?>
         <h1>Veritabanı Bağlantısı</h1>
         <p class="aciklama">MySQL veritabanı bilgilerinizi girin.</p>
         <div class="ipucu"><b>Hostinger ipucu:</b> hPanel → Veritabanları → MySQL Veritabanları bölümünden yeni bir veritabanı oluşturun. Sunucu adresi genellikle <b>localhost</b>'tur. Veritabanı adı ve kullanıcı adı <b>u123456789_</b> önekiyle başlar.</div>
-        <form method="post" action="?adim=2">
+        <form method="post" action="?step=2">
             <label>Veritabanı Sunucusu</label>
             <input type="text" name="db_host" value="<?= htmlspecialchars($_POST['db_host'] ?? 'localhost') ?>" required>
             <label>Veritabanı Adı</label>
@@ -830,25 +830,25 @@ input:focus { outline:none; border-color:var(--lime); box-shadow:0 0 0 3px rgba(
             <div style="text-align:right"><button class="btn" type="submit">Bağlantıyı Test Et →</button></div>
         </form>
 
-    <?php elseif ($adim === 3): ?>
-        <?php if (empty($_SESSION['kurulum_db'])): header('Location: ?adim=2'); exit; endif; ?>
+    <?php elseif ($step === 3): ?>
+        <?php if (empty($_SESSION['install_db'])): header('Location: ?step=2'); exit; endif; ?>
         <h1>Site Bilgileri & Yönetici Hesabı</h1>
         <p class="aciklama">Sisteme giriş yapacağınız yönetici hesabını oluşturun.</p>
-        <form method="post" action="?adim=3">
+        <form method="post" action="?step=3">
             <label>Site / Ajans Adı</label>
-            <input type="text" name="site_adi" value="<?= htmlspecialchars($_POST['site_adi'] ?? 'SADA One') ?>" required>
+            <input type="text" name="site_name" value="<?= htmlspecialchars($_POST['site_name'] ?? 'SADA One') ?>" required>
             <label>Adınız Soyadınız</label>
-            <input type="text" name="admin_ad" value="<?= htmlspecialchars($_POST['admin_ad'] ?? '') ?>" required>
+            <input type="text" name="admin_name" value="<?= htmlspecialchars($_POST['admin_name'] ?? '') ?>" required>
             <label>E-posta Adresi</label>
-            <input type="email" name="admin_eposta" value="<?= htmlspecialchars($_POST['admin_eposta'] ?? '') ?>" required>
+            <input type="email" name="admin_email" value="<?= htmlspecialchars($_POST['admin_email'] ?? '') ?>" required>
             <div class="satir">
-                <div><label>Şifre (en az 6 karakter)</label><input type="password" name="admin_sifre" required minlength="6"></div>
-                <div><label>Şifre Tekrar</label><input type="password" name="admin_sifre2" required minlength="6"></div>
+                <div><label>Şifre (en az 6 karakter)</label><input type="password" name="admin_password" required minlength="6"></div>
+                <div><label>Şifre Tekrar</label><input type="password" name="admin_password2" required minlength="6"></div>
             </div>
             <div style="text-align:right"><button class="btn" type="submit">Kurulumu Başlat →</button></div>
         </form>
 
-    <?php elseif ($adim === 4): ?>
+    <?php elseif ($step === 4): ?>
         <div class="merkez">
             <div class="tamam-ikon"><svg fill="none" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
             <h1>Kurulum Tamamlandı 🎉</h1>

@@ -7,41 +7,41 @@
 require __DIR__ . '/includes/init.php';
 $u = require_staff();
 
-$tip = $_GET['tip'] ?? 'gorevler';
+$type = $_GET['type'] ?? 'tasks';
 
-function csv_gonder(string $dosyaAdi, array $basliklar, array $satirlar): void {
+function csv_send(string $clientName, array $basliklar, array $satirlar): void {
     header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="' . $dosyaAdi . '_' . date('Y-m-d') . '.csv"');
-    $cikti = fopen('php://output', 'w');
-    fwrite($cikti, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel uyumu)
-    fputcsv($cikti, $basliklar, ';');
-    foreach ($satirlar as $s) fputcsv($cikti, $s, ';');
-    fclose($cikti);
+    header('Content-Disposition: attachment; filename="' . $clientName . '_' . date('Y-m-d') . '.csv"');
+    $output = fopen('php://output', 'w');
+    fwrite($output, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel uyumu)
+    fputcsv($output, $basliklar, ';');
+    foreach ($satirlar as $s) fputcsv($output, $s, ';');
+    fclose($output);
     exit;
 }
 
-switch ($tip) {
-case 'gorevler':
-    $veriler = rows("SELECT g.baslik, p.ad proje, d.ad dosya, u.ad atanan, g.durum, g.oncelik, g.son_tarih, g.created, g.tamamlanma
-        FROM gorevler g JOIN projeler p ON p.id=g.proje_id JOIN dosyalar d ON d.id=p.dosya_id LEFT JOIN users u ON u.id=g.atanan_id
+switch ($type) {
+case 'tasks':
+    $veriler = rows("SELECT g.title, p.name project, d.name client, u.name assignee, g.status, g.priority, g.due_date, g.created, g.completion
+        FROM tasks g JOIN projects p ON p.id=g.project_id JOIN clients d ON d.id=p.client_id LEFT JOIN users u ON u.id=g.assignee_id
         ORDER BY g.id DESC");
-    csv_gonder('gorevler', ['Görev', 'Proje', 'Dosya', 'Atanan', 'Durum', 'Öncelik', 'Son Tarih', 'Oluşturulma', 'Tamamlanma'],
-        array_map(fn($r) => [$r['baslik'], $r['proje'], $r['dosya'], $r['atanan'] ?? '', GOREV_DURUMLARI[$r['durum']], ONCELIKLER[$r['oncelik']], $r['son_tarih'] ?? '', substr($r['created'], 0, 10), $r['tamamlanma'] ? substr($r['tamamlanma'], 0, 10) : ''], $veriler));
+    csv_send('tasks', ['Görev', 'Proje', 'Dosya', 'Atanan', 'Durum', 'Öncelik', 'Son Tarih', 'Oluşturulma', 'Tamamlanma'],
+        array_map(fn($r) => [$r['title'], $r['project'], $r['client'], $r['assignee'] ?? '', GOREV_DURUMLARI[$r['status']], ONCELIKLER[$r['priority']], $r['due_date'] ?? '', substr($r['created'], 0, 10), $r['completion'] ? substr($r['completion'], 0, 10) : ''], $veriler));
 
-case 'finans':
-    if (!yetki('finans')) yetkisiz();
-    $veriler = rows("SELECT o.baslik, p.ad proje, d.ad dosya, o.tur, o.tutar, o.tarih, o.durum, o.aciklama
-        FROM odemeler o JOIN projeler p ON p.id=o.proje_id JOIN dosyalar d ON d.id=p.dosya_id ORDER BY o.tarih DESC");
-    csv_gonder('finans', ['Kayıt', 'Proje', 'Dosya', 'Tür', 'Tutar (TL)', 'Tarih', 'Durum', 'Açıklama'],
-        array_map(fn($r) => [$r['baslik'], $r['proje'], $r['dosya'], $r['tur'] === 'fatura' ? 'Fatura' : 'Tahsilat', number_format((float)$r['tutar'], 2, ',', ''), $r['tarih'], ['bekliyor' => 'Bekliyor', 'odendi' => 'Ödendi', 'gecikti' => 'Gecikti'][$r['durum']], $r['aciklama'] ?? ''], $veriler));
+case 'finance':
+    if (!permission('finans')) deny();
+    $veriler = rows("SELECT o.title, p.name project, d.name client, o.type, o.amount, o.date, o.status, o.description
+        FROM payments o JOIN projects p ON p.id=o.project_id JOIN clients d ON d.id=p.client_id ORDER BY o.date DESC");
+    csv_send('finance', ['Kayıt', 'Proje', 'Dosya', 'Tür', 'Tutar (TL)', 'Tarih', 'Durum', 'Açıklama'],
+        array_map(fn($r) => [$r['title'], $r['project'], $r['client'], $r['type'] === 'fatura' ? 'Fatura' : 'Tahsilat', number_format((float)$r['amount'], 2, ',', ''), $r['date'], ['bekliyor' => 'Bekliyor', 'odendi' => 'Ödendi', 'overdue' => 'Gecikti'][$r['status']], $r['description'] ?? ''], $veriler));
 
-case 'zaman':
-    if (!yetki('kapasite') && !yetki('rapor')) yetkisiz();
-    $veriler = rows("SELECT u.ad kisi, g.baslik gorev, p.ad proje, z.dakika, z.tarih, z.aciklama
-        FROM zaman_kayitlari z JOIN users u ON u.id=z.user_id JOIN gorevler g ON g.id=z.gorev_id JOIN projeler p ON p.id=g.proje_id
-        ORDER BY z.tarih DESC");
-    csv_gonder('zaman_raporu', ['Kişi', 'Görev', 'Proje', 'Süre (dk)', 'Süre', 'Tarih', 'Açıklama'],
-        array_map(fn($r) => [$r['kisi'], $r['gorev'], $r['proje'], $r['dakika'], dakika_format((int)$r['dakika']), $r['tarih'], $r['aciklama'] ?? ''], $veriler));
+case 'time':
+    if (!permission('kapasite') && !permission('rapor')) deny();
+    $veriler = rows("SELECT u.name person, g.title task, p.name project, z.minutes, z.date, z.description
+        FROM time_entries z JOIN users u ON u.id=z.user_id JOIN tasks g ON g.id=z.task_id JOIN projects p ON p.id=g.project_id
+        ORDER BY z.date DESC");
+    csv_send('time_report', ['Kişi', 'Görev', 'Proje', 'Süre (dk)', 'Süre', 'Tarih', 'Açıklama'],
+        array_map(fn($r) => [$r['person'], $r['task'], $r['project'], $r['minutes'], format_minutes((int)$r['minutes']), $r['date'], $r['description'] ?? ''], $veriler));
 
 default:
     header('Location: index.php');
