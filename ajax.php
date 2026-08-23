@@ -1662,10 +1662,10 @@ case 'user_save':
     require_admin();
     $email = mb_strtolower(trim($g('email'))); // email uniqueness: stored in normalized form
     $data = [
-        'name' => trim($g('name')), 'email' => $email, 'role' => $g('role', 'team'),
+        'name' => trim($g('name')), 'email' => $email, 'role' => $g('role', 'ekip'),
         'job_title' => $g('job_title'), 'client_id' => $g('client_id') ? (int)$g('client_id') : null,
         'weekly_capacity' => max(0, (int)$g('weekly_capacity', 45)),
-        'maas' => max(0, (float)str_replace(',', '.', $g('salary', '0'))),
+        'salary' => max(0, (float)str_replace(',', '.', $g('salary', '0'))),
     ];
     if (!isset(ROLES[$data['role']])) json_out(['ok' => false, 'error' => 'Geçersiz rol.']);
     // Per-user permission overrides

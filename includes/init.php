@@ -327,7 +327,7 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '5.0';
+const APP_VERSION = '5.0.1';
 const VERSION_NOTES = [
     '5.0' => [
         'Takılma sorunu çözüldü: oturum kilidi artık anında bırakılıyor — çok sekmede sayfalar birbirini beklemiyor',
