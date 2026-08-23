@@ -35,7 +35,7 @@ page_start('Toplantı Takvimi', 'meetings');
 ?>
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">Toplantı Takvimi</div><div class="sayfa-alt">Katılımcılı ve linkli toplantılar — başlamadan ~1 saat önce hatırlatılır</div></div>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalToplanti"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Toplantı Planla</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalMeeting"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Toplantı Planla</button></div>
 </div>
 
 <div class="takvim-baslik-bar">
@@ -52,7 +52,7 @@ page_start('Toplantı Takvimi', 'meetings');
     <div class="bos-ikon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z"/></svg></div>
     <div class="bos-baslik">Bu ay toplantı yok</div>
     <div class="bos-metin">Toplantı planlayın, katılımcılar otomatik bilgilendirilsin.</div>
-    <button class="btn btn-marka" data-modal="modalToplanti">Toplantı Planla</button>
+    <button class="btn btn-marka" data-modal="modalMeeting">Toplantı Planla</button>
 </div>
 <?php else: foreach ($days as $dayDate => $gunToplantilari):
     $todayMu = $dayDate === date('Y-m-d');

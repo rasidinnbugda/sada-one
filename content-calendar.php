@@ -49,7 +49,7 @@ page_start('İçerik Takvimi', 'content');
 ?>
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">İçerik Takvimi</div><div class="sayfa-alt">Dosya (marka) bazlı sosyal medya içerik planı</div></div>
-    <?php if (permission('icerik_yonet')): ?><div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalIcerik"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> İçerik Planla</button></div><?php endif; ?>
+    <?php if (permission('icerik_yonet')): ?><div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalContent"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> İçerik Planla</button></div><?php endif; ?>
 </div>
 
 <div class="filtre-bar">

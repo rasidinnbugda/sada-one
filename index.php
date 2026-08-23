@@ -52,7 +52,7 @@ if (is_staff()) {
             <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h7"/></svg> Paneli Düzenle
         </button>
         <?php if (permission('dosya_yonet')): ?>
-        <button class="btn btn-marka" data-modal="modalProje">
+        <button class="btn btn-marka" data-modal="modalProject">
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Proje
         </button>
         <?php endif; ?>

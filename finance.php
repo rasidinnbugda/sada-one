@@ -86,15 +86,15 @@ page_start('Finans', 'finance');
     <div><div class="sayfa-baslik">Finans & Kapasite</div><div class="sayfa-alt">Fatura, tahsilat ve ekip çalışma kapasitesi</div></div>
     <div class="sayfa-ust-aksiyon">
         <a href="export.php?type=finans" class="btn"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 15V3m0 12l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg> CSV İndir</a>
-        <button class="btn btn-marka" data-modal="modalOdeme"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Kayıt Ekle</button>
+        <button class="btn btn-marka" data-modal="modalPayment"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Kayıt Ekle</button>
     </div>
 </div>
 
 <div class="sekme-kap">
 <div class="sekmeler">
     <button class="sekme aktif" data-sekme="kayitlar">Gelirler</button>
-    <button class="sekme" data-sekme="expenses">Giderler</button>
-    <button class="sekme" data-sekme="documents">Teklif & Fatura</button>
+    <button class="sekme" data-sekme="giderler">Giderler</button>
+    <button class="sekme" data-sekme="belgeler">Teklif & Fatura</button>
     <button class="sekme" data-sekme="cari">Cari Hesap</button>
     <button class="sekme" data-sekme="karzarar">Kâr / Zarar</button>
     <?php if (permission('kapasite')): ?><button class="sekme" data-sekme="kapasite">Ekip Kapasitesi</button><?php endif; ?>
@@ -145,7 +145,7 @@ page_start('Finans', 'finance');
             <span class="kucuk">Ödenen: <b style="color:var(--tehlike)"><?= money($expenseTotal) ?></b></span>
             <span class="kucuk">Bekleyen: <b style="color:var(--uyari)"><?= money($expensePending) ?></b></span>
         </div>
-        <button class="btn btn-marka btn-sm" data-modal="modalGider"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Gider Ekle</button>
+        <button class="btn btn-marka btn-sm" data-modal="modalExpense"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Gider Ekle</button>
     </div>
     <?php if (!$expenses): ?>
     <div class="metin-muted kucuk orta kart" style="padding:30px">Henüz gider kaydı yok. Maaş tanımlı kullanıcılar için her ay başında otomatik oluşur.</div>
@@ -169,7 +169,7 @@ page_start('Finans', 'finance');
 <div class="sekme-icerik" id="sekme-belgeler">
     <div class="satir-esnek arasi mb-3">
         <div class="hucre-alt">Numaralı teklif/fatura belgeleri — yazdırıp PDF olarak müşteriye gönderin</div>
-        <button class="btn btn-marka btn-sm" data-modal="modalBelge"><?= icon('document', 14) ?> Yeni Belge</button>
+        <button class="btn btn-marka btn-sm" data-modal="modalDocument"><?= icon('document', 14) ?> Yeni Belge</button>
     </div>
     <?php if (!$documents): ?>
     <div class="metin-muted kucuk orta kart" style="padding:30px">Henüz belge yok. İlk teklifinizi oluşturun.</div>

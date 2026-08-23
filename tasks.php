@@ -83,7 +83,7 @@ page_start('Görevler', 'tasks');
             </button>
         </div>
         <?php if (!is_intern()): ?>
-        <button class="btn btn-marka" data-modal="modalGorev"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Görev</button>
+        <button class="btn btn-marka" data-modal="modalTask"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Görev</button>
         <?php endif; ?>
     </div>
 </div>

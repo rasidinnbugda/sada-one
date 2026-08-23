@@ -206,7 +206,7 @@ page_start($task['title'], 'tasks');
 
         <!-- Time tracking -->
         <div class="kart">
-            <div class="satir-esnek arasi mb-2"><div class="kart-baslik" style="font-size:14px">Zaman Takibi</div><button class="btn btn-sm" data-modal="modalZaman"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div>
+            <div class="satir-esnek arasi mb-2"><div class="kart-baslik" style="font-size:14px">Zaman Takibi</div><button class="btn btn-sm" data-modal="modalTime"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div>
             <div class="orta" style="padding:8px 0"><div class="stat-deger" style="font-size:26px"><?= format_minutes($totalMin) ?></div><div class="hucre-alt">toplam kayıtlı süre</div></div>
             <?php if ($zamanlar): ?><div class="dikey mt-2" style="gap:8px;max-height:200px;overflow-y:auto">
                 <?php foreach ($zamanlar as $z): ?>

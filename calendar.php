@@ -109,7 +109,7 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
 ?>
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">Prodüksiyon Takvimi</div><div class="sayfa-alt">Çekimler, toplantılar ve teslim tarihleri — çok günlü işler şerit olarak yayılır</div></div>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalEtkinlik"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Etkinlik Ekle</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalEvent"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Etkinlik Ekle</button></div>
 </div>
 
 <div class="kart">

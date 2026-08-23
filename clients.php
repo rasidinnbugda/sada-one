@@ -27,7 +27,7 @@ page_start(is_customer() ? 'Dosyalarım' : 'Dosyalar', 'clients');
     </div>
     <?php if (permission('dosya_yonet')): ?>
     <div class="sayfa-ust-aksiyon">
-        <button class="btn btn-marka" data-modal="modalDosya" onclick="clientFormSifirla()">
+        <button class="btn btn-marka" data-modal="modalClient" onclick="clientFormSifirla()">
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Dosya
         </button>
     </div>
@@ -50,7 +50,7 @@ page_start(is_customer() ? 'Dosyalarım' : 'Dosyalar', 'clients');
     <div class="bos-ikon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg></div>
     <div class="bos-baslik">Henüz dosya yok</div>
     <div class="bos-metin">İlk markanızı, şirketinizi veya STK'nızı ekleyerek başlayın.</div>
-    <?php if (permission('dosya_yonet')): ?><button class="btn btn-marka" data-modal="modalDosya">Yeni Dosya Oluştur</button><?php endif; ?>
+    <?php if (permission('dosya_yonet')): ?><button class="btn btn-marka" data-modal="modalClient">Yeni Dosya Oluştur</button><?php endif; ?>
 </div>
 <?php else: ?>
 <div class="izgara izgara-auto" id="clientIzgara">

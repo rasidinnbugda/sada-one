@@ -17,7 +17,7 @@ page_start('Duyurular', 'duyurular');
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">Duyuru Panosu</div><div class="sayfa-alt">Ekip içi duyurular ve önemli notlar</div></div>
     <?php if (is_pm()): ?>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalDuyuru"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Duyuru Yayınla</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalAnnouncement"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Duyuru Yayınla</button></div>
     <?php endif; ?>
 </div>
 

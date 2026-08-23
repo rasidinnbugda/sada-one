@@ -16,7 +16,7 @@ page_start('Fikir Panosu', 'ideas');
 ?>
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">Fikir Panosu</div><div class="sayfa-alt">İçerik fikirleri — hangi kuruma uyarlanabilir, nasıl uygulanır</div></div>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalFikir"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Fikir Öner</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalIdea"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Fikir Öner</button></div>
 </div>
 
 <?php if (!$ideas): ?>
@@ -24,7 +24,7 @@ page_start('Fikir Panosu', 'ideas');
     <div class="bos-ikon">💡</div>
     <div class="bos-baslik">Pano boş</div>
     <div class="bos-metin">Aklınıza gelen içerik fikrini paylaşın — hangi kuruma uyarlanabileceğini de yazın, ekip değerlendirsin.</div>
-    <button class="btn btn-marka" data-modal="modalFikir">İlk Fikri Öner</button>
+    <button class="btn btn-marka" data-modal="modalIdea">İlk Fikri Öner</button>
 </div>
 <?php else: ?>
 <div class="izgara izgara-3">

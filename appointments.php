@@ -28,7 +28,7 @@ page_start('Randevular', 'appointments');
         <div class="sayfa-alt"><?= is_customer() ? 'Ajansla görüşme talebi oluşturun; onaylanınca takviminize düşer' : $pendingCount . ' bekleyen talep — onaylananlar toplantı takvimine eklenir' ?></div>
     </div>
     <?php if (is_customer()): ?>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalRandevu"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Randevu Talep Et</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalAppointment"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Randevu Talep Et</button></div>
     <?php endif; ?>
 </div>
 
@@ -37,7 +37,7 @@ page_start('Randevular', 'appointments');
     <div class="bos-ikon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zm7-6l2 2 4-4"/></svg></div>
     <div class="bos-baslik">Randevu talebi yok</div>
     <div class="bos-metin"><?= is_customer() ? 'Görüşmek istediğiniz konu ve size uygun saati iletin, en kısa sürede dönüş yapalım.' : 'Müşterilerden gelen randevu talepleri burada görünür.' ?></div>
-    <?php if (is_customer()): ?><button class="btn btn-marka" data-modal="modalRandevu">Randevu Talep Et</button><?php endif; ?>
+    <?php if (is_customer()): ?><button class="btn btn-marka" data-modal="modalAppointment">Randevu Talep Et</button><?php endif; ?>
 </div>
 <?php else: foreach ($appointments as $r): ?>
 <div class="kart mb-2" style="<?= $r['status'] === 'bekliyor' ? 'border-color:var(--warning)' : '' ?>">

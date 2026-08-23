@@ -23,7 +23,7 @@ page_start('Talepler', 'requests');
 ?>
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik"><?= is_staff() ? 'Gelen Talepler' : 'Taleplerim' ?></div><div class="sayfa-alt"><?= is_staff() ? 'Müşteri ve ekip talepleri' : 'Oluşturduğunuz talepler ve durumları' ?></div></div>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalYeniTalep"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Talep</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalNewRequest"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Talep</button></div>
 </div>
 
 <?php if (is_staff()): ?>
@@ -36,7 +36,7 @@ page_start('Talepler', 'requests');
 <?php endif; ?>
 
 <?php if (!$requests): ?>
-<div class="bos-durum"><div class="bos-ikon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 10h8m-8 4h4m9-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><div class="bos-baslik">Talep yok</div><div class="bos-metin"><?= is_staff() ? 'Henüz gelen bir talep bulunmuyor.' : 'Bir iş, revizyon veya çekim talebi oluşturmak için başlayın.' ?></div><button class="btn btn-marka" data-modal="modalYeniTalep">Yeni Talep Oluştur</button></div>
+<div class="bos-durum"><div class="bos-ikon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 10h8m-8 4h4m9-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><div class="bos-baslik">Talep yok</div><div class="bos-metin"><?= is_staff() ? 'Henüz gelen bir talep bulunmuyor.' : 'Bir iş, revizyon veya çekim talebi oluşturmak için başlayın.' ?></div><button class="btn btn-marka" data-modal="modalNewRequest">Yeni Talep Oluştur</button></div>
 <?php else: ?>
 <div class="tablo-sar"><table class="tablo" id="requestList"><thead><tr><th>Talep</th><?php if (is_staff()): ?><th>Gönderen</th><th>Dosya/Proje</th><?php endif; ?><th>Tarih</th><th>Durum</th><th></th></tr></thead><tbody>
     <?php foreach ($requests as $t): ?>

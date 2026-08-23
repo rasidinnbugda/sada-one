@@ -45,7 +45,7 @@ page_start($client['name'], 'clients');
     </div>
     <?php if (permission('dosya_yonet')): ?>
     <div class="sayfa-ust-aksiyon">
-        <button class="btn btn-marka" data-modal="modalProje"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Proje Ekle</button>
+        <button class="btn btn-marka" data-modal="modalProject"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Proje Ekle</button>
         <button class="btn" onclick="clientEdit()"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg> Düzenle</button>
     </div>
     <?php endif; ?>
@@ -80,7 +80,7 @@ page_start($client['name'], 'clients');
         <!-- Social media tracking -->
         <div class="satir-esnek arasi mb-2 mt-3">
             <div class="kart-baslik"><?= icon('grafik', 16) ?> Sosyal Medya (<?= count($socialAccounts) ?>)</div>
-            <?php if (permission('icerik_yonet')): ?><button class="btn btn-sm btn-marka" data-modal="modalSosyalHesap"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Hesap Ekle</button><?php endif; ?>
+            <?php if (permission('icerik_yonet')): ?><button class="btn btn-sm btn-marka" data-modal="modalSocialAccount"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Hesap Ekle</button><?php endif; ?>
         </div>
         <?php if (!$socialAccounts): ?>
         <div class="kart orta metin-muted kucuk" style="padding:24px">Bu dosya için sosyal medya hesabı eklenmemiş.<?= permission('icerik_yonet') ? ' Hesap ekleyip takipçi verilerini düzenli girerek büyümeyi izleyin.' : '' ?></div>
@@ -216,7 +216,7 @@ page_start($client['name'], 'clients');
         <div class="kart mb-2">
             <div class="satir-esnek arasi mb-2">
                 <div class="kart-baslik" style="font-size:14px">Sözleşmeler</div>
-                <?php if (permission('dosya_yonet')): ?><button class="mini-btn" data-modal="modalSozlesme">+ Ekle</button><?php endif; ?>
+                <?php if (permission('dosya_yonet')): ?><button class="mini-btn" data-modal="modalContract">+ Ekle</button><?php endif; ?>
             </div>
             <?php if (!$contracts): ?><div class="metin-muted kucuk">Sözleşme kaydı yok. Bitiş tarihine 30 gün kala otomatik hatırlatılır.</div>
             <?php else: foreach ($contracts as $sz):

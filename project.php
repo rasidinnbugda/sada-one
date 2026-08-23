@@ -56,7 +56,7 @@ page_start($project['name'], 'projects');
     <?php if (is_staff()): ?>
     <div class="sayfa-ust-aksiyon">
         <a href="report.php?project=<?= $id ?>" target="_blank" class="btn"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 17h6M9 13h6M9 9h1m4 12H7a2 2 0 01-2-2V5a2 2 0 012-2h5.6a1 1 0 01.7.3l5.4 5.4a1 1 0 01.3.7V19a2 2 0 01-2 2z"/></svg> Rapor</a>
-        <button class="btn btn-marka" data-modal="modalGorev"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Görev Ekle</button>
+        <button class="btn btn-marka" data-modal="modalTask"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Görev Ekle</button>
         <?php if (permission('dosya_yonet')): ?><button class="btn" onclick="modalOpen('modalProjectDuzen')"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button><?php endif; ?>
     </div>
     <?php endif; ?>
@@ -64,15 +64,15 @@ page_start($project['name'], 'projects');
 
 <div class="sekme-kap">
     <div class="sekmeler">
-        <button class="sekme aktif" data-sekme="summary">Özet</button>
-        <button class="sekme" data-sekme="tasks">Görevler <span class="rozet" style="padding:1px 7px"><?= count($tasks) ?></span></button>
-        <?php if ($project['type'] === 'aylik'): ?><button class="sekme" data-sekme="periods">Dönemler</button><?php endif; ?>
-        <button class="sekme" data-sekme="approvals">Onaylar <?php if ($b = count(array_filter($approvals, fn($o) => $o['status'] === 'bekliyor'))): ?><span class="rozet r-bekliyor" style="padding:1px 7px"><?= $b ?></span><?php endif; ?></button>
-        <button class="sekme" data-sekme="content">İçerikler</button>
-        <?php if (is_staff()): ?><button class="sekme" data-sekme="station">İstasyon <?php if ($checkList && ($eksikK = count(array_filter($checkList, fn($k) => !$k['is_done'])))): ?><span class="rozet r-bekliyor" style="padding:1px 7px"><?= $eksikK ?></span><?php endif; ?></button><?php endif; ?>
+        <button class="sekme aktif" data-sekme="ozet">Özet</button>
+        <button class="sekme" data-sekme="gorevler">Görevler <span class="rozet" style="padding:1px 7px"><?= count($tasks) ?></span></button>
+        <?php if ($project['type'] === 'aylik'): ?><button class="sekme" data-sekme="donemler">Dönemler</button><?php endif; ?>
+        <button class="sekme" data-sekme="onaylar">Onaylar <?php if ($b = count(array_filter($approvals, fn($o) => $o['status'] === 'bekliyor'))): ?><span class="rozet r-bekliyor" style="padding:1px 7px"><?= $b ?></span><?php endif; ?></button>
+        <button class="sekme" data-sekme="icerik">İçerikler</button>
+        <?php if (is_staff()): ?><button class="sekme" data-sekme="istasyon">İstasyon <?php if ($checkList && ($eksikK = count(array_filter($checkList, fn($k) => !$k['is_done'])))): ?><span class="rozet r-bekliyor" style="padding:1px 7px"><?= $eksikK ?></span><?php endif; ?></button><?php endif; ?>
         <button class="sekme" data-sekme="tartisma">Tartışma <?php if ($commentCount = (int)val("SELECT COUNT(*) FROM comments WHERE ref_type='proje' AND ref_id=?", [$id])): ?><span class="rozet" style="padding:1px 7px"><?= $commentCount ?></span><?php endif; ?></button>
-        <button class="sekme" data-sekme="archive">Arşiv</button>
-        <button class="sekme" data-sekme="activity">Aktivite</button>
+        <button class="sekme" data-sekme="arsiv">Arşiv</button>
+        <button class="sekme" data-sekme="aktivite">Aktivite</button>
     </div>
 
     <!-- SUMMARY -->
@@ -152,7 +152,7 @@ page_start($project['name'], 'projects');
     <div class="sekme-icerik" id="sekme-donemler">
         <div class="satir-esnek arasi mb-3">
             <div class="kart-baslik">Aylık Dönemler</div>
-            <?php if (is_staff()): ?><button class="btn btn-marka btn-sm" data-modal="modalDonem"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Dönem Aç</button><?php endif; ?>
+            <?php if (is_staff()): ?><button class="btn btn-marka btn-sm" data-modal="modalPeriod"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Dönem Aç</button><?php endif; ?>
         </div>
         <?php if (!$periods): ?>
         <div class="bos-durum"><div class="bos-ikon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div><div class="bos-baslik">Henüz dönem açılmamış</div><div class="bos-metin">Aylık düzenli hizmet için ilk dönemi açın; şablondan görevler otomatik oluşturulabilir.</div></div>
@@ -173,7 +173,7 @@ page_start($project['name'], 'projects');
     <div class="sekme-icerik" id="sekme-onaylar">
         <div class="satir-esnek arasi mb-3">
             <div class="kart-baslik">Onay Süreçleri</div>
-            <?php if (is_staff()): ?><button class="btn btn-marka btn-sm" data-modal="modalOnay"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Onaya Gönder</button><?php endif; ?>
+            <?php if (is_staff()): ?><button class="btn btn-marka btn-sm" data-modal="modalApproval"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Onaya Gönder</button><?php endif; ?>
         </div>
         <?php if (!$approvals): ?>
         <div class="metin-muted kucuk orta kart" style="padding:30px">Henüz onay süreci başlatılmamış.</div>
@@ -252,7 +252,7 @@ page_start($project['name'], 'projects');
                 <div class="kart" style="border-color:var(--uyari)">
                     <div class="satir-esnek arasi mb-2">
                         <div class="kart-baslik">Bütçe & Ek Talepler <span class="rozet r-bekliyor" style="padding:1px 8px">Kısıtlı görünüm</span></div>
-                        <button class="btn btn-sm" data-modal="modalEkTalep">+ Ek Talep</button>
+                        <button class="btn btn-sm" data-modal="modalEkRequest">+ Ek Talep</button>
                     </div>
                     <div class="dikey kucuk mb-2" style="gap:6px">
                         <div class="satir-esnek arasi"><span class="metin-muted">Onaylı ana bütçe</span><b><?= number_format((float)$project['budget'], 2, ',', '.') ?> ₺</b></div>
@@ -339,7 +339,7 @@ page_start($project['name'], 'projects');
     <div class="sekme-icerik" id="sekme-arsiv">
         <div class="satir-esnek arasi mb-3">
             <div class="kart-baslik">Dosya Arşivi</div>
-            <button class="btn btn-marka btn-sm" data-modal="modalYukle"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Dosya Yükle</button>
+            <button class="btn btn-marka btn-sm" data-modal="modalUpload"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Dosya Yükle</button>
         </div>
         <?php if (!$archives): ?>
         <div class="metin-muted kucuk orta kart" style="padding:30px">Arşivde dosya yok.</div>

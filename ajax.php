@@ -296,7 +296,7 @@ case 'project_save':
         $id = insert('projects', $data);
         // For monthly projects, open a period for the current month
         if ($data['type'] === 'aylik') get_or_create_period($id, (int)date('Y'), (int)date('n'));
-        project_channel($id, 'project');
+        project_channel($id, 'proje');
         project_channel($id, 'musteri');
         project_members_save($id, $g('members'));
         // Set up tasks from the project template
@@ -1710,7 +1710,7 @@ case 'user_save':
     // Automatically add the new user to the relevant channels
     if ($data['role'] !== 'musteri') {
         // General channel + all project channels (except for interns)
-        foreach (rows("SELECT id, type FROM channels WHERE type='genel' OR (type='proje' AND ?='tam')", [$data['role'] === 'stajyer' ? 'stajyer' : 'full']) as $channel) {
+        foreach (rows("SELECT id, type FROM channels WHERE type='genel' OR (type='proje' AND ?='tam')", [$data['role'] === 'stajyer' ? 'stajyer' : 'tam']) as $channel) {
             q("INSERT IGNORE INTO channel_members (channel_id, user_id) VALUES (?,?)", [$channel['id'], $id]);
         }
     } else {

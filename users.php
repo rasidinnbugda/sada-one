@@ -13,7 +13,7 @@ page_start('Kullanıcılar', 'users');
 ?>
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">Kullanıcılar</div><div class="sayfa-alt"><?= count($users) ?> kullanıcı · ekip ve müşteri hesapları</div></div>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalKullanici" onclick="userSifirla()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Kullanıcı</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalUser" onclick="userSifirla()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Kullanıcı</button></div>
 </div>
 
 <div class="filtre-bar">

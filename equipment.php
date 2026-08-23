@@ -25,7 +25,7 @@ page_start('Ekipman', 'ekipman');
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">Stüdyo Ekipmanları</div><div class="sayfa-alt"><?= count($equipment) ?> demirbaş — zimmet, çekim ve SD kart takibi</div></div>
     <?php if ($can_manage): ?>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalEkipman" onclick="equipmentSifirla()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Ekipman Ekle</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalEquipment" onclick="equipmentSifirla()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Ekipman Ekle</button></div>
     <?php endif; ?>
 </div>
 
@@ -48,7 +48,7 @@ page_start('Ekipman', 'ekipman');
 </div>
 
 <?php if (!$equipment): ?>
-<div class="bos-durum"><div class="bos-ikon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg></div><div class="bos-baslik">Envanter boş</div><div class="bos-metin">Kamera, SD kart, tripod gibi demirbaşları ekleyerek stüdyo takibini başlatın.</div><?php if ($can_manage): ?><button class="btn btn-marka" data-modal="modalEkipman" onclick="equipmentSifirla()">İlk Ekipmanı Ekle</button><?php endif; ?></div>
+<div class="bos-durum"><div class="bos-ikon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg></div><div class="bos-baslik">Envanter boş</div><div class="bos-metin">Kamera, SD kart, tripod gibi demirbaşları ekleyerek stüdyo takibini başlatın.</div><?php if ($can_manage): ?><button class="btn btn-marka" data-modal="modalEquipment" onclick="equipmentSifirla()">İlk Ekipmanı Ekle</button><?php endif; ?></div>
 <?php else: ?>
 <div class="izgara izgara-auto" id="equipmentList">
     <?php foreach ($equipment as $ek):

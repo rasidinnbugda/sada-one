@@ -26,7 +26,7 @@ page_start(is_staff() ? 'Projeler' : 'Projelerim', 'projects');
         <div class="sayfa-alt"><?= count($projects) ?> proje</div>
     </div>
     <?php if (permission('dosya_yonet')): ?>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalProje"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Proje</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalProject"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Proje</button></div>
     <?php endif; ?>
 </div>
 

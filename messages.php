@@ -48,7 +48,7 @@ page_start('Mesajlar', 'messages');
         <div class="kanal-arama satir-esnek" style="gap:8px">
             <input class="girdi" placeholder="Kanal ara..." data-search=".kanal-oge" style="flex:1">
             <button class="ikon-eylem" data-modal="modalDM" title="Birebir mesaj"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></button>
-            <?php if (is_staff()): ?><button class="ikon-eylem" data-modal="modalKanal" title="Yeni kanal"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button><?php endif; ?>
+            <?php if (is_staff()): ?><button class="ikon-eylem" data-modal="modalChannel" title="Yeni kanal"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button><?php endif; ?>
         </div>
         <?php if (!$channels): ?>
         <div class="bos-mini">Henüz bir kanalınız yok.</div>
@@ -75,7 +75,7 @@ page_start('Mesajlar', 'messages');
             <div class="dosya-avatar" style="width:38px;height:38px;font-size:15px;background:var(--surface-2)"><?= $activeChannel['icon'] ? e($activeChannel['icon']) : (['genel' => '#', 'project' => icon('klasor', 17), 'musteri' => icon('el-sikisma', 17), 'ozel' => icon('sohbet', 17)][$activeChannel['type']] ?? '#') ?></div>
             <div><div class="kanal-ad"><?= e($activeChannel['name']) ?></div><div class="hucre-alt"><?= count($channelMembers) ?> üye<?= $activeChannel['archive'] ? ' · arşivde' : '' ?></div></div>
             <div class="satir-esnek" style="margin-left:auto;gap:6px">
-                <button class="btn btn-sm btn-hayalet" data-modal="modalUyeler">
+                <button class="btn btn-sm btn-hayalet" data-modal="modalMembers">
                     <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="15"><path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z"/></svg>
                     Üyeler
                 </button>

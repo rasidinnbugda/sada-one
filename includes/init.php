@@ -327,7 +327,7 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '5.0.1';
+const APP_VERSION = '5.0.2';
 const VERSION_NOTES = [
     '5.0' => [
         'Takılma sorunu çözüldü: oturum kilidi artık anında bırakılıyor — çok sekmede sayfalar birbirini beklemiyor',
@@ -852,7 +852,7 @@ function task_lock_reason(array $task, string $targetStatus): ?string {
     return null;
 }
 
-function project_channel(int $projectId, string $type = 'project'): int {
+function project_channel(int $projectId, string $type = 'proje'): int {
     $k = row("SELECT id FROM channels WHERE project_id=? AND type=?", [$projectId, $type]);
     if ($k) return (int)$k['id'];
     $project = row("SELECT name FROM projects WHERE id=?", [$projectId]);

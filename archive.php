@@ -21,7 +21,7 @@ page_start('Dosya Arşivi', 'archive');
 ?>
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">Dosya Arşivi</div><div class="sayfa-alt">Logo, brief, tasarım ve medya dosyaları</div></div>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalYukle"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4l4 4M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/></svg> Dosya Yükle</button></div>
+    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalUpload"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4l4 4M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/></svg> Dosya Yükle</button></div>
 </div>
 
 <div class="filtre-bar">
