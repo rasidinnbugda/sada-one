@@ -53,6 +53,7 @@ page_start($task['title'], 'tasks');
         <select class="secim" style="width:auto;min-width:160px" id="statusPicker" onchange="statusChange(this.value)">
             <?php foreach (TASK_STATUSES as $k => $v): ?><option value="<?= $k ?>" <?= $task['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
         </select>
+        <button class="btn" title="Görevi ve tartışmayı AI ile özetle" onclick="aiSummary(<?= $id ?>)">🪄</button>
         <button class="btn" onclick="modalOpen('modalTaskDuzen')"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
     </div>
 </div>
@@ -370,6 +371,19 @@ async function checkToggle(id, box) {
 async function lockToggle() {
     const j = await api('lock_toggle', { id: <?= $id ?> });
     if (j.ok) { toast(j.message, 'basari'); liveRefresh(); setTimeout(() => location.reload(), 650); }
+}
+</script>
+<div class="modal-katman" id="modalAiSummary">
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">🪄 Görev Özeti</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal-govde"><div class="kucuk metin-2" id="aiSummaryText" style="white-space:pre-wrap;line-height:1.7">Özet hazırlanıyor...</div></div></div>
+</div>
+<script>
+async function aiSummary(taskId) {
+    modalOpen('modalAiSummary');
+    const box = document.getElementById('aiSummaryText');
+    box.textContent = 'Özet hazırlanıyor... (~15 sn)';
+    const j = await api('ai_summarize', { task_id: taskId });
+    box.textContent = j.ok ? j.summary : (j.error || 'Özet üretilemedi.');
 }
 </script>
 <?php page_end(); ?>

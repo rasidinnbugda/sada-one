@@ -190,6 +190,13 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
                 <div class="form-grup"><label class="form-etiket">Alınacaklar</label><textarea name="shopping_list" class="metin-alani" rows="2" placeholder="- Yedek pil&#10;- Gaffer bandı"></textarea></div>
                 <div class="form-grup"><label class="form-etiket">İhtiyaç Listesi</label><textarea name="needs_list" class="metin-alani" rows="2" placeholder="- Mekan izni&#10;- Prompter metni"></textarea></div>
             </div>
+            <?php if (permission('butce_gor')): ?>
+            <div class="form-grup"><label class="form-etiket">Çekim Maliyeti (₺)</label><input name="cost" class="girdi" placeholder="0.00"><div class="form-ipucu">Kiralama, ulaşım vb. Girildiğinde Finans'a otomatik gider kaydı düşer.</div></div>
+            <?php endif; ?>
+            <div class="form-grup"><label class="form-etiket">Drive Klasörü <span class="metin-muted" style="font-weight:400">(çekim için, opsiyonel)</span></label>
+                <input name="drive_folder" class="girdi" placeholder="Klasör linki veya ID — boşsa dosyanın klasörü kullanılır">
+                <div class="form-ipucu">Çekim görüntülerinin yükleneceği klasör; aktarım buradan otomatik denetlenir.</div>
+            </div>
             <?php if ($musaitEquipment): ?>
             <div class="form-grup">
                 <label class="form-etiket">Ekipman Seç <span class="metin-muted" style="font-weight:400">(stüdyodaki müsait ekipmanlar — seçilenler çekime zimmetlenir)</span></label>

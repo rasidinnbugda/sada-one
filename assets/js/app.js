@@ -774,3 +774,8 @@
     window.ozelPickerRefresh = () => { ozelSelectSetup(); ozelDateSetup(); };
 
 })();
+
+/* ---------- PWA: register the service worker ---------- */
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}

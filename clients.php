@@ -95,6 +95,15 @@ page_start(is_customer() ? 'Dosyalarım' : 'Dosyalar', 'clients');
                 <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="description" id="d_description" class="metin-alani"></textarea></div>
                 <div class="form-satir">
                     <div class="form-grup"><label class="form-etiket">İletişim Kişisi</label><input name="contact_name" id="d_contact_name" class="girdi"></div>
+                    <div class="form-grup"><label class="form-etiket">Dosya Yöneticisi</label>
+                        <select name="manager_id" id="d_manager_id" class="secim">
+                            <option value="">— Atanmadı</option>
+                            <?php foreach (rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm','ekip') AND is_active=1 ORDER BY name") as $m2): ?>
+                            <option value="<?= $m2['id'] ?>"><?= e($m2['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-ipucu">Aylık raporu doldurmakla yükümlü kişi; hatırlatmalar ona gider.</div>
+                    </div>
                     <div class="form-grup"><label class="form-etiket">Telefon</label><input name="contact_phone" id="d_contact_tel" class="girdi"></div>
                 </div>
                 <div class="form-satir">

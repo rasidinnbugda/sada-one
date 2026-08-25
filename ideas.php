@@ -16,7 +16,9 @@ page_start('Fikir Panosu', 'ideas');
 ?>
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">Fikir Panosu</div><div class="sayfa-alt">İçerik fikirleri — hangi kuruma uyarlanabilir, nasıl uygulanır</div></div>
-    <div class="sayfa-ust-aksiyon"><button class="btn btn-marka" data-modal="modalIdea"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Fikir Öner</button></div>
+    <div class="sayfa-ust-aksiyon">
+        <button class="btn" onclick="modalOpen('modalAiIdea')">🪄 AI ile Üret</button>
+        <button class="btn btn-marka" data-modal="modalIdea"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Fikir Öner</button></div>
 </div>
 
 <?php if (!$ideas): ?>
@@ -69,6 +71,39 @@ page_start('Fikir Panosu', 'ideas');
 async function ideaIlerlet(id, status) {
     const j = await api('idea_status', { id, status });
     if (j.ok) location.reload();
+}
+</script>
+<!-- AI idea generator -->
+<div class="modal-katman" id="modalAiIdea">
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">🪄 AI ile Fikir Üret</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal-govde">
+        <div class="form-grup"><label class="form-etiket">Kurum / Konu</label><input id="aiTopic" class="girdi" placeholder="Örn. yerel kahve zinciri, Ramazan kampanyası"></div>
+        <button class="btn btn-marka" id="aiIdeaBtn" onclick="aiIdeas()">Üret</button>
+        <div class="dikey mt-3" id="aiIdeaList" style="gap:8px"></div>
+    </div></div>
+</div>
+<script>
+async function aiIdeas() {
+    const topic = document.getElementById('aiTopic').value.trim();
+    if (!topic) { toast('Kurum/konu yazın', 'hata'); return; }
+    const btn = document.getElementById('aiIdeaBtn'), list = document.getElementById('aiIdeaList');
+    btn.disabled = true; btn.textContent = 'Üretiliyor... (~15 sn)';
+    const j = await api('ai_idea_generate', { topic });
+    btn.disabled = false; btn.textContent = 'Üret';
+    if (!j.ok) { toast(j.error || 'Üretilemedi', 'hata'); return; }
+    list.innerHTML = '';
+    for (const f of j.ideas) {
+        const div = document.createElement('div');
+        div.style.cssText = 'padding:11px 13px;background:var(--surface-2);border-radius:11px';
+        div.innerHTML = `<div class="kalin kucuk"></div><div class="kucuk metin-2 mt-1"></div><button class="mini-btn mt-1">+ Panoya ekle</button>`;
+        div.children[0].textContent = f.fikir || '';
+        div.children[1].textContent = f.aciklama || '';
+        div.children[2].addEventListener('click', async () => {
+            const r = await api('idea_save', { idea: f.fikir, organization: topic, description: f.aciklama || '' });
+            if (r.ok) { div.children[2].textContent = '✓ Eklendi'; div.children[2].disabled = true; }
+        });
+        list.appendChild(div);
+    }
 }
 </script>
 <?php page_end(); ?>

@@ -92,6 +92,61 @@ page_start('Ayarlar', 'settings');
     </div>
 </div>
 
+<div class="izgara izgara-2 mt-3">
+    <!-- Google Drive integration -->
+    <div class="kart">
+        <div class="kart-baslik mb-2">📁 Google Drive Entegrasyonu</div>
+        <div class="hucre-alt mb-3">Çekimlerin Drive'a aktarılıp aktarılmadığını panel otomatik denetler. Kurulum bir kez yapılır.</div>
+        <?php $driveKurulu = is_file(ROOT . '/storage/google-service.json'); ?>
+        <?php if ($driveKurulu): ?>
+        <div class="satir-esnek mb-2" style="gap:10px;padding:10px 14px;background:var(--parlak);border-radius:10px">
+            <span class="kucuk">✅ Servis hesabı anahtarı yüklü.</span>
+        </div>
+        <?php endif; ?>
+        <form data-ajax="setting_save" data-refresh="evet">
+            <div class="form-grup"><label class="form-etiket">Servis Hesabı Anahtarı (JSON)</label>
+                <input type="file" name="google_service_key" class="girdi" accept=".json">
+            </div>
+            <div class="satir-esnek" style="gap:10px">
+                <button type="submit" class="btn btn-marka">Kaydet</button>
+                <button type="button" class="btn" data-action="drive_test" data-refresh="hayir">Bağlantıyı Test Et</button>
+            </div>
+        </form>
+        <div class="metin-2 kucuk mt-3" style="line-height:1.8">
+            <b>Kurulum (≈15 dk, ücretsiz):</b><br>
+            <b>1.</b> <a href="https://console.cloud.google.com" target="_blank" style="color:var(--marka)">console.cloud.google.com</a> → yeni proje oluşturun (örn. "sada-one").<br>
+            <b>2.</b> <b>API'ler ve Hizmetler → Kitaplık</b> → "Google Drive API"yi bulup <b>Etkinleştir</b>'e basın.<br>
+            <b>3.</b> <b>API'ler ve Hizmetler → Kimlik Bilgileri → Kimlik bilgisi oluştur → Hizmet hesabı</b> → ad verin, oluşturun (rol seçmeye gerek yok).<br>
+            <b>4.</b> Hizmet hesabına tıklayın → <b>Anahtarlar → Anahtar ekle → JSON</b> → inen dosyayı yukarıdan yükleyin.<br>
+            <b>5.</b> Takip edilecek Drive klasörlerini, hizmet hesabının e-posta adresiyle (<code>...@...iam.gserviceaccount.com</code>) <b>Görüntüleyen</b> olarak paylaşın.<br>
+            <b>6.</b> Dosya (müşteri) kartındaki <b>Drive Klasörü</b> alanına klasör linkini yapıştırın — hepsi bu.
+        </div>
+    </div>
+
+    <!-- AI integration -->
+    <div class="kart">
+        <div class="kart-baslik mb-2">🪄 Yapay Zeka (Claude)</div>
+        <div class="hucre-alt mb-3">Aylık rapor taslağı, içerik fikri üretimi ve görev özetleme için kullanılır. Kullanım başına ücretlendirilir; anahtar <a href="https://console.anthropic.com" target="_blank" style="color:var(--marka)">console.anthropic.com</a>'dan alınır.</div>
+        <form data-ajax="setting_save" data-refresh="hayir">
+            <div class="form-grup"><label class="form-etiket">Anthropic API Anahtarı</label>
+                <input type="password" name="anthropic_api_key" class="girdi" placeholder="<?= setting('anthropic_api_key') ? '••••••••••••' : 'sk-ant-...' ?>">
+                <div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın.</div>
+            </div>
+            <div class="form-grup"><label class="form-etiket">Model</label>
+                <select name="ai_model" class="secim">
+                    <?php foreach (['claude-opus-5' => 'Claude Opus 5 (önerilen — en yüksek kalite)', 'claude-sonnet-5' => 'Claude Sonnet 5 (hızlı ve ekonomik)', 'claude-haiku-4-5' => 'Claude Haiku 4.5 (en ekonomik)'] as $mk => $mv): ?>
+                    <option value="<?= $mk ?>" <?= (setting('ai_model') ?: 'claude-opus-5') === $mk ? 'selected' : '' ?>><?= $mv ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="satir-esnek" style="gap:10px">
+                <button type="submit" class="btn btn-marka">Kaydet</button>
+                <button type="button" class="btn" data-action="ai_test" data-refresh="hayir">Bağlantıyı Test Et</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="kart mt-3">
     <div class="kart-baslik mb-2">Google Workspace (Gmail) SMTP Kurulumu</div>
     <div class="metin-2 kucuk" style="line-height:1.8">

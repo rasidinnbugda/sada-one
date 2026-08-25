@@ -309,6 +309,19 @@ if (permission('dosya_yonet')):
                 <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="description" class="metin-alani"><?= e($client['description']) ?></textarea></div>
                 <div class="form-satir">
                     <div class="form-grup"><label class="form-etiket">İletişim Kişisi</label><input name="contact_name" class="girdi" value="<?= e($client['contact_name']) ?>"></div>
+                    <div class="form-grup"><label class="form-etiket">Dosya Yöneticisi</label>
+                        <select name="manager_id" class="secim">
+                            <option value="">— Atanmadı</option>
+                            <?php foreach (rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm','ekip') AND is_active=1 ORDER BY name") as $m2): ?>
+                            <option value="<?= $m2['id'] ?>" <?= ($client['manager_id'] ?? null) == $m2['id'] ? 'selected' : '' ?>><?= e($m2['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-ipucu">Aylık rapordan sorumlu kişi; hatırlatmalar ona gider.</div>
+                    </div>
+                    <div class="form-grup"><label class="form-etiket">Drive Klasörü <span class="metin-muted" style="font-weight:400">(opsiyonel)</span></label>
+                        <input name="drive_folder" class="girdi" value="<?= e($client['drive_folder_id'] ?? '') ?>" placeholder="Klasör linki veya ID">
+                        <div class="form-ipucu">Bu dosyanın çekim aktarımları bu klasörden otomatik denetlenir (Ayarlar → Drive Entegrasyonu kuruluysa).</div>
+                    </div>
                     <div class="form-grup"><label class="form-etiket">Telefon</label><input name="contact_phone" class="girdi" value="<?= e($client['contact_phone']) ?>"></div>
                 </div>
                 <div class="form-satir">

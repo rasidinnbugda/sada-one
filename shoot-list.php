@@ -42,6 +42,14 @@ page_start('Çekim Listesi', 'shoots');
             </div>
             <div class="satir-esnek" style="gap:8px">
                 <span class="rozet rozet-tur"><?= icon('calendar', 12) ?> <?= format_date($c['start'], true) ?><?= $c['end'] ? ' → ' . format_date($c['end'], true) : '' ?></span>
+                <?php if (permission('butce_gor') && $c['cost'] > 0): ?><span class="rozet r-bekliyor" title="Çekim maliyeti"><?= number_format((float)$c['cost'], 0, ',', '.') ?> ₺</span><?php endif; ?>
+                <?php if ($c['drive_status'] === 'aktarildi'): ?>
+                <span class="rozet r-tamamlandi" title="Görüntüler Drive'da">📁 Aktarıldı</span>
+                <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn">Drive ↗</a><?php endif; ?>
+                <?php elseif (strtotime($c['start']) < time()): ?>
+                <span class="rozet r-gecikti" title="Görüntüler henüz Drive'da görünmüyor">📁 Aktarılmadı</span>
+                <button class="mini-btn" onclick="driveMark(<?= $c['id'] ?>)">Aktarıldı işaretle</button>
+                <?php endif; ?>
                 <?php if (permission('takvim_yonet')): ?>
                 <button class="btn btn-sm" onclick='ckDuzenle(<?= json_encode(['id' => $c['id'], 'shopping_list' => $c['shopping_list'], 'needs_list' => $c['needs_list']], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 13) ?> Listeyi Düzenle</button>
                 <?php endif; ?>
@@ -83,6 +91,12 @@ page_start('Çekim Listesi', 'shoots');
 </div>
 
 <script>
+async function driveMark(id) {
+    const link = prompt('Drive klasör/dosya linki (opsiyonel — boş bırakılabilir):', '');
+    if (link === null) return;
+    const j = await api('drive_mark', { id, drive_link: link });
+    if (j.ok) { toast(j.mesaj, 'basari'); setTimeout(() => location.reload(), 500); }
+}
 function ckEdit(c) {
     document.getElementById('ck_id').value = c.id;
     document.getElementById('ck_shopping_list').value = c.shopping_list || '';

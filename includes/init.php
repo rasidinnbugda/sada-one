@@ -327,8 +327,16 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '5.0.2';
+const APP_VERSION = '6.0';
 const VERSION_NOTES = [
+    '6.0' => [
+        'Google Drive takibi: çekim görüntüleri Drive\'a aktarılmadıysa panel uyarır; servis hesabı kurulunca klasörü kendisi denetleyip otomatik işaretler',
+        'Dosyalara ve çekimlere Drive klasörü bağlanabiliyor; çekim listesinde "Aktarıldı/Aktarılmadı" durumu',
+        'E-posta zinciri: son tarihi yaklaşan/geciken görev mailleri + yöneticilere her sabah günlük özet maili',
+        'Yapay zeka (Claude): aylık rapor taslağını tek tıkla doldurma, fikir panosunda AI ile fikir üretme, görev/tartışma özetleme',
+        'Panel artık telefona kurulabilir uygulama (PWA): ana ekrana ekleyin, tam ekran çalışır',
+        'Aylık raporda dosya bazlı otomatik finans özeti; çekim maliyeti girilince Finans\'a otomatik gider kaydı',
+    ],
     '5.0' => [
         'Takılma sorunu çözüldü: oturum kilidi artık anında bırakılıyor — çok sekmede sayfalar birbirini beklemiyor',
         'Kişisel sayfaların CDN/proxy önbelleğine takılması engellendi',
@@ -563,7 +571,7 @@ function notify(int $userId, string $title, string $message = '', string $link =
     [$panelOpen, $emailOpen] = notification_pref($alici, $category);
     if (!$panelOpen) return; // the user has turned this category off
     insert('notifications', [
-        'user_id' => $userId, 'title' => $title, 'mesaj' => $message,
+        'user_id' => $userId, 'title' => $title, 'message' => $message,
         'link' => $link, 'is_read' => 0, 'created' => date('Y-m-d H:i:s'),
     ]);
     if ($email && $emailOpen && setting('eposta_bildirim') === '1' && setting('smtp_aktif') === '1') {
@@ -795,6 +803,145 @@ function run_recurring_jobs(bool $force = false): int {
             notify((int)$ya['id'], '⏰ Sözleşme bitiyor: ' . $sz['client_name'], '"' . $sz['title'] . '" sözleşmesi ' . format_date($sz['end']) . ' tarihinde sona eriyor.', 'client.php?id=' . $sz['client_id'], 'gorev');
         }
         update_row('contracts', ['is_reminded' => 1], 'id=?', [$sz['id']]);
+    }
+
+    require_once __DIR__ . '/mailer.php'; // due/digest/drive mails below need it
+
+    /* --- Task due-date chain: notification + e-mail (max once per day) --- */
+    if (val("SELECT setting_value FROM settings WHERE setting_key='last_due_check'") !== date('Y-m-d')) {
+        q("INSERT INTO settings (setting_key, setting_value) VALUES ('last_due_check', ?) ON DUPLICATE KEY UPDATE setting_value=?", [date('Y-m-d'), date('Y-m-d')]);
+        $dueTasks = rows("SELECT g.id, g.title, g.due_date, g.assignee_id,
+            (SELECT GROUP_CONCAT(ga.user_id) FROM task_assignees ga WHERE ga.task_id=g.id) assignee_ids
+            FROM tasks g WHERE g.is_archived=0 AND g.status!='tamamlandi' AND g.due_date IS NOT NULL
+            AND g.due_date <= DATE_ADD(CURDATE(), INTERVAL 1 DAY)");
+        foreach ($dueTasks as $dt) {
+            $who = array_filter(array_unique(array_merge([(int)$dt['assignee_id']], array_map('intval', explode(',', (string)$dt['assignee_ids'])))));
+            $overdue = $dt['due_date'] < date('Y-m-d');
+            foreach ($who as $uid) {
+                $title = $overdue ? '🔴 Görev gecikti: ' . $dt['title'] : '⏳ Son gün yarın: ' . $dt['title'];
+                $body = $overdue
+                    ? 'Son tarihi ' . format_date($dt['due_date']) . ' olan görev hâlâ tamamlanmadı.'
+                    : 'Görevin son tarihi yarın (' . format_date($dt['due_date']) . ').';
+                notify($uid, $title, $body, 'task.php?id=' . $dt['id'], 'gorev');
+                $mail = val("SELECT email FROM users WHERE id=? AND is_active=1", [$uid]);
+                if ($mail) send_email($mail, $title, $body . "\n\nGörev: " . full_url('task.php?id=' . $dt['id']));
+            }
+        }
+    }
+
+    /* --- Daily manager digest e-mail (first run of the day after 07:00) --- */
+    if ((int)date('G') >= 7 && val("SELECT setting_value FROM settings WHERE setting_key='last_daily_digest'") !== date('Y-m-d')) {
+        q("INSERT INTO settings (setting_key, setting_value) VALUES ('last_daily_digest', ?) ON DUPLICATE KEY UPDATE setting_value=?", [date('Y-m-d'), date('Y-m-d')]);
+        $overdueList = rows("SELECT g.title, g.due_date, u.name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id WHERE g.is_archived=0 AND g.status!='tamamlandi' AND g.due_date < CURDATE() ORDER BY g.due_date LIMIT 15");
+        $todayShoots = rows("SELECT title, start FROM events WHERE type='cekim' AND DATE(start)=CURDATE()");
+        $pendingApprovals = (int)val("SELECT COUNT(*) FROM approvals WHERE status='bekliyor'");
+        $missingDrive = (int)val("SELECT COUNT(*) FROM events WHERE type='cekim' AND drive_status='bekliyor' AND COALESCE(`end`, start) < DATE_SUB(NOW(), INTERVAL 12 HOUR) AND start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        if ($overdueList || $todayShoots || $pendingApprovals || $missingDrive) {
+            $ozet = "Günaydın! " . date('d.m.Y') . " özeti:\n\n";
+            if ($overdueList) { $ozet .= "GECİKEN GÖREVLER (" . count($overdueList) . "):\n"; foreach ($overdueList as $o2) $ozet .= "- " . $o2['title'] . ' (' . ($o2['name'] ?: 'atanmamış') . ', son: ' . format_date($o2['due_date']) . ")\n"; $ozet .= "\n"; }
+            if ($todayShoots) { $ozet .= "BUGÜNÜN ÇEKİMLERİ:\n"; foreach ($todayShoots as $s2) $ozet .= "- " . $s2['title'] . ' (' . substr($s2['start'], 11, 5) . ")\n"; $ozet .= "\n"; }
+            if ($pendingApprovals) $ozet .= "Bekleyen onay: $pendingApprovals\n";
+            if ($missingDrive) $ozet .= "Drive'a aktarılmamış çekim: $missingDrive\n";
+            $ozet .= "\nPanel: " . full_url('index.php');
+            foreach (rows("SELECT email FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $yd) {
+                if ($yd['email']) send_email($yd['email'], '📋 SADA One günlük özet — ' . date('d.m.Y'), $ozet);
+            }
+        }
+    }
+
+    /* --- Drive transfer tracking (max once per day) ---
+     * Semi-automatic: a finished shoot without a Drive link/mark → warn the crew.
+     * Fully automatic (if the service account is configured): look into the shoot's
+     * (or client's) Drive folder; files created after the shoot start → auto-mark. */
+    if (val("SELECT setting_value FROM settings WHERE setting_key='last_drive_check'") !== date('Y-m-d')) {
+        q("INSERT INTO settings (setting_key, setting_value) VALUES ('last_drive_check', ?) ON DUPLICATE KEY UPDATE setting_value=?", [date('Y-m-d'), date('Y-m-d')]);
+        require_once __DIR__ . '/google-drive.php';
+        $driveOn = drive_configured();
+        $driveToken = $driveOn ? drive_token() : null;
+        $pendingShoots = rows("SELECT e.id, e.title, e.start, e.created_by, e.drive_folder_id, e.drive_link,
+            c.drive_folder_id client_folder, c.manager_id,
+            (SELECT GROUP_CONCAT(ep.user_id) FROM event_participants ep WHERE ep.event_id=e.id) participant_ids
+            FROM events e LEFT JOIN clients c ON c.id = COALESCE(e.client_id, (SELECT client_id FROM projects WHERE id=e.project_id))
+            WHERE e.type='cekim' AND e.drive_status='bekliyor'
+            AND COALESCE(e.`end`, e.start) < DATE_SUB(NOW(), INTERVAL 12 HOUR)
+            AND e.start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        foreach ($pendingShoots as $sh) {
+            $folder = $sh['drive_folder_id'] ?: $sh['client_folder'];
+            // Fully automatic check
+            if ($driveToken && $folder) {
+                $afterIso = gmdate('Y-m-d\TH:i:s\Z', strtotime($sh['start']));
+                $r = drive_files_after($folder, $afterIso, $driveToken);
+                if ($r['ok'] && $r['count'] > 0) {
+                    update_row('events', ['drive_status' => 'aktarildi'], 'id=?', [$sh['id']]);
+                    if ($sh['manager_id']) notify((int)$sh['manager_id'], '✅ Drive aktarımı doğrulandı', '"' . $sh['title'] . '" çekiminin dosyaları Drive klasöründe görüldü (' . $r['count'] . '+ dosya).', 'shoot-list.php', 'gorev');
+                    continue;
+                }
+            }
+            // Semi-automatic: a manually added link also counts as transferred
+            if ($sh['drive_link']) {
+                update_row('events', ['drive_status' => 'aktarildi'], 'id=?', [$sh['id']]);
+                continue;
+            }
+            // Still nothing → warn the crew (+ the client manager)
+            $who = array_filter(array_unique(array_merge(
+                array_map('intval', explode(',', (string)$sh['participant_ids'])),
+                [(int)$sh['created_by'], (int)$sh['manager_id']])));
+            foreach ($who as $uid) {
+                notify($uid, '📁 Drive aktarımı bekleniyor: ' . $sh['title'],
+                    format_date($sh['start'], true) . ' tarihli çekimin görüntüleri henüz Drive\'a aktarılmadı. Aktardıysanız çekim listesinden işaretleyin.',
+                    'shoot-list.php', 'gorev');
+                $mail = val("SELECT email FROM users WHERE id=? AND is_active=1", [$uid]);
+                if ($mail) send_email($mail, '📁 Drive aktarımı bekleniyor: ' . $sh['title'],
+                    format_date($sh['start'], true) . " tarihli çekimin görüntüleri henüz Drive'a aktarılmadı.\n\nÇekim listesi: " . full_url('shoot-list.php'));
+            }
+        }
+    }
+
+    /* --- Monthly-report reminders (max once per day) ---
+     * Window 1: last 3 days of the month  → remind the client manager about the CURRENT month
+     * Window 2: first 3 days of the month → remind about the PREVIOUS month
+     * Day 4:    still empty               → escalate to admins/PMs as overdue */
+    $today = date('Y-m-d');
+    if (val("SELECT setting_value FROM settings WHERE setting_key='last_report_reminder'") !== $today) {
+        q("INSERT INTO settings (setting_key, setting_value) VALUES ('last_report_reminder', ?) ON DUPLICATE KEY UPDATE setting_value=?", [$today, $today]);
+        $day = (int)date('j');
+        $lastDay = (int)date('t');
+        $missing = function (string $period): array {
+            return rows("SELECT c.id, c.name, c.manager_id, r.status
+                FROM clients c LEFT JOIN monthly_reports r ON r.client_id=c.id AND r.period=?
+                WHERE c.status='aktif' AND c.manager_id IS NOT NULL AND (r.id IS NULL OR r.status='taslak')", [$period]);
+        };
+        if ($day >= $lastDay - 2) {
+            $period = date('Y-m');
+            foreach ($missing($period) as $cl) {
+                notify((int)$cl['manager_id'], '📊 Aylık rapor zamanı: ' . $cl['name'],
+                    ($cl['status'] === 'taslak' ? 'Taslak raporu tamamlayıp' : 'Bu ayın raporunu doldurup') . ' "Tamamlandı" olarak kaydedin.',
+                    'monthly-reports.php?client=' . $cl['id'] . '&period=' . $period, 'gorev');
+            }
+        }
+        if ($day <= 3) {
+            $period = date('Y-m', strtotime('first day of last month'));
+            foreach ($missing($period) as $cl) {
+                notify((int)$cl['manager_id'], '📊 Geçen ayın raporu bekliyor: ' . $cl['name'],
+                    'Önceki ayın (' . $period . ') raporu henüz tamamlanmadı.',
+                    'monthly-reports.php?client=' . $cl['id'] . '&period=' . $period, 'gorev');
+            }
+        }
+        if ($day === 4) {
+            $period = date('Y-m', strtotime('first day of last month'));
+            $late = $missing($period);
+            if ($late) {
+                $names = implode(', ', array_column($late, 'name'));
+                foreach ($late as $cl) {
+                    notify((int)$cl['manager_id'], '🔴 Rapor gecikti: ' . $cl['name'],
+                        $period . ' raporu hâlâ tamamlanmadı. Lütfen en kısa sürede doldurun.',
+                        'monthly-reports.php?client=' . $cl['id'] . '&period=' . $period, 'gorev');
+                }
+                foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $ya) {
+                    notify((int)$ya['id'], '🔴 Geciken aylık raporlar', $period . ' dönemi için eksik: ' . mb_substr($names, 0, 180), 'monthly-reports.php', 'gorev');
+                }
+            }
+        }
     }
 
     return $count;

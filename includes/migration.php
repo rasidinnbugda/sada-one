@@ -91,7 +91,7 @@ function migration_commands(): array {
     "ALTER TABLE projects ADD COLUMN team_roles TEXT",
     "ALTER TABLE events ADD COLUMN shopping_list TEXT",
     "ALTER TABLE events ADD COLUMN needs_list TEXT",
-    "CREATE TABLE IF NOT EXISTS project_ek_requests (id INT AUTO_INCREMENT PRIMARY KEY, project_id INT NOT NULL, title VARCHAR(200) NOT NULL, amount DECIMAL(12,2) NOT NULL DEFAULT 0, out_of_scope TINYINT(1) NOT NULL DEFAULT 0, status ENUM('bekliyor','onaylandi','reddedildi') NOT NULL DEFAULT 'bekliyor', description VARCHAR(500) DEFAULT NULL, created_by INT NOT NULL, created DATETIME NOT NULL, INDEX(project_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
+    "CREATE TABLE IF NOT EXISTS project_extra_requests (id INT AUTO_INCREMENT PRIMARY KEY, project_id INT NOT NULL, title VARCHAR(200) NOT NULL, amount DECIMAL(12,2) NOT NULL DEFAULT 0, out_of_scope TINYINT(1) NOT NULL DEFAULT 0, status ENUM('bekliyor','onaylandi','reddedildi') NOT NULL DEFAULT 'bekliyor', description VARCHAR(500) DEFAULT NULL, created_by INT NOT NULL, created DATETIME NOT NULL, INDEX(project_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
     "CREATE TABLE IF NOT EXISTS project_checklist (id INT AUTO_INCREMENT PRIMARY KEY, project_id INT NOT NULL, item VARCHAR(200) NOT NULL, check_note VARCHAR(500) DEFAULT NULL, owner_id INT DEFAULT NULL, is_done TINYINT(1) NOT NULL DEFAULT 0, is_delivered TINYINT(1) NOT NULL DEFAULT 0, sort_order INT NOT NULL DEFAULT 0, INDEX(project_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
     "CREATE TABLE IF NOT EXISTS project_review (id INT AUTO_INCREMENT PRIMARY KEY, project_id INT NOT NULL, type ENUM('ic','dis','case_study') NOT NULL, content TEXT, updated_by INT DEFAULT NULL, updated DATETIME DEFAULT NULL, UNIQUE KEY pd_unique (project_id, type)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
     "CREATE TABLE IF NOT EXISTS mentorship (id INT AUTO_INCREMENT PRIMARY KEY, member_id INT NOT NULL, field VARCHAR(200) NOT NULL, mentor_id INT DEFAULT NULL, project_id INT DEFAULT NULL, practice_arena VARCHAR(255) DEFAULT NULL, output TEXT, status ENUM('planlandi','devam','tamamlandi') NOT NULL DEFAULT 'planlandi', created DATETIME NOT NULL, updated DATETIME DEFAULT NULL, INDEX(member_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
@@ -99,6 +99,16 @@ function migration_commands(): array {
     "CREATE TABLE IF NOT EXISTS ideas (id INT AUTO_INCREMENT PRIMARY KEY, idea VARCHAR(300) NOT NULL, organization VARCHAR(200) DEFAULT NULL, description TEXT, proposer_id INT NOT NULL, status ENUM('yeni','begenildi','uygulandi') NOT NULL DEFAULT 'yeni', created DATETIME NOT NULL, INDEX(proposer_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
     "CREATE TABLE IF NOT EXISTS monthly_reports (id INT AUTO_INCREMENT PRIMARY KEY, client_id INT NOT NULL, period CHAR(7) NOT NULL, summary TEXT, work_done TEXT, metrics TEXT, plan TEXT, author_id INT NOT NULL, status ENUM('taslak','tamamlandi') NOT NULL DEFAULT 'taslak', created DATETIME NOT NULL, updated DATETIME DEFAULT NULL, UNIQUE KEY ar_unique (client_id, period)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
     "CREATE TABLE IF NOT EXISTS task_manager_notes (task_id INT NOT NULL, user_id INT NOT NULL, note TEXT, updated DATETIME DEFAULT NULL, PRIMARY KEY (task_id, user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
+    // ---- v5.1: monthly-report automation + shoot costs ----
+    "ALTER TABLE clients ADD COLUMN manager_id INT DEFAULT NULL",
+    "ALTER TABLE events ADD COLUMN cost DECIMAL(12,2) NOT NULL DEFAULT 0",
+    "ALTER TABLE expenses ADD COLUMN event_id INT DEFAULT NULL",
+    // ---- v6.0: Drive tracking + AI groundwork ----
+    "RENAME TABLE project_ek_requests TO project_extra_requests",
+    "ALTER TABLE clients ADD COLUMN drive_folder_id VARCHAR(120) DEFAULT NULL",
+    "ALTER TABLE events ADD COLUMN drive_folder_id VARCHAR(120) DEFAULT NULL",
+    "ALTER TABLE events ADD COLUMN drive_link VARCHAR(500) DEFAULT NULL",
+    "ALTER TABLE events ADD COLUMN drive_status ENUM('bekliyor','aktarildi') NOT NULL DEFAULT 'bekliyor'",
     ];
 }
 
@@ -113,7 +123,7 @@ function run_migrations(PDO $pdo): array {
             $pdo->exec($sql);
             $results[] = ['ok', $sql];
         } catch (PDOException $e) {
-            $zaten = (strpos($e->getMessage(), 'Duplicate') !== false || strpos($e->getMessage(), 'exists') !== false);
+            $zaten = (strpos($e->getMessage(), 'Duplicate') !== false || strpos($e->getMessage(), 'exists') !== false || strpos($e->getMessage(), "doesn't exist") !== false);
             $results[] = [$zaten ? 'skip' : 'hata', $sql . ($zaten ? '' : ' — ' . $e->getMessage())];
         }
     }

@@ -25,6 +25,88 @@ case 'notification_read':
     update_row('notifications', ['is_read' => 1], 'id=? AND user_id=?', [(int)$g('id'), $u['id']]);
     json_out(['ok' => true]);
 
+/* ==================== v6.0: DRIVE + AI ==================== */
+case 'drive_test':
+    if (!is_admin()) deny();
+    require_once __DIR__ . '/includes/google-drive.php';
+    $r = drive_test();
+    if (!$r['ok']) json_out(['ok' => false, 'error' => $r['error']]);
+    json_out(['ok' => true, 'mesaj' => 'Bağlantı kuruldu. Servis hesabı: ' . $r['service_email'], 'service_email' => $r['service_email']]);
+
+case 'drive_folder_test':
+    // Verify a specific folder is readable by the service account
+    if (!is_staff()) deny();
+    require_once __DIR__ . '/includes/google-drive.php';
+    $fid = trim($g('folder_id'));
+    if (preg_match('~folders/([A-Za-z0-9_-]{10,})~', $fid, $fm)) $fid = $fm[1];
+    if ($fid === '') json_out(['ok' => false, 'error' => 'Klasör ID boş.']);
+    $r = drive_files_after($fid, '1970-01-01T00:00:00Z');
+    if (!$r['ok']) json_out(['ok' => false, 'error' => 'Klasör okunamadı: ' . $r['error'] . ' (Klasörü servis hesabı e-postasıyla paylaştınız mı?)']);
+    json_out(['ok' => true, 'mesaj' => 'Klasör erişilebilir ✓' . ($r['sample'] ? ' (örnek dosya: ' . $r['sample'] . ')' : ' (klasör şu an boş)')]);
+
+case 'drive_mark':
+    // Manually mark a shoot as transferred (with an optional Drive link)
+    if (!is_staff()) deny();
+    $eventId = (int)$g('id');
+    update_row('events', ['drive_status' => 'aktarildi', 'drive_link' => trim($g('drive_link')) ?: null], 'id=?', [$eventId]);
+    json_out(['ok' => true, 'mesaj' => 'Çekim "Drive\'a aktarıldı" olarak işaretlendi.', 'refresh' => true]);
+
+case 'ai_test':
+    if (!is_admin()) deny();
+    require_once __DIR__ . '/includes/ai.php';
+    $r = ai_ask('Kısa yanıt ver.', 'Sadece "SADA One bağlantısı hazır." yaz.', 64);
+    if (!$r['ok']) json_out(['ok' => false, 'error' => $r['error']]);
+    json_out(['ok' => true, 'mesaj' => 'AI bağlantısı çalışıyor: ' . $r['text']]);
+
+case 'ai_report_draft':
+    if (is_intern() || is_customer()) deny();
+    require_once __DIR__ . '/includes/ai.php';
+    if (!ai_enabled()) json_out(['ok' => false, 'error' => 'AI anahtarı tanımlı değil (Ayarlar → Yapay Zeka).']);
+    $clientId = (int)$g('client_id');
+    $period = preg_match('/^\d{4}-\d{2}$/', $g('period')) ? $g('period') : date('Y-m');
+    $pStart = "$period-01"; $pEnd = date('Y-m-t', strtotime($pStart));
+    $clientName = val("SELECT name FROM clients WHERE id=?", [$clientId]);
+    if (!$clientName) json_out(['ok' => false, 'error' => 'Dosya bulunamadı.']);
+    // Collect this month's panel data for the client
+    $doneTasks = rows("SELECT g.title FROM tasks g JOIN projects p ON p.id=g.project_id WHERE p.client_id=? AND g.status='tamamlandi' AND g.created BETWEEN ? AND ? LIMIT 40", [$clientId, "$pStart 00:00:00", "$pEnd 23:59:59"]);
+    $contents = rows("SELECT i.title, i.platform, i.status FROM contents i LEFT JOIN projects p ON p.id=i.project_id WHERE (i.client_id=? OR p.client_id=?) AND i.date BETWEEN ? AND ? LIMIT 60", [$clientId, $clientId, $pStart, $pEnd]);
+    $shoots = rows("SELECT e.title, e.start FROM events e LEFT JOIN projects p ON p.id=e.project_id WHERE e.type='cekim' AND (e.client_id=? OR p.client_id=?) AND e.start BETWEEN ? AND ? LIMIT 20", [$clientId, $clientId, "$pStart 00:00:00", "$pEnd 23:59:59"]);
+    $metrics = rows("SELECT m.date, m.followers, m.engagement, h.platform FROM social_metrics m JOIN social_accounts h ON h.id=m.account_id WHERE h.client_id=? AND m.date BETWEEN ? AND ? ORDER BY m.date LIMIT 30", [$clientId, $pStart, $pEnd]);
+    $veriJson = json_encode(['musteri' => $clientName, 'donem' => $period,
+        'tamamlanan_gorevler' => array_column($doneTasks, 'title'),
+        'icerikler' => $contents, 'cekimler' => $shoots, 'sosyal_metrikler' => $metrics], JSON_UNESCAPED_UNICODE);
+    $draft = ai_ask_json(
+        'Bir dijital ajansın müşteri dosyası için Türkçe aylık faaliyet raporu taslağı yazıyorsun. Profesyonel, net, abartısız yaz. Veri yoksa uydurma; "bu ay ... çalışması yapılmadı" gibi dürüst ifadeler kullan. JSON anahtarları: ozet, yapilanlar, metrikler, plan. yapilanlar ve metrikler alanlarında madde işaretli satırlar (- ile) kullan.',
+        $veriJson, 3000);
+    if (!$draft || !isset($draft['ozet'])) json_out(['ok' => false, 'error' => 'AI taslak üretemedi, lütfen tekrar deneyin.']);
+    json_out(['ok' => true, 'draft' => ['summary' => (string)$draft['ozet'], 'work_done' => (string)($draft['yapilanlar'] ?? ''), 'metrics' => (string)($draft['metrikler'] ?? ''), 'plan' => (string)($draft['plan'] ?? '')]]);
+
+case 'ai_idea_generate':
+    if (is_customer()) deny();
+    require_once __DIR__ . '/includes/ai.php';
+    if (!ai_enabled()) json_out(['ok' => false, 'error' => 'AI anahtarı tanımlı değil (Ayarlar → Yapay Zeka).']);
+    $topic = trim($g('topic'));
+    if ($topic === '') json_out(['ok' => false, 'error' => 'Kurum/konu yazın.']);
+    $list = ai_ask_json(
+        'Bir sosyal medya ajansı için Türkçe içerik fikirleri üretiyorsun. Özgün, uygulanabilir, kuruma özgü fikirler ver; klişelerden kaçın. JSON: {"fikirler":[{"fikir":"...","aciklama":"..."}]} — tam 6 fikir.',
+        'Kurum/konu: ' . $topic, 2500);
+    if (!$list || empty($list['fikirler'])) json_out(['ok' => false, 'error' => 'Fikir üretilemedi, tekrar deneyin.']);
+    json_out(['ok' => true, 'ideas' => array_slice(array_values($list['fikirler']), 0, 8)]);
+
+case 'ai_summarize':
+    if (is_customer()) deny();
+    require_once __DIR__ . '/includes/ai.php';
+    if (!ai_enabled()) json_out(['ok' => false, 'error' => 'AI anahtarı tanımlı değil (Ayarlar → Yapay Zeka).']);
+    $taskId = (int)$g('task_id');
+    $task = row("SELECT title, description FROM tasks WHERE id=?", [$taskId]);
+    if (!$task) json_out(['ok' => false, 'error' => 'Görev bulunamadı.']);
+    $comments = rows("SELECT u.name, y.comment FROM comments y JOIN users u ON u.id=y.user_id WHERE y.ref_tur='gorev' AND y.ref_id=? ORDER BY y.id LIMIT 60", [$taskId]);
+    $metin = "GÖREV: {$task['title']}\nAÇIKLAMA: {$task['description']}\n\nYORUMLAR:\n";
+    foreach ($comments as $c) $metin .= "- {$c['name']}: {$c['comment']}\n";
+    $r = ai_ask('Bir görev ve tartışmasını Türkçe özetle: mevcut durum, alınan kararlar, açık sorular ve yapılacaklar. Kısa madde işaretleri kullan, 150 kelimeyi geçme.', mb_substr($metin, 0, 12000), 1200);
+    if (!$r['ok']) json_out(['ok' => false, 'error' => $r['error']]);
+    json_out(['ok' => true, 'summary' => $r['text']]);
+
 case 'version_check':
     if ($u['role'] !== 'yonetici') deny();
     require_once __DIR__ . '/includes/updater-core.php';
@@ -140,19 +222,19 @@ case 'extra_request_save':
     if (!project_access($pid)) deny();
     $title = trim($g('title'));
     if ($title === '') json_out(['ok' => false, 'error' => 'Talep başlığı zorunludur.']);
-    insert('project_ek_requests', ['project_id' => $pid, 'title' => $title, 'amount' => (float)str_replace(',', '.', $g('amount', '0')),
+    insert('project_extra_requests', ['project_id' => $pid, 'title' => $title, 'amount' => (float)str_replace(',', '.', $g('amount', '0')),
         'out_of_scope' => (int)(bool)$g('out_of_scope'), 'description' => trim($g('description')) ?: null, 'created_by' => $u['id'], 'created' => $now]);
     json_out(['ok' => true, 'mesaj' => 'Ek talep kaydedildi.', 'refresh' => true]);
 
 case 'extra_request_status':
     if (!permission('butce_gor')) deny();
     if (!in_array($g('status'), ['bekliyor', 'onaylandi', 'reddedildi'])) json_out(['ok' => false, 'error' => 'Geçersiz durum.']);
-    update_row('project_ek_requests', ['status' => $g('status')], 'id=?', [(int)$g('id')]);
+    update_row('project_extra_requests', ['status' => $g('status')], 'id=?', [(int)$g('id')]);
     json_out(['ok' => true]);
 
 case 'extra_request_delete':
     if (!permission('butce_gor')) deny();
-    q("DELETE FROM project_ek_requests WHERE id=?", [(int)$g('id')]);
+    q("DELETE FROM project_extra_requests WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'refresh' => true]);
 
 case 'pcheck_add':
@@ -245,7 +327,16 @@ case 'client_save':
         'description' => $g('description'), 'contact_name' => $g('contact_name'),
         'contact_email' => $g('contact_email'), 'contact_phone' => $g('contact_phone'),
         'status' => $g('status', 'aktif'),
+        'manager_id' => (int)$g('manager_id') ?: null,
     ];
+    // Drive folder: accept a full URL or a bare folder ID
+    if ($g('drive_folder') !== '') {
+        $df = trim($g('drive_folder'));
+        if (preg_match('~folders/([A-Za-z0-9_-]{10,})~', $df, $dfm)) $df = $dfm[1];
+        $data['drive_folder_id'] = $df !== '' ? mb_substr($df, 0, 120) : null;
+    } elseif (isset($_POST['drive_folder'])) {
+        $data['drive_folder_id'] = null;
+    }
     if ($data['name'] === '') json_out(['ok' => false, 'error' => 'Dosya adı gerekli.']);
     $logo = file_upload('logo');
     if ($logo) {
@@ -898,13 +989,36 @@ case 'event_save':
         'online_link' => trim($g('online_link')) ?: null,
         'shopping_list' => trim($g('shopping_list')) ?: null,
         'needs_list' => trim($g('needs_list')) ?: null,
+        'cost' => max(0, (float)str_replace(',', '.', $g('cost', '0'))),
     ];
+    // Drive folder for the shoot (URL or bare ID)
+    if (isset($_POST['drive_folder'])) {
+        $df = trim($g('drive_folder'));
+        if (preg_match('~folders/([A-Za-z0-9_-]{10,})~', $df, $dfm)) $df = $dfm[1];
+        $data['drive_folder_id'] = $df !== '' ? mb_substr($df, 0, 120) : null;
+    }
     if ($data['title'] === '' || !$data['start']) json_out(['ok' => false, 'error' => 'Başlık ve tarih gerekli.']);
+    // Only budget-permitted users may set the cost; others keep the existing value
+    if (!permission('butce_gor')) unset($data['cost']);
+    // Shoot cost → automatic expense record in Finance (upsert/delete by event_id)
+    $syncEventExpense = function (int $eventId) use ($data) {
+        if (!array_key_exists('cost', $data)) return;
+        $existing = row("SELECT id FROM expenses WHERE event_id=?", [$eventId]);
+        if ($data['cost'] > 0) {
+            $expense = ['type' => 'diger', 'title' => 'Çekim: ' . $data['title'], 'amount' => $data['cost'],
+                'date' => substr($data['start'], 0, 10), 'status' => 'odendi', 'description' => 'Çekim maliyeti (otomatik kayıt)', 'event_id' => $eventId];
+            if ($existing) update_row('expenses', $expense, 'id=?', [$existing['id']]);
+            else insert('expenses', $expense + ['created' => date('Y-m-d H:i:s')]);
+        } elseif ($existing) {
+            q("DELETE FROM expenses WHERE id=?", [$existing['id']]);
+        }
+    };
     // In-system participants (for meetings)
     $participantIds = json_decode($g('participant_ids', ''), true);
     if ($g('id')) {
         $eventId = (int)$g('id');
         update_row('events', $data, 'id=?', [$eventId]);
+        $syncEventExpense($eventId);
         if (is_array($participantIds)) {
             $eskiler = array_column(rows("SELECT user_id FROM event_participants WHERE event_id=?", [$eventId]), 'user_id');
             q("DELETE FROM event_participants WHERE event_id=?", [$eventId]);
@@ -918,6 +1032,7 @@ case 'event_save':
     }
     $data['created_by'] = $u['id']; $data['created'] = $now;
     $eventId = insert('events', $data);
+    $syncEventExpense($eventId);
     if (is_array($participantIds)) {
         foreach (array_unique(array_map('intval', $participantIds)) as $kid) {
             if (!$kid) continue;
@@ -1788,7 +1903,25 @@ case 'setting_save':
     require_admin();
     $fieldToKey = ['site_name' => 'site_adi', 'default_theme' => 'varsayilan_tema', 'smtp_is_active' => 'smtp_aktif',
         'smtp_host' => 'smtp_host', 'smtp_port' => 'smtp_port', 'smtp_user' => 'smtp_kullanici',
-        'smtp_sender' => 'smtp_gonderen', 'email_notification' => 'eposta_bildirim'];
+        'smtp_sender' => 'smtp_gonderen', 'email_notification' => 'eposta_bildirim',
+        'ai_model' => 'ai_model'];
+    // AI key: only overwrite when a new value is typed (placeholder dots stay put)
+    if (!empty($_POST['anthropic_api_key']) && !str_starts_with($_POST['anthropic_api_key'], '••')) {
+        q("INSERT INTO settings (setting_key,setting_value) VALUES ('anthropic_api_key',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['anthropic_api_key']), trim($_POST['anthropic_api_key'])]);
+    }
+    // Google service-account key file → storage/ (blocked from the web, outside uploads/)
+    if (!empty($_FILES['google_service_key']['tmp_name'])) {
+        $keyJson = json_decode((string)file_get_contents($_FILES['google_service_key']['tmp_name']), true);
+        if (!is_array($keyJson) || empty($keyJson['client_email']) || empty($keyJson['private_key'])) {
+            json_out(['ok' => false, 'error' => 'Geçersiz servis hesabı dosyası: JSON içinde client_email/private_key bulunamadı.']);
+        }
+        $storageDir = ROOT . '/storage';
+        if (!is_dir($storageDir)) mkdir($storageDir, 0755, true);
+        if (!file_exists("$storageDir/.htaccess")) file_put_contents("$storageDir/.htaccess", "Require all denied\n");
+        if (!file_exists("$storageDir/index.html")) file_put_contents("$storageDir/index.html", '');
+        move_uploaded_file($_FILES['google_service_key']['tmp_name'], "$storageDir/google-service.json");
+        q("DELETE FROM settings WHERE setting_key='google_drive_token'"); // yeni anahtar → eski token geçersiz
+    }
     foreach ($fieldToKey as $fieldName => $setting_key) {
         if (isset($_POST[$fieldName])) q("INSERT INTO settings (setting_key,setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?", [$setting_key, $_POST[$fieldName], $_POST[$fieldName]]);
     }

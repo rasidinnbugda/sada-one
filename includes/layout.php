@@ -94,6 +94,11 @@ function page_start(string $title, string $activePage = ''): void {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/app.css?v=<?= APP_VERSION ?>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#b1fb01">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="assets/img/icon-192.png">
 <script type="speculationrules">
 {"prerender": [{"where": {"and": [
     {"href_matches": "/*"},
@@ -127,6 +132,16 @@ function page_start(string $title, string $activePage = ''): void {
                 if ($n[1] === 'messages' && $u) {
                     $okunmamis = (int)val("SELECT COUNT(*) FROM messages m JOIN channel_members ku ON ku.channel_id=m.channel_id AND ku.user_id=? WHERE m.user_id!=? AND ku.archive=0 AND (ku.last_read IS NULL OR m.created>ku.last_read)", [$u['id'], $u['id']]);
                     if ($okunmamis) echo '<span class="nav-sayac">' . ($okunmamis > 99 ? '99+' : $okunmamis) . '</span>';
+                }
+                if ($n[1] === 'mreports' && $u) {
+                    // Missing monthly reports of the current window, for the clients this user manages
+                    $day = (int)date('j'); $lastDay = (int)date('t');
+                    $wPeriod = $day >= $lastDay - 2 ? date('Y-m') : ($day <= 4 ? date('Y-m', strtotime('first day of last month')) : null);
+                    if ($wPeriod) {
+                        $eksikRapor = (int)val("SELECT COUNT(*) FROM clients c LEFT JOIN monthly_reports r ON r.client_id=c.id AND r.period=?
+                            WHERE c.status='aktif' AND c.manager_id=? AND (r.id IS NULL OR r.status='taslak')", [$wPeriod, $u['id']]);
+                        if ($eksikRapor) echo '<span class="nav-sayac">' . $eksikRapor . '</span>';
+                    }
                 }
                 echo '</a>';
             };

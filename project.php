@@ -31,7 +31,7 @@ $projectMembers = rows("SELECT u.id, u.name, u.color, u.avatar, u.job_title FROM
 // Station (SOP) data — visible only to staff
 $budgetGor = permission('butce_gor');
 $checkList = is_staff() ? rows("SELECT k.*, u.name owner_name FROM project_checklist k LEFT JOIN users u ON u.id=k.owner_id WHERE k.project_id=? ORDER BY k.sort_order", [$id]) : [];
-$ekRequests = $budgetGor ? rows("SELECT t.*, u.name creator_name FROM project_ek_requests t LEFT JOIN users u ON u.id=t.created_by WHERE t.project_id=? ORDER BY t.id DESC", [$id]) : [];
+$ekRequests = $budgetGor ? rows("SELECT t.*, u.name creator_name FROM project_extra_requests t LEFT JOIN users u ON u.id=t.created_by WHERE t.project_id=? ORDER BY t.id DESC", [$id]) : [];
 $reviews = [];
 if (is_staff()) foreach (rows("SELECT * FROM project_review WHERE project_id=?", [$id]) as $dg) $reviews[$dg['type']] = $dg;
 $revisionCount = (int)val("SELECT COUNT(*) FROM approvals WHERE project_id=? AND status='revize'", [$id]);

@@ -12,6 +12,29 @@ $wAcik = fn($k) => in_array($k, $openWidgets);
 
 page_start('Panel', 'panel');
 
+/* ---------- Monthly-report duty warning (window: last 3 / first 4 days) ---------- */
+$reportWarnings = [];
+if (is_staff()) {
+    $day = (int)date('j'); $lastDay = (int)date('t');
+    $warnPeriod = $day >= $lastDay - 2 ? date('Y-m') : ($day <= 4 ? date('Y-m', strtotime('first day of last month')) : null);
+    if ($warnPeriod) {
+        $reportWarnings = rows("SELECT c.id, c.name, r.status FROM clients c
+            LEFT JOIN monthly_reports r ON r.client_id=c.id AND r.period=?
+            WHERE c.status='aktif' AND c.manager_id=? AND (r.id IS NULL OR r.status='taslak')", [$warnPeriod, $u['id']]);
+    }
+}
+if ($reportWarnings): ?>
+<div class="kart mb-3" style="border-color:var(--tehlike);background:linear-gradient(135deg,var(--surface),rgba(240,79,79,.06))">
+    <div class="kart-baslik mb-1" style="font-size:15px">📊 Aylık rapor sırası sende</div>
+    <div class="kucuk metin-2 mb-2"><b><?= e($warnPeriod) ?></b> dönemi için sorumlusu olduğun şu dosyaların raporu bekliyor:</div>
+    <div class="satir-esnek sarma" style="gap:8px">
+        <?php foreach ($reportWarnings as $rw): ?>
+        <a href="monthly-reports.php?client=<?= $rw['id'] ?>&period=<?= $warnPeriod ?>" class="btn btn-sm"><?= e($rw['name']) ?><?= $rw['status'] === 'taslak' ? ' (taslak)' : '' ?></a>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif;
+
 /* ---------- Release notes (dismissible) ---------- */
 if (($u['seen_version'] ?? '') !== APP_VERSION && isset(VERSION_NOTES[APP_VERSION])): ?>
 <div class="kart mb-3" id="versionCard" style="border-color:var(--marka);background:linear-gradient(135deg,var(--surface),var(--parlak))">

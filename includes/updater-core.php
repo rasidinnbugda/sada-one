@@ -83,7 +83,7 @@ function install_package(string $zipPath): array {
         // Security: prevent path traversal (zip slip)
         if (str_contains($goreli, '..')) { $atlanan++; continue; }
         // Protected: configuration, user uploads, backups
-        if ($goreli === 'config.php' || str_starts_with($goreli, 'uploads/') || str_starts_with($goreli, 'backups/') || str_starts_with($goreli, '.git/')) { $atlanan++; continue; }
+        if ($goreli === 'config.php' || str_starts_with($goreli, 'storage/') || str_starts_with($goreli, 'uploads/') || str_starts_with($goreli, 'backups/') || str_starts_with($goreli, 'storage/') || str_starts_with($goreli, '.git/')) { $atlanan++; continue; }
         $target = ROOT . '/' . $goreli;
         $directory = dirname($target);
         if (!is_dir($directory)) mkdir($directory, 0755, true);
