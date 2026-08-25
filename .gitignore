@@ -18,3 +18,4 @@ error_log
 
 # Google servis anahtarı — asla depoya/pakete girmez
 storage/*.json
+storage/*.log
