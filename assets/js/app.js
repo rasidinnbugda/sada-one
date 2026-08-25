@@ -69,7 +69,7 @@
     /* ---------- Dropdown menu ---------- */
     document.addEventListener('click', e => {
         const btn = e.target.closest('[data-acilir-btn]');
-        const openOlan = $$('.acilir.open');
+        const openOlan = $$('.acilir.acik');
         if (btn) {
             const grup = btn.closest('.acilir');
             const zatenOpen = grup.classList.contains('acik');
@@ -121,11 +121,11 @@
     karartma?.addEventListener('click', sidebarClose);
 
     /* ---------- Theme switching ---------- */
-    $$('.theme-nokta').forEach(nokta => {
+    $$('.tema-nokta').forEach(nokta => {
         nokta.addEventListener('click', async () => {
             const theme = nokta.dataset.theme;
             document.documentElement.setAttribute('data-theme', theme);
-            $$('.theme-nokta').forEach(n => n.classList.toggle('secili', n === nokta));
+            $$('.tema-nokta').forEach(n => n.classList.toggle('secili', n === nokta));
             await api('theme_change', { theme });
         });
     });
@@ -206,11 +206,11 @@
         if (!form.matches('[data-ajax]')) return;
         e.preventDefault();
         // Serialize member picker checkboxes to JSON
-        const memberJson = form.querySelector('.member-json');
-        if (memberJson) memberJson.value = JSON.stringify($$('.member-box:checked', form).map(c => c.value));
+        const memberJson = form.querySelector('.uye-json');
+        if (memberJson) memberJson.value = JSON.stringify($$('.uye-kutu:checked', form).map(c => c.value));
         // Serialize task assignees
-        const assigneeJson = form.querySelector('.assignees-json');
-        if (assigneeJson) assigneeJson.value = JSON.stringify($$('.assignee-box:checked', form).map(c => c.value));
+        const assigneeJson = form.querySelector('.atananlar-json');
+        if (assigneeJson) assigneeJson.value = JSON.stringify($$('.atanan-kutu:checked', form).map(c => c.value));
         const btn = form.querySelector('[type="submit"]');
         const oldText = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.innerHTML = 'İşleniyor...'; }
@@ -350,19 +350,19 @@
                 const icons = { 'Dosyalar': '📁', 'Projeler': '📋', 'Görevler': '✅', 'İçerikler': '📅', 'Talepler': '💬' };
                 for (const grup in j.results) {
                     if (!j.results[grup].length) continue;
-                    h += `<div class="search-grup">${icons[grup] || ''} ${grup}</div>`;
+                    h += `<div class="arama-grup">${icons[grup] || ''} ${grup}</div>`;
                     j.results[grup].forEach(s => {
-                        h += `<a href="${s.link}" class="search-oge"><span>${s.name.replace(/</g, '&lt;')}</span><span class="hucre-bottom">${s.bottom || ''}</span></a>`;
+                        h += `<a href="${s.link}" class="arama-oge"><span>${s.name.replace(/</g, '&lt;')}</span><span class="hucre-alt">${s.bottom || ''}</span></a>`;
                     });
                 }
                 panel.innerHTML = h || '<div class="bos-mini">Sonuç bulunamadı</div>';
-                panel.classList.add('open');
+                panel.classList.add('acik');
             }, 280);
         });
         document.addEventListener('click', e => {
-            if (!e.target.closest('.search-global')) panel.classList.remove('open');
+            if (!e.target.closest('.arama-global')) panel.classList.remove('acik');
         });
-        searchGirdi.addEventListener('keydown', e => { if (e.key === 'Escape') panel.classList.remove('open'); });
+        searchGirdi.addEventListener('keydown', e => { if (e.key === 'Escape') panel.classList.remove('acik'); });
     }
 
     /* ---------- @Mention autocomplete ---------- */
@@ -387,7 +387,7 @@
             eslesen.forEach((k, i) => {
                 const b = document.createElement('button');
                 b.type = 'button';
-                b.className = 'mention-oge' + (i === 0 ? ' is_active' : '');
+                b.className = 'mention-oge' + (i === 0 ? ' aktif' : '');
                 b.textContent = '@ ' + k.name;
                 b.addEventListener('mousedown', e => { e.preventDefault(); sec(k); });
                 acilir.appendChild(b);
@@ -401,7 +401,7 @@
             ta.value = newKadar + sonrasi;
             ta.selectionStart = ta.selectionEnd = newKadar.length;
             // add the id to the hidden field
-            const gizli = (ta.closest('form') || kap).querySelector('.mention-ids');
+            const gizli = (ta.closest('form') || kap).querySelector('.mention-idler');
             if (gizli) {
                 const mevcut = gizli.value ? JSON.parse(gizli.value) : [];
                 if (!mevcut.includes(person.id)) mevcut.push(person.id);
@@ -579,7 +579,7 @@
 
     /* ---------- Custom SELECT ---------- */
     window.ozelSelectSetup = function (scope) {
-        (scope || document).querySelectorAll('select.select:not([data-osec]):not(.native-kal)').forEach(sel => {
+        (scope || document).querySelectorAll('select.secim:not([data-osec]):not(.native-kal)').forEach(sel => {
             sel.dataset.osec = '1';
             const ozgunStil = sel.getAttribute('style') || '';
             sel.style.display = 'none';
@@ -605,11 +605,11 @@
                     panel.appendChild(search);
                 }
                 const list = document.createElement('div');
-                list.className = 'osec-list';
+                list.className = 'osec-liste';
                 ops.forEach(op => {
                     const b = document.createElement('button');
                     b.type = 'button';
-                    b.className = 'osec-oge' + (op.selected ? ' selected' : '');
+                    b.className = 'osec-oge' + (op.selected ? ' secili' : '');
                     b.textContent = op.textContent.trim() || '—';
                     b.addEventListener('click', () => {
                         sel.value = op.value;
@@ -640,7 +640,7 @@
             panel.innerHTML = '';
             const top = document.createElement('div');
             top.className = 'otarih-ust';
-            top.innerHTML = `<button type="button" class="sort_order-ok" data-y="-1">‹</button><b>${MONTHS_TR[ga]} ${gy}</b><button type="button" class="sort_order-ok" data-y="1">›</button>`;
+            top.innerHTML = `<button type="button" class="sira-ok" data-y="-1">‹</button><b>${MONTHS_TR[ga]} ${gy}</b><button type="button" class="sira-ok" data-y="1">›</button>`;
             top.querySelectorAll('[data-y]').forEach(b => b.addEventListener('click', () => {
                 ga += +b.dataset.y; if (ga < 0) { ga = 11; gy--; } if (ga > 11) { ga = 0; gy++; }
                 ciz();
@@ -745,7 +745,7 @@
                     const panel = document.createElement('div');
                     panel.appendChild(timeList(gercek.value.slice(0, 5), v => { gercek.value = v; show(); gercek.dispatchEvent(new Event('change', { bubbles: true })); panelClose(); }));
                     panelOpen(inp, panel);
-                    panel.querySelector('.selected')?.scrollIntoView({ block: 'center' });
+                    panel.querySelector('.secili')?.scrollIntoView({ block: 'center' });
                     return;
                 }
                 if (type === 'date') {
@@ -762,11 +762,11 @@
                     else gercek.value = tSecim + 'T' + (sSecim || '10:00');
                     show(); gercek.dispatchEvent(new Event('change', { bubbles: true })); panelClose();
                 };
-                const tak = calendarPanel(tSecim, min, v => { if (!v) { tSecim = ''; bitir(); return; } tSecim = v; tak.querySelectorAll('.otarih-day').forEach(g => g.classList.remove('secili')); bitir(); });
-                const time = timeList(sSecim, v => { sSecim = v; if (tSecim) bitir(); else { time.querySelectorAll('.selected').forEach(x => x.classList.remove('secili')); } });
+                const tak = calendarPanel(tSecim, min, v => { if (!v) { tSecim = ''; bitir(); return; } tSecim = v; tak.querySelectorAll('.otarih-gun').forEach(g => g.classList.remove('secili')); bitir(); });
+                const time = timeList(sSecim, v => { sSecim = v; if (tSecim) bitir(); else { time.querySelectorAll('.secili').forEach(x => x.classList.remove('secili')); } });
                 panel.append(tak, time);
                 panelOpen(inp, panel);
-                time.querySelector('.selected')?.scrollIntoView({ block: 'center' });
+                time.querySelector('.secili')?.scrollIntoView({ block: 'center' });
             });
         });
     };

@@ -361,8 +361,18 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.0.1';
+const APP_VERSION = '6.0.2';
 const VERSION_NOTES = [
+    '6.0.2' => [
+        'Açılır menüler (bildirimler, profil, hızlı oluştur) artık tekrar basınca ve dışarı tıklayınca kapanıyor',
+        'Üst bardaki global arama tamamen çalışır hale geldi — sonuç paneli görünmüyordu',
+        'Özel açılır seçim kutuları (tarih, saat ve tüm seçim menüleri) hiçbir sayfada devreye girmiyordu; düzeltildi',
+        'Proje üyeleri ve görev atananları kaydedilmiyordu — seçim kutuları forma bağlanmamıştı',
+        '@bahsetme listesi, tarih seçicide seçili gün/saat işareti ve sıralama okları onarıldı',
+        'Cam temalarda (Liquid Glass / Glassmorphism) açılır paneller, arama sonuçları ve modallar artık arkasını göstermiyor: opak zemin + daha güçlü bulanıklık',
+        'Sidebar ve panel içi kaydırma çubukları inceltildi; boştayken görünmüyor, üzerine gelince beliriyor',
+        'Ekipman sayfasındaki "Çekimde" sayacı ve proje dönem etiketleri (Açık/Kapalı) düzeltildi',
+    ],
     '6.0.1' => [
         'Modal kapatma (çarpı) düğmeleri ve panel genelinde onlarca ölü düğme onarıldı (randevu onayı, puanlama, etkinlik/içerik taşıma, ekipman işlemleri, ödeme/gider durumları, adım tamamlama, kullanıcı/akış düzenleme, yorum ve tepkiler...)',
         'Bildirimler: "Okundu işaretle", bildirim silme, canlı sayaç rozeti ve mobil menü aç/kapat düzeltildi',

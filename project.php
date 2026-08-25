@@ -160,7 +160,7 @@ page_start($project['name'], 'projects');
         <div class="izgara izgara-3">
             <?php foreach ($periods as $d): ?>
             <a href="tasks.php?project=<?= $id ?>&period=<?= $d['id'] ?>" class="kart kart-tik">
-                <div class="satir-esnek arasi mb-2"><div class="kart-baslik" style="font-size:15px"><?= period_name($d) ?></div><?= badge($d['status'], ['open' => 'Açık', 'closed' => 'Kapalı']) ?></div>
+                <div class="satir-esnek arasi mb-2"><div class="kart-baslik" style="font-size:15px"><?= period_name($d) ?></div><?= badge($d['status'], ['acik' => 'Açık', 'kapali' => 'Kapalı']) ?></div>
                 <div class="hucre-alt"><?= $d['task_count'] ?> görev</div>
             </a>
             <?php endforeach; ?>
@@ -504,7 +504,7 @@ function stRoleAdd(role = '', person = '') {
     stTeam.forEach(k => ops += `<option value="${k.name.replace(/"/g, '&quot;')}" ${k.name === person ? 'selected' : ''}>${k.name}</option>`);
     div.innerHTML = `<input class="girdi ist-rol-ad" placeholder="Rol (örn. Art Director)" value="${role.replace(/"/g, '&quot;')}" style="flex:1" ${istDuzenlenebilir ? '' : 'disabled'}>
         <select class="secim native-kal ist-rol-kisi" style="flex:1" ${istDuzenlenebilir ? '' : 'disabled'}>${ops}</select>
-        ${istDuzenlenebilir ? '<button type="button" class="icon-action tehlike" onclick="this.parentElement.remove();stRoleWrite()">✕</button>' : ''}`;
+        ${istDuzenlenebilir ? '<button type="button" class="ikon-eylem tehlike" onclick="this.parentElement.remove();stRoleWrite()">✕</button>' : ''}`;
     list.appendChild(div);
 }
 function stRoleWrite() {

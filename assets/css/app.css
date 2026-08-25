@@ -325,6 +325,34 @@
     backdrop-filter: blur(22px) saturate(1.5);
     -webkit-backdrop-filter: blur(22px) saturate(1.5);
 }
+/* ---- Floating panels need their own, near-opaque ground ----
+   Cards sit on the page background, so a 7-12% white works for them. Menus float
+   over arbitrary content that also scrolls behind them, so the same value makes
+   the text unreadable. These panels get a solid tinted base plus a stronger blur;
+   the glass look survives because the blur and the luminous border remain. */
+[data-theme="liquid-glass"] { --overlay: rgba(20, 33, 56, .93); }
+[data-theme="glass"] { --overlay: rgba(38, 27, 74, .93); }
+[data-theme="liquid-glass-light"] { --overlay: rgba(252, 253, 255, .95); }
+[data-theme="glass-light"] { --overlay: rgba(253, 251, 255, .95); }
+
+[data-theme="liquid-glass"] .acilir-panel, [data-theme="liquid-glass"] .osec-panel,
+[data-theme="liquid-glass"] .arama-sonuc, [data-theme="liquid-glass"] .dock-panel,
+[data-theme="liquid-glass"] .mention-acilir, [data-theme="liquid-glass"] .modal,
+[data-theme="liquid-glass-light"] .acilir-panel, [data-theme="liquid-glass-light"] .osec-panel,
+[data-theme="liquid-glass-light"] .arama-sonuc, [data-theme="liquid-glass-light"] .dock-panel,
+[data-theme="liquid-glass-light"] .mention-acilir, [data-theme="liquid-glass-light"] .modal,
+[data-theme="glass"] .acilir-panel, [data-theme="glass"] .osec-panel,
+[data-theme="glass"] .arama-sonuc, [data-theme="glass"] .dock-panel,
+[data-theme="glass"] .mention-acilir, [data-theme="glass"] .modal,
+[data-theme="glass-light"] .acilir-panel, [data-theme="glass-light"] .osec-panel,
+[data-theme="glass-light"] .arama-sonuc, [data-theme="glass-light"] .dock-panel,
+[data-theme="glass-light"] .mention-acilir, [data-theme="glass-light"] .modal {
+    background: var(--overlay);
+    backdrop-filter: blur(30px) saturate(1.7);
+    -webkit-backdrop-filter: blur(30px) saturate(1.7);
+    box-shadow: 0 18px 48px -16px var(--golge), inset 0 1px 0 rgba(255, 255, 255, .16);
+}
+
 /* Liquid glass: extra-round, luminous edges */
 [data-theme="liquid-glass"] .kart, [data-theme="liquid-glass-light"] .kart,
 [data-theme="liquid-glass"] .stat-kart, [data-theme="liquid-glass-light"] .stat-kart {
@@ -389,6 +417,54 @@ svg { flex-shrink: 0; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 99px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-2); }
+
+/* ---- Inner scroll areas ----
+   The page scrollbar can afford a 2px ring in --bg, because the page really does
+   sit on --bg. Panels do not: the sidebar is --bg-2, dropdowns are --surface, so
+   that same ring reads as a mismatched halo around the thumb. Inside panels the
+   bar goes thin and borderless, and only surfaces while the area is hovered. */
+.kenar-nav, .bildirim-liste, .kanban-liste, .kanal-liste, .osec-liste, .osaat-liste,
+.arama-sonuc, .dock-icerik, .mention-acilir, .sohbet-govde {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+.kenar-nav:hover, .bildirim-liste:hover, .kanban-liste:hover, .kanal-liste:hover,
+.osec-liste:hover, .osaat-liste:hover, .arama-sonuc:hover, .dock-icerik:hover,
+.mention-acilir:hover, .sohbet-govde:hover {
+    scrollbar-color: var(--border-2) transparent;
+}
+.kenar-nav::-webkit-scrollbar, .bildirim-liste::-webkit-scrollbar,
+.kanban-liste::-webkit-scrollbar, .kanal-liste::-webkit-scrollbar,
+.osec-liste::-webkit-scrollbar, .osaat-liste::-webkit-scrollbar,
+.arama-sonuc::-webkit-scrollbar, .dock-icerik::-webkit-scrollbar,
+.mention-acilir::-webkit-scrollbar, .sohbet-govde::-webkit-scrollbar { width: 6px; height: 6px; }
+.kenar-nav::-webkit-scrollbar-track, .bildirim-liste::-webkit-scrollbar-track,
+.kanban-liste::-webkit-scrollbar-track, .kanal-liste::-webkit-scrollbar-track,
+.osec-liste::-webkit-scrollbar-track, .osaat-liste::-webkit-scrollbar-track,
+.arama-sonuc::-webkit-scrollbar-track, .dock-icerik::-webkit-scrollbar-track,
+.mention-acilir::-webkit-scrollbar-track, .sohbet-govde::-webkit-scrollbar-track { background: transparent; }
+.kenar-nav::-webkit-scrollbar-thumb, .bildirim-liste::-webkit-scrollbar-thumb,
+.kanban-liste::-webkit-scrollbar-thumb, .kanal-liste::-webkit-scrollbar-thumb,
+.osec-liste::-webkit-scrollbar-thumb, .osaat-liste::-webkit-scrollbar-thumb,
+.arama-sonuc::-webkit-scrollbar-thumb, .dock-icerik::-webkit-scrollbar-thumb,
+.mention-acilir::-webkit-scrollbar-thumb, .sohbet-govde::-webkit-scrollbar-thumb {
+    background: transparent; border: none; border-radius: 99px;
+    transition: background .2s ease;
+}
+.kenar-nav:hover::-webkit-scrollbar-thumb, .bildirim-liste:hover::-webkit-scrollbar-thumb,
+.kanban-liste:hover::-webkit-scrollbar-thumb, .kanal-liste:hover::-webkit-scrollbar-thumb,
+.osec-liste:hover::-webkit-scrollbar-thumb, .osaat-liste:hover::-webkit-scrollbar-thumb,
+.arama-sonuc:hover::-webkit-scrollbar-thumb, .dock-icerik:hover::-webkit-scrollbar-thumb,
+.mention-acilir:hover::-webkit-scrollbar-thumb, .sohbet-govde:hover::-webkit-scrollbar-thumb {
+    background: var(--border-2);
+}
+.kenar-nav::-webkit-scrollbar-thumb:hover, .bildirim-liste::-webkit-scrollbar-thumb:hover,
+.kanban-liste::-webkit-scrollbar-thumb:hover, .kanal-liste::-webkit-scrollbar-thumb:hover,
+.osec-liste::-webkit-scrollbar-thumb:hover, .osaat-liste::-webkit-scrollbar-thumb:hover,
+.arama-sonuc::-webkit-scrollbar-thumb:hover, .dock-icerik::-webkit-scrollbar-thumb:hover,
+.mention-acilir::-webkit-scrollbar-thumb:hover, .sohbet-govde::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+}
 
 /* ============================================================
    YERLEŞİM
@@ -916,7 +992,8 @@ table.tablo { width: 100%; border-collapse: collapse; }
 .kalin { font-weight: 700; }
 .orta { text-align: center; }
 .mt-0 { margin-top: 0; } .mt-1 { margin-top: 8px; } .mt-2 { margin-top: 16px; } .mt-3 { margin-top: 24px; }
-.mb-2 { margin-bottom: 16px; } .mb-3 { margin-bottom: 24px; }
+.mb-0 { margin-bottom: 0; } .mb-1 { margin-bottom: 8px; } .mb-2 { margin-bottom: 16px; } .mb-3 { margin-bottom: 24px; }
+.mt-auto { margin-top: auto; }
 .gizli { display: none !important; }
 .etiket-nokta { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 

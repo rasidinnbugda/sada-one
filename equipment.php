@@ -32,7 +32,7 @@ page_start('Ekipman', 'ekipman');
 <div class="stat-izgara">
     <div class="stat-kart"><div class="stat-deger" style="color:var(--basari)" data-counter="<?= $counts['studyoda'] ?>">0</div><div class="stat-etiket">Stüdyoda</div></div>
     <div class="stat-kart"><div class="stat-deger" style="color:var(--bilgi)" data-counter="<?= $counts['zimmette'] ?>">0</div><div class="stat-etiket">Zimmette</div></div>
-    <div class="stat-kart"><div class="stat-deger" style="color:var(--uyari)" data-counter="<?= $counts['on_shoot'] ?>">0</div><div class="stat-etiket">Çekimde</div></div>
+    <div class="stat-kart"><div class="stat-deger" style="color:var(--uyari)" data-counter="<?= $counts['cekimde'] ?>">0</div><div class="stat-etiket">Çekimde</div></div>
     <div class="stat-kart"><div class="stat-deger" style="color:var(--tehlike)" data-counter="<?= $counts['arizali'] + $counts['bakimda'] ?>">0</div><div class="stat-etiket">Arızalı / Bakımda</div></div>
     <?php if (permission('finans') && $totalValue > 0): ?>
     <div class="stat-kart"><div class="stat-deger" style="font-size:20px"><?= money($totalValue) ?></div><div class="stat-etiket">Toplam Demirbaş Değeri</div></div>
