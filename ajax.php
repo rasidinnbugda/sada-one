@@ -100,7 +100,7 @@ case 'ai_summarize':
     $taskId = (int)$g('task_id');
     $task = row("SELECT title, description FROM tasks WHERE id=?", [$taskId]);
     if (!$task) json_out(['ok' => false, 'error' => 'Görev bulunamadı.']);
-    $comments = rows("SELECT u.name, y.comment FROM comments y JOIN users u ON u.id=y.user_id WHERE y.ref_tur='gorev' AND y.ref_id=? ORDER BY y.id LIMIT 60", [$taskId]);
+    $comments = rows("SELECT u.name, y.message AS comment FROM comments y JOIN users u ON u.id=y.user_id WHERE y.ref_type='gorev' AND y.ref_id=? ORDER BY y.id LIMIT 60", [$taskId]);
     $metin = "GÖREV: {$task['title']}\nAÇIKLAMA: {$task['description']}\n\nYORUMLAR:\n";
     foreach ($comments as $c) $metin .= "- {$c['name']}: {$c['comment']}\n";
     $r = ai_ask('Bir görev ve tartışmasını Türkçe özetle: mevcut durum, alınan kararlar, açık sorular ve yapılacaklar. Kısa madde işaretleri kullan, 150 kelimeyi geçme.', mb_substr($metin, 0, 12000), 1200);
@@ -1818,7 +1818,7 @@ case 'user_save':
     }
     if (val("SELECT COUNT(*) FROM users WHERE email=?", [$email]))
         json_out(['ok' => false, 'error' => 'Bu e-posta kullanımda.']);
-    if (strlen($g('password')) < 6) json_out(['ok' => false, 'error' => 'Şifre en az 6 karakter.']);
+    if (strlen($g('password')) < 8) json_out(['ok' => false, 'error' => 'Şifre en az 8 karakter.']);
     $data['password'] = password_hash($g('password'), PASSWORD_DEFAULT);
     $data['theme'] = 'lime'; $data['color'] = '#b1fb01'; $data['created'] = $now;
     $id = insert('users', $data);
@@ -1961,7 +1961,7 @@ case 'profile_save':
     $data = ['name' => trim($g('name')), 'job_title' => $g('job_title')];
     if ($data['name'] === '') json_out(['ok' => false, 'error' => 'Ad gerekli.']);
     if ($g('password')) {
-        if (strlen($g('password')) < 6) json_out(['ok' => false, 'error' => 'Şifre en az 6 karakter.']);
+        if (strlen($g('password')) < 8) json_out(['ok' => false, 'error' => 'Şifre en az 8 karakter.']);
         $data['password'] = password_hash($g('password'), PASSWORD_DEFAULT);
     }
     $avatarClient = file_upload('avatar');

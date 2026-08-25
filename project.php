@@ -128,9 +128,9 @@ page_start($project['name'], 'projects');
             <div class="satir-esnek arasi" style="padding:9px 12px;background:var(--surface-2);border-radius:10px;gap:10px">
                 <span class="kucuk kalin" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($tg['title']) ?></span>
                 <?php if (isset($gorevPuanlari[$tg['id']])): ?>
-                <button class="btn btn-sm" onclick="puanVer('gorev', <?= $tg['id'] ?>, '<?= e($tg['title']) ?>')" title="Puanı güncelle"><?= stars((float)$gorevPuanlari[$tg['id']], 13) ?></button>
+                <button class="btn btn-sm" onclick="ratingGive('gorev', <?= $tg['id'] ?>, '<?= e($tg['title']) ?>')" title="Puanı güncelle"><?= stars((float)$gorevPuanlari[$tg['id']], 13) ?></button>
                 <?php else: ?>
-                <button class="btn btn-marka btn-sm" onclick="puanVer('gorev', <?= $tg['id'] ?>, '<?= e($tg['title']) ?>')" style="flex-shrink:0"><?= icon('star', 13) ?> Değerlendir</button>
+                <button class="btn btn-marka btn-sm" onclick="ratingGive('gorev', <?= $tg['id'] ?>, '<?= e($tg['title']) ?>')" style="flex-shrink:0"><?= icon('star', 13) ?> Değerlendir</button>
                 <?php endif; ?>
             </div>
             <?php endforeach; ?>
@@ -189,7 +189,7 @@ page_start($project['name'], 'projects');
                 <?php if ($o['status'] === 'bekliyor' && (is_customer() || is_admin())): ?>
                 <div class="satir-esnek" style="gap:6px;flex-shrink:0">
                     <button class="btn btn-sm" style="color:var(--basari)" data-action="approval_reply" data-id="<?= $o['id'] ?>" data-status="onaylandi">Onayla</button>
-                    <button class="btn btn-sm" onclick="onayNot(<?= $o['id'] ?>,'revize')">Revize</button>
+                    <button class="btn btn-sm" onclick="approvalNot(<?= $o['id'] ?>,'revize')">Revize</button>
                 </div>
                 <?php endif; ?>
             </div>
@@ -268,8 +268,8 @@ page_start($project['name'], 'projects');
                             <div class="satir-esnek" style="gap:7px;flex-shrink:0">
                                 <b><?= number_format((float)$t['amount'], 2, ',', '.') ?> ₺</b>
                                 <?php if ($t['status'] === 'bekliyor'): ?>
-                                <button class="mini-btn" style="color:var(--basari)" onclick="ektalepDurum(<?= $t['id'] ?>, 'onaylandi', this)">Onayla</button>
-                                <button class="mini-btn" style="color:var(--tehlike)" onclick="ektalepDurum(<?= $t['id'] ?>, 'reddedildi', this)">Reddet</button>
+                                <button class="mini-btn" style="color:var(--basari)" onclick="extraRequestStatus(<?= $t['id'] ?>, 'onaylandi', this)">Onayla</button>
+                                <button class="mini-btn" style="color:var(--tehlike)" onclick="extraRequestStatus(<?= $t['id'] ?>, 'reddedildi', this)">Reddet</button>
                                 <?php else: ?><?= badge($t['status'], ['onaylandi' => 'Onaylandı', 'reddedildi' => 'Reddedildi', 'bekliyor' => 'Bekliyor']) ?><?php endif; ?>
                                 <button class="ikon-eylem tehlike" style="width:24px;height:24px" data-action="extra_request_delete" data-id="<?= $t['id'] ?>" data-approval="Ek talep silinsin mi?"><?= icon('cop', 12) ?></button>
                             </div>
@@ -298,9 +298,9 @@ page_start($project['name'], 'projects');
                                 <b <?= $k['is_done'] ? 'style="text-decoration:line-through;opacity:.6"' : '' ?>><?= e($k['item']) ?></b>
                                 <?php if ($k['check_note']): ?><div class="hucre-alt"><?= e($k['check_note']) ?></div><?php endif; ?>
                             </div>
-                            <button class="mini-btn" onclick="pkSorumlu(<?= $k['id'] ?>)" title="Sorumlu ata"><?= $k['owner_name'] ? e(explode(' ', $k['owner_name'])[0]) : '+ sorumlu' ?></button>
+                            <button class="mini-btn" onclick="pkOwner(<?= $k['id'] ?>)" title="Sorumlu ata"><?= $k['owner_name'] ? e(explode(' ', $k['owner_name'])[0]) : '+ sorumlu' ?></button>
                             <button class="mini-btn <?= $k['is_delivered'] ? '' : '' ?>" style="color:<?= $k['is_delivered'] ? 'var(--basari)' : 'var(--muted)' ?>" onclick="pkToggle(<?= $k['id'] ?>, 'teslim', this)" title="Ekipman teslim edildi mi?"><?= $k['is_delivered'] ? '✓ Teslim' : 'Teslim?' ?></button>
-                            <button class="ikon-eylem tehlike" style="width:24px;height:24px" onclick="pkSil(<?= $k['id'] ?>, this)"><?= icon('cop', 12) ?></button>
+                            <button class="ikon-eylem tehlike" style="width:24px;height:24px" onclick="pkDelete(<?= $k['id'] ?>, this)"><?= icon('cop', 12) ?></button>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -318,7 +318,7 @@ page_start($project['name'], 'projects');
                     <div class="form-grup">
                         <label class="form-etiket"><?= $dtTitle ?><?php if ($dg): ?> <span class="metin-muted" style="font-weight:400">· <?= format_date($dg['updated'], true) ?></span><?php endif; ?></label>
                         <textarea class="metin-alani" rows="3" id="deg_<?= $dtCode ?>" placeholder="<?= e($dtIpucu) ?>"><?= e($dg['content'] ?? '') ?></textarea>
-                        <button class="mini-btn mt-1" onclick="degKaydet('<?= $dtCode ?>')">Kaydet</button>
+                        <button class="mini-btn mt-1" onclick="reviewSave('<?= $dtCode ?>')">Kaydet</button>
                     </div>
                     <?php endforeach; ?>
                 </div>
@@ -379,7 +379,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
 
 <!-- Send-for-approval modal -->
 <div class="modal-katman" id="modalApproval">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Müşteri Onayına Gönder</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Müşteri Onayına Gönder</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="onay_gonder" data-refresh="evet">
         <input type="hidden" name="project_id" value="<?= $id ?>">
         <div class="modal-govde">
@@ -388,24 +388,24 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
             <div class="form-grup"><label class="form-etiket">Dosya Eki</label><input type="file" name="client" class="girdi"><div class="form-ipucu">Görsel, PDF, video vb. (max 50MB)</div></div>
             <div class="form-grup"><label class="form-etiket">veya Drive Linki</label><input name="drive_link" class="girdi" placeholder="https://drive.google.com/..."></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Onaya Gönder</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Onaya Gönder</button></div>
     </form></div>
 </div>
 
 <!-- File upload modal -->
 <div class="modal-katman" id="modalUpload">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Dosya Yükle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Dosya Yükle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="archive_upload" data-refresh="evet">
         <input type="hidden" name="project_id" value="<?= $id ?>">
         <div class="modal-govde"><div class="form-grup"><label class="form-etiket">Dosya Seç <span class="zorunlu">*</span></label><input type="file" name="client" class="girdi" required></div></div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Yükle</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Yükle</button></div>
     </form></div>
 </div>
 
 <?php if ($project['type'] === 'aylik' && is_staff()): ?>
 <!-- Open-period modal -->
 <div class="modal-katman" id="modalPeriod">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Dönem Aç</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Dönem Aç</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="period_open" data-refresh="evet">
         <input type="hidden" name="project_id" value="<?= $id ?>">
         <div class="modal-govde">
@@ -415,7 +415,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
             </div>
             <div class="form-grup"><label class="form-etiket">Akış Şablonundan Görev Oluştur</label><select name="template_id" class="secim"><option value="">Boş dönem</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-ipucu">Seçilen şablonun adımları görev akışı olarak eklenir.</div></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Dönemi Aç</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Dönemi Aç</button></div>
     </form></div>
 </div>
 <?php endif; ?>
@@ -425,7 +425,7 @@ $clients = rows("SELECT id, name FROM clients WHERE status='aktif' ORDER BY name
 $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is_active=1 ORDER BY name"); ?>
 <!-- Edit project -->
 <div class="modal-katman" id="modalProjectDuzen">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Projeyi Düzenle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Projeyi Düzenle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="project_save">
         <input type="hidden" name="id" value="<?= $id ?>">
         <div class="modal-govde">
@@ -448,7 +448,7 @@ $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is
         </div>
         <div class="modal-alt">
             <?php if (is_admin()): ?><button type="button" class="btn btn-tehlike" data-action="project_delete" data-id="<?= $id ?>" data-approval="Proje ve tüm görevleri silinecek. Emin misiniz?" style="margin-right:auto">Sil</button><?php endif; ?>
-            <button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button>
+            <button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button>
         </div>
     </form></div>
 </div>
@@ -458,11 +458,11 @@ $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is
 
 <!-- Approval note (revision) modal -->
 <div class="modal-katman" id="modalApprovalNot">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Revize / Not Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Revize / Not Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="approval_reply">
         <input type="hidden" name="id" id="approvalNotId"><input type="hidden" name="status" id="approvalNotStatus">
         <div class="modal-govde"><div class="form-grup"><label class="form-etiket">Notunuz</label><textarea name="not" class="metin-alani" required placeholder="Değişiklik taleplerinizi yazın..."></textarea></div></div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Gönder</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Gönder</button></div>
     </form></div>
 </div>
 <script>
@@ -473,7 +473,7 @@ function approvalNot(id, status) { document.getElementById('approvalNotId').valu
 <!-- Extra request modal (budget permission) -->
 <?php if ($budgetGor): ?>
 <div class="modal-katman" id="modalEkRequest">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Ek Talep Kaydet</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Ek Talep Kaydet</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="extra_request_save">
         <input type="hidden" name="project_id" value="<?= $id ?>">
         <div class="modal-govde">
@@ -484,7 +484,7 @@ function approvalNot(id, status) { document.getElementById('approvalNotId').valu
             </div>
             <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="description" class="metin-alani" placeholder="Talebin detayı, kim istedi..."></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 <?php endif; ?>

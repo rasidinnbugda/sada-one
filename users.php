@@ -33,7 +33,7 @@ page_start('Kullanıcılar', 'users');
         <td class="kucuk"><?= $k['job_title'] ? e($k['job_title']) : '' ?><?= $k['md_count'] > 1 ? ' · ' . $k['md_count'] . ' dosya' : ($k['client_name'] ? ' · ' . e($k['client_name']) : '') ?></td>
         <td class="kucuk metin-muted"><?= $k['last_login'] ? 'Son giriş ' . time_ago($k['last_login']) : 'Hiç girmedi' ?></td>
         <td style="width:120px;text-align:right">
-            <button class="ikon-eylem" onclick='kullaniciDuzenle(<?= json_encode($k, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
+            <button class="ikon-eylem" onclick='userEdit(<?= json_encode($k, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
             <?php if ($k['id'] != $u['id']): ?><button class="ikon-eylem <?= $k['is_active'] ? 'tehlike' : '' ?>" data-action="user_status" data-id="<?= $k['id'] ?>" data-is_active="<?= $k['is_active'] ? 0 : 1 ?>" data-approval="<?= $k['is_active'] ? 'Kullanıcı pasifleştirilsin mi?' : 'Kullanıcı aktifleştirilsin mi?' ?>" title="<?= $k['is_active'] ? 'Pasifleştir' : 'Aktifleştir' ?>"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="<?= $k['is_active'] ? 'M18.36 6.64a9 9 0 11-12.73 0M12 2v10' : 'M5 13l4 4L19 7' ?>"/></svg></button><?php endif; ?>
         </td>
     </tr>
@@ -41,7 +41,7 @@ page_start('Kullanıcılar', 'users');
 </tbody></table></div>
 
 <div class="modal-katman" id="modalUser">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="userTitle">Yeni Kullanıcı</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="userTitle">Yeni Kullanıcı</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="user_save" id="userForm">
         <input type="hidden" name="id" id="k_id">
         <div class="modal-govde">
@@ -81,7 +81,7 @@ page_start('Kullanıcılar', 'users');
                 </div>
             </div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 

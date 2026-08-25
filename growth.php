@@ -70,7 +70,7 @@ page_start('Gelişim & Mentörlük', 'growth');
 
 <?php if ($can_manage): ?>
 <div class="modal-katman" id="modalMentor">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="mBaslik">Yeni Mentörlük Eşleşmesi</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="mBaslik">Yeni Mentörlük Eşleşmesi</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="mentorship_save">
         <input type="hidden" name="id" id="m_id">
         <div class="modal-govde">
@@ -90,7 +90,7 @@ page_start('Gelişim & Mentörlük', 'growth');
                 <select name="status" id="m_status" class="secim"><?php foreach ($MDURUM as $min => $dv): ?><option value="<?= $min ?>"><?= $dv ?></option><?php endforeach; ?></select></div>
             <div class="form-grup"><label class="form-etiket">Çıktı & Değerlendirme Notu</label><textarea name="output" id="m_output" class="metin-alani" placeholder="Süreç sonunda gözlemler, değerlendirme..."></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 <?php endif; ?>

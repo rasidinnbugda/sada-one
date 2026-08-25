@@ -139,7 +139,7 @@ if ($announcements && $wAcik('duyurular')): ?>
         $panelSteps = rows("SELECT ga.name step_name, g.id gid, g.title FROM task_steps ga JOIN tasks g ON g.id=ga.task_id WHERE ga.status='aktif' AND g.is_archived=0 AND $pAdimKosul LIMIT 4", $pAdimParam);
         if ($panelSteps): ?>
         <div class="katla kapali" data-collapse="panelAdimlar" style="border-bottom:1px solid var(--border)">
-            <button data-katla-btn type="button" class="satir-esnek" style="gap:8px;padding:10px 0;width:100%">
+            <button data-collapse-btn type="button" class="satir-esnek" style="gap:8px;padding:10px 0;width:100%">
                 <span class="katla-ok"><svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" width="12"><path d="M19 9l-7 7-7-7"/></svg></span>
                 <span class="kucuk kalin"><?= icon('roket', 13) ?> Adımlarım</span>
                 <span class="rozet r-devam" style="padding:1px 8px"><?= count($panelSteps) ?> sıra sende</span>
@@ -281,7 +281,7 @@ if ($announcements && $wAcik('duyurular')): ?>
 
 <!-- Widget personalization modal -->
 <div class="modal-katman" id="modalWidget">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Paneli Düzenle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Paneli Düzenle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde">
         <div class="hucre-alt mb-3">Panelde görmek istediğiniz bölümleri seçin.</div>
         <div class="dikey" style="gap:10px">
@@ -293,7 +293,7 @@ if ($announcements && $wAcik('duyurular')): ?>
             <?php endforeach; ?>
         </div>
     </div>
-    <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="button" class="btn btn-marka" onclick="widgetSave()">Kaydet</button></div>
+    <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="button" class="btn btn-marka" onclick="widgetSave()">Kaydet</button></div>
     </div>
 </div>
 <script>
@@ -369,7 +369,7 @@ function project_modal(?int $clientId = null) {
 ?>
 <div class="modal-katman" id="modalProject">
     <div class="modal">
-        <div class="modal-ust"><div class="modal-baslik">Yeni Proje</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+        <div class="modal-ust"><div class="modal-baslik">Yeni Proje</div><button class="modal-kapat" data-modal-close>✕</button></div>
         <form data-ajax="project_save">
             <div class="modal-govde">
                 <div class="form-grup">
@@ -406,7 +406,7 @@ function project_modal(?int $clientId = null) {
                 <?php member_picker(); ?>
                 <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="description" class="metin-alani" placeholder="Proje kapsamı..."></textarea></div>
             </div>
-            <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
+            <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
         </form>
     </div>
 </div>

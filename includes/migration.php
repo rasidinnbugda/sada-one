@@ -104,7 +104,6 @@ function migration_commands(): array {
     "ALTER TABLE events ADD COLUMN cost DECIMAL(12,2) NOT NULL DEFAULT 0",
     "ALTER TABLE expenses ADD COLUMN event_id INT DEFAULT NULL",
     // ---- v6.0: Drive tracking + AI groundwork ----
-    "RENAME TABLE project_ek_requests TO project_extra_requests",
     "ALTER TABLE clients ADD COLUMN drive_folder_id VARCHAR(120) DEFAULT NULL",
     "ALTER TABLE events ADD COLUMN drive_folder_id VARCHAR(120) DEFAULT NULL",
     "ALTER TABLE events ADD COLUMN drive_link VARCHAR(500) DEFAULT NULL",
@@ -118,6 +117,20 @@ function run_migrations(PDO $pdo): array {
     // Legacy Turkish schemas are renamed to English first (no-op on fresh installs)
     require_once __DIR__ . '/legacy-migration.php';
     foreach (legacy_localization($pdo) as $l) $results[] = [str_starts_with($l, 'ERR') ? 'error' : 'ok', 'legacy: ' . $l];
+    // Table renames must run BEFORE the CREATE IF NOT EXISTS list: otherwise an empty
+    // new-named table gets created first, the rename then collides, and the old data
+    // is stranded in the old table. If both exist, keep the one that holds the data.
+    foreach ([['project_ek_requests', 'project_extra_requests']] as [$oldT, $newT]) {
+        try {
+            $hasOld = (bool)$pdo->query("SHOW TABLES LIKE " . $pdo->quote($oldT))->fetchColumn();
+            $hasNew = (bool)$pdo->query("SHOW TABLES LIKE " . $pdo->quote($newT))->fetchColumn();
+            if ($hasOld && $hasNew) {
+                $newCount = (int)$pdo->query("SELECT COUNT(*) FROM `$newT`")->fetchColumn();
+                if ($newCount === 0) { $pdo->exec("DROP TABLE `$newT`"); $hasNew = false; }
+            }
+            if ($hasOld && !$hasNew) { $pdo->exec("RENAME TABLE `$oldT` TO `$newT`"); $results[] = ['ok', "rename: $oldT → $newT"]; }
+        } catch (PDOException $e) { $results[] = ['hata', "rename $oldT — " . $e->getMessage()]; }
+    }
     foreach (migration_commands() as $sql) {
         try {
             $pdo->exec($sql);

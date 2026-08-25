@@ -120,7 +120,7 @@ function page_start(string $title, string $activePage = ''): void {
             <?php else: ?>
             <a href="index.php" class="logotip">SADA<span>.</span></a>
             <?php endif; ?>
-            <button class="kenar-kapat" data-kenar-kapat aria-label="Menüyü kapat">✕</button>
+            <button class="kenar-kapat" data-sidebar-close aria-label="Menüyü kapat">✕</button>
         </div>
         <nav class="kenar-nav">
             <?php
@@ -190,7 +190,7 @@ function page_start(string $title, string $activePage = ''): void {
 
     <div class="icerik-alani">
         <header class="ustbar">
-            <button class="menu-btn" data-kenar-ac aria-label="Menüyü aç"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+            <button class="menu-btn" data-sidebar-open aria-label="Menüyü aç"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
             <div class="ustbar-baslik"><?= e($title) ?></div>
             <div class="arama-global">
                 <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
@@ -201,12 +201,12 @@ function page_start(string $title, string $activePage = ''): void {
                 <div class="acilir" data-acilir>
                     <button class="ikon-btn" data-acilir-btn aria-label="Bildirimler">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                        <?php if ($notificationCount): ?><span class="ikon-sayac" id="notificationCounter"><?= $notificationCount > 99 ? '99+' : $notificationCount ?></span><?php endif; ?>
+                        <span class="ikon-sayac" data-notification-badge<?= $notificationCount ? '' : ' style="display:none"' ?>><?= $notificationCount > 99 ? '99+' : (int)$notificationCount ?></span>
                     </button>
                     <div class="acilir-panel bildirim-panel">
                         <div class="acilir-baslik">Bildirimler
                             <span class="satir-esnek" style="gap:10px">
-                                <?php if ($notificationCount): ?><button class="mini-btn" data-tumunu-oku>Okundu işaretle</button><?php endif; ?>
+                                <?php if ($notificationCount): ?><button class="mini-btn" data-all-read>Okundu işaretle</button><?php endif; ?>
                                 <button class="mini-btn" style="color:var(--tehlike)" data-action="notification_clear" data-approval="Tüm bildirimler silinsin mi?">Tümünü sil</button>
                             </span>
                         </div>
@@ -218,7 +218,7 @@ function page_start(string $title, string $activePage = ''): void {
                                 <div class="bildirim-baslik"><?= e($b['title']) ?></div>
                                 <?php if ($b['message']): ?><div class="bildirim-metin"><?= e(mb_substr($b['message'], 0, 90)) ?></div><?php endif; ?>
                                 <div class="bildirim-zaman"><?= time_ago($b['created']) ?></div>
-                                <span class="bildirim-sil-x" data-bildirim-sil title="Sil">✕</span>
+                                <span class="bildirim-sil-x" data-notification-delete title="Sil">✕</span>
                             </a>
                             <?php endforeach; endif; ?>
                         </div>

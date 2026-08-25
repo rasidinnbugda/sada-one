@@ -51,7 +51,7 @@ page_start('Çekim Listesi', 'shoots');
                 <button class="mini-btn" onclick="driveMark(<?= $c['id'] ?>)">Aktarıldı işaretle</button>
                 <?php endif; ?>
                 <?php if (permission('takvim_yonet')): ?>
-                <button class="btn btn-sm" onclick='ckDuzenle(<?= json_encode(['id' => $c['id'], 'shopping_list' => $c['shopping_list'], 'needs_list' => $c['needs_list']], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 13) ?> Listeyi Düzenle</button>
+                <button class="btn btn-sm" onclick='ckEdit(<?= json_encode(['id' => $c['id'], 'shopping_list' => $c['shopping_list'], 'needs_list' => $c['needs_list']], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 13) ?> Listeyi Düzenle</button>
                 <?php endif; ?>
             </div>
         </div>
@@ -79,14 +79,14 @@ page_start('Çekim Listesi', 'shoots');
 <?php endif; ?>
 
 <div class="modal-katman" id="modalShootList">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Çekim Listesini Düzenle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Çekim Listesini Düzenle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="shoot_list_save">
         <input type="hidden" name="id" id="ck_id">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Alınacaklar</label><textarea name="shopping_list" id="ck_shopping_list" class="metin-alani" rows="4" placeholder="- Yedek pil&#10;- Gaffer bandı&#10;- Su ve atıştırmalık"></textarea></div>
             <div class="form-grup"><label class="form-etiket">İhtiyaç Listesi</label><textarea name="needs_list" id="ck_needs" class="metin-alani" rows="4" placeholder="- Mekan izni teyidi&#10;- Prompter metni&#10;- Ek ışık kiralama"></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 

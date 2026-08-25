@@ -10,7 +10,7 @@ $u = require_staff();
 $ideas = rows("SELECT f.*, uu.name proposer_name, uu.color proposer_color, uu.avatar proposer_avatar
     FROM ideas f JOIN users uu ON uu.id=f.proposer_id ORDER BY FIELD(f.status,'yeni','begenildi','uygulandi'), f.id DESC");
 $can_manage = is_admin() || $u['role'] === 'pm';
-$FDURUM = ['new' => ['Yeni', 'r-bekliyor'], 'begenildi' => ['Beğenildi', 'r-devam'], 'uygulandi' => ['Uygulandı', 'r-tamamlandi']];
+$FDURUM = ['yeni' => ['Yeni', 'r-bekliyor'], 'begenildi' => ['Beğenildi', 'r-devam'], 'uygulandi' => ['Uygulandı', 'r-tamamlandi']];
 
 page_start('Fikir Panosu', 'ideas');
 ?>
@@ -56,14 +56,14 @@ page_start('Fikir Panosu', 'ideas');
 <?php endif; ?>
 
 <div class="modal-katman" id="modalIdea">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Fikir Öner</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Fikir Öner</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="idea_save">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Fikir <span class="zorunlu">*</span></label><input name="idea" class="girdi" required placeholder="Örn. Kurum çalışanlarıyla 'bir günüm' reels serisi"></div>
             <div class="form-grup"><label class="form-etiket">Uyarlanabilecek Kurum</label><input name="organization" class="girdi" placeholder="Hangi müşteri/dosya için uygun olur?"></div>
             <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="description" class="metin-alani" placeholder="Nasıl uygulanır, neden işe yarar..."></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Panoya Ekle</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Panoya Ekle</button></div>
     </form></div>
 </div>
 
@@ -75,7 +75,7 @@ async function ideaIlerlet(id, status) {
 </script>
 <!-- AI idea generator -->
 <div class="modal-katman" id="modalAiIdea">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">🪄 AI ile Fikir Üret</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">🪄 AI ile Fikir Üret</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde">
         <div class="form-grup"><label class="form-etiket">Kurum / Konu</label><input id="aiTopic" class="girdi" placeholder="Örn. yerel kahve zinciri, Ramazan kampanyası"></div>
         <button class="btn btn-marka" id="aiIdeaBtn" onclick="aiIdeas()">Üret</button>

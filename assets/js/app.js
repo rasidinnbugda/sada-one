@@ -136,8 +136,8 @@
         if (read) {
             e.preventDefault(); e.stopPropagation();
             await api('notification_all_read');
-            $$('.notification-oge.new').forEach(b => b.classList.remove('yeni'));
-            $('#notificationCounter')?.remove();
+            $$('.bildirim-oge.yeni').forEach(b => b.classList.remove('yeni'));
+            const rozet = $('[data-notification-badge]'); if (rozet) rozet.style.display = 'none';
             read.remove();
         }
         const notificationDelete = e.target.closest('[data-notification-delete]');
@@ -321,7 +321,7 @@
             } else {
                 // Rejected by the lock etc.: put the card back into its old column
                 card.dataset.status = oldStatus;
-                const oldList = $(`.kanban-sutun[data-durum="${oldStatus}"] .kanban-liste`);
+                const oldList = $(`.kanban-sutun[data-status="${oldStatus}"] .kanban-liste`);
                 if (oldList) oldList.appendChild(card);
                 updateKanbanCounts();
             }
@@ -469,14 +469,14 @@
 
     /* ---------- Row sorting arrows (workflow/form editors) ---------- */
     document.addEventListener('click', e => {
-        const ok = e.target.closest('[data-sort_order-yon]');
+        const ok = e.target.closest('[data-sort-dir]');
         if (!ok) return;
         e.preventDefault();
         const row_item = ok.closest('[data-siralanabilir]');
         if (!row_item) return;
-        if (ok.dataset.positionYon === 'yukari' && row_item.previousElementSibling) {
+        if (ok.dataset.sortDir === 'yukari' && row_item.previousElementSibling) {
             row_item.parentElement.insertBefore(row_item, row_item.previousElementSibling);
-        } else if (ok.dataset.positionYon === 'asagi' && row_item.nextElementSibling) {
+        } else if (ok.dataset.sortDir === 'asagi' && row_item.nextElementSibling) {
             row_item.parentElement.insertBefore(row_item.nextElementSibling, row_item);
         }
     });

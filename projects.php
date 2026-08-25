@@ -71,7 +71,7 @@ if (permission('dosya_yonet')) {
     $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is_active=1 ORDER BY name");
 ?>
 <div class="modal-katman" id="modalProject">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Proje</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Proje</div><button class="modal-kapat" data-modal-close>✕</button></div>
         <form data-ajax="project_save">
             <div class="modal-govde">
                 <div class="form-grup"><label class="form-etiket">Proje Adı <span class="zorunlu">*</span></label><input name="name" class="girdi" required></div>
@@ -91,7 +91,7 @@ if (permission('dosya_yonet')) {
                 <?php member_picker(); ?>
                 <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="description" class="metin-alani"></textarea></div>
             </div>
-            <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
+            <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
         </form>
     </div>
 </div>

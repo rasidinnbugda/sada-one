@@ -41,7 +41,7 @@ function task_kanban(array $tasks, int $projectId = 0): void {
 function task_modal(int $projectId, array $team, array $templates, array $periods = []): void {
 ?>
 <div class="modal-katman" id="modalTask">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Görev</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Görev</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="task_save">
         <input type="hidden" name="project_id" value="<?= $projectId ?>" <?= $projectId ? '' : 'disabled' ?> id="taskProjectId">
         <div class="modal-govde">
@@ -98,7 +98,7 @@ function task_modal(int $projectId, array $team, array $templates, array $period
             </div>
             <?php endif; ?>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
     </form></div>
 </div>
 <?php }
@@ -137,7 +137,7 @@ function rating_modal(): void {
     $basildi = true;
 ?>
 <div class="modal-katman" id="modalRating">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">İşi Değerlendir</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">İşi Değerlendir</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="rating_give">
         <input type="hidden" name="ref_type" id="p_ref_type"><input type="hidden" name="ref_id" id="p_ref_id"><input type="hidden" name="rating" id="p_rating" value="5">
         <div class="modal-govde">
@@ -147,7 +147,7 @@ function rating_modal(): void {
             </div>
             <div class="form-grup"><label class="form-etiket">Yorumunuz (opsiyonel)</label><textarea name="comment_box" class="metin-alani" placeholder="Bu iş hakkında düşünceleriniz..."></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>Vazgeç</button><button type="submit" class="btn btn-marka">Gönder</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>Vazgeç</button><button type="submit" class="btn btn-marka">Gönder</button></div>
     </form></div>
 </div>
 <script>
@@ -210,18 +210,18 @@ function comment_show(array $y, array $reactions, bool $answer = false): void {
             <div class="satir-esnek sarma mt-1" style="gap:6px">
                 <!-- Reactions -->
                 <?php foreach ($yTepkiler as $emoji => $info): ?>
-                <button class="tepki-cip <?= in_array($u['id'], $info['ids']) ? 'benim' : '' ?>" data-comment_box="<?= $y['id'] ?>" data-emoji="<?= e($emoji) ?>" onclick="tepki(<?= $y['id'] ?>,'<?= e($emoji) ?>')" title="<?= e(implode(', ', $info['names'])) ?>"><?= e($emoji) ?> <span class="tepki-adet"><?= count($info['ids']) ?></span></button>
+                <button class="tepki-cip <?= in_array($u['id'], $info['ids']) ? 'benim' : '' ?>" data-comment_box="<?= $y['id'] ?>" data-emoji="<?= e($emoji) ?>" onclick="reaction(<?= $y['id'] ?>,'<?= e($emoji) ?>')" title="<?= e(implode(', ', $info['names'])) ?>"><?= e($emoji) ?> <span class="tepki-adet"><?= count($info['ids']) ?></span></button>
                 <?php endforeach; ?>
                 <div class="acilir" data-acilir style="display:inline-block">
                     <button class="tepki-cip" data-acilir-btn title="Tepki ver">☺+</button>
                     <div class="acilir-panel" style="min-width:auto;display:flex;gap:2px;padding:5px">
                         <?php foreach (['👍', '❤️', '🎉', '🔥', '😂', '👀'] as $em): ?>
-                        <button class="tepki-sec" onclick="tepki(<?= $y['id'] ?>,'<?= $em ?>')"><?= $em ?></button>
+                        <button class="tepki-sec" onclick="reaction(<?= $y['id'] ?>,'<?= $em ?>')"><?= $em ?></button>
                         <?php endforeach; ?>
                     </div>
                 </div>
-                <?php if (!$answer): ?><button class="mini-btn" onclick="yanitAc(<?= $y['id'] ?>)">Yanıtla</button><?php endif; ?>
-                <?php if ($benimki): ?><button class="mini-btn" onclick="yorumDuzenle(<?= $y['id'] ?>)">Düzenle</button><?php endif; ?>
+                <?php if (!$answer): ?><button class="mini-btn" onclick="answerOpen(<?= $y['id'] ?>)">Yanıtla</button><?php endif; ?>
+                <?php if ($benimki): ?><button class="mini-btn" onclick="commentEdit(<?= $y['id'] ?>)">Düzenle</button><?php endif; ?>
                 <?php if ($silebilir): ?><button class="mini-btn" style="color:var(--tehlike)" data-action="comment_box_delete" data-id="<?= $y['id'] ?>" data-approval="Yorum silinsin mi?">Sil</button><?php endif; ?>
             </div>
         </div>

@@ -32,7 +32,7 @@ page_start('Proje Şablonları', 'ptemplates');
         <div class="satir-esnek arasi mb-2">
             <div><div class="kart-baslik" style="font-size:16px"><?= e($ps['name']) ?></div><?php if ($ps['description']): ?><div class="hucre-alt mt-1"><?= e($ps['description']) ?></div><?php endif; ?></div>
             <div class="satir-esnek" style="gap:4px">
-                <button class="ikon-eylem" onclick='psDuzenle(<?= json_encode($ps, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 16) ?></button>
+                <button class="ikon-eylem" onclick='psEdit(<?= json_encode($ps, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 16) ?></button>
                 <button class="ikon-eylem tehlike" data-action="ptemplate_delete" data-id="<?= $ps['id'] ?>" data-approval="Şablon silinsin mi? (Mevcut projeler etkilenmez)"><?= icon('cop', 16) ?></button>
             </div>
         </div>
@@ -55,7 +55,7 @@ page_start('Proje Şablonları', 'ptemplates');
 <?php endif; ?>
 
 <div class="modal-katman" id="modalPS">
-    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik" id="psTitle">Yeni Proje Şablonu</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik" id="psTitle">Yeni Proje Şablonu</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="ptemplate_save" id="psForm">
         <input type="hidden" name="id" id="ps_id"><input type="hidden" name="tasks" id="ps_tasks">
         <div class="modal-govde">
@@ -69,7 +69,7 @@ page_start('Proje Şablonları', 'ptemplates');
                 <button type="button" class="btn btn-sm btn-hayalet mt-2" onclick="psTaskAdd()">+ Görev Ekle</button>
             </div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 

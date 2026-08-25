@@ -67,11 +67,11 @@ page_start($task['title'], 'tasks');
         <div class="akis-adim <?= $a['status'] === 'tamam' ? 'tamam' : ($a['status'] === 'aktif' ? 'aktif' : '') ?>" data-step="<?= $a['id'] ?>" data-sort_order="<?= $i + 1 ?>">
             <div class="akis-cizgi"></div>
             <div class="akis-adim-ic">
-                <button class="akis-yuvarlak" onclick="adimTamamla(<?= $a['id'] ?>)" title="Tamamla / geri al">
+                <button class="akis-yuvarlak" onclick="stepComplete(<?= $a['id'] ?>)" title="Tamamla / geri al">
                     <?php if ($a['status'] === 'tamam'): ?><svg width="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg><?php else: ?><?= $i + 1 ?><?php endif; ?>
                 </button>
                 <div class="akis-ad"><?= e($a['name']) ?></div>
-                <button class="akis-sorumlu" onclick="adimSorumlu(<?= $a['id'] ?>)" style="cursor:pointer"><?= $a['owner_name'] ? e(explode(' ', $a['owner_name'])[0]) : '+ sorumlu' ?></button>
+                <button class="akis-sorumlu" onclick="stepOwner(<?= $a['id'] ?>)" style="cursor:pointer"><?= $a['owner_name'] ? e(explode(' ', $a['owner_name'])[0]) : '+ sorumlu' ?></button>
             </div>
         </div>
         <?php endforeach; ?>
@@ -96,7 +96,7 @@ page_start($task['title'], 'tasks');
             <div class="dikey" style="gap:2px" id="checkList">
                 <?php foreach ($checks as $k): ?>
                 <div class="kontrol-oge <?= $k['is_done'] ? 'tamam' : '' ?>">
-                    <input type="checkbox" <?= $k['is_done'] ? 'checked' : '' ?> onchange="kontrolToggle(<?= $k['id'] ?>, this)">
+                    <input type="checkbox" <?= $k['is_done'] ? 'checked' : '' ?> onchange="checkToggle(<?= $k['id'] ?>, this)">
                     <span class="kontrol-metin"><?= e($k['name']) ?></span>
                     <button class="ikon-eylem tehlike" style="width:26px;height:26px" data-action="check_delete" data-id="<?= $k['id'] ?>" data-approval="Madde silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="13"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
@@ -220,20 +220,20 @@ page_start($task['title'], 'tasks');
 
 <!-- Add Drive link -->
 <div class="modal-katman" id="modalDriveLink">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Drive Linki Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Drive Linki Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="archive_link_add">
         <input type="hidden" name="task_id" value="<?= $id ?>"><input type="hidden" name="project_id" value="<?= $task['project_id'] ?>">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Bağlantı Adı</label><input name="name" class="girdi" placeholder="Örn. Kurgu v2 — final klasörü"></div>
             <div class="form-grup"><label class="form-etiket">Drive Linki <span class="zorunlu">*</span></label><input name="url" class="girdi" required placeholder="https://drive.google.com/..."><div class="form-ipucu">İş teslimlerinde dosya yüklemek yerine Drive klasör/dosya linki bırakın.</div></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Ekle</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Ekle</button></div>
     </form></div>
 </div>
 
 <!-- Modals -->
 <div class="modal-katman" id="modalTime">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Zaman Kaydı Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Zaman Kaydı Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="time_add" data-refresh="evet">
         <input type="hidden" name="task_id" value="<?= $id ?>">
         <div class="modal-govde">
@@ -244,12 +244,12 @@ page_start($task['title'], 'tasks');
             <div class="form-grup"><label class="form-etiket">Tarih</label><input type="date" name="date" class="girdi" value="<?= date('Y-m-d') ?>"></div>
             <div class="form-grup"><label class="form-etiket">Açıklama</label><input name="description" class="girdi" placeholder="Ne üzerinde çalıştınız?"></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 
 <div class="modal-katman" id="modalTaskDuzen">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Görevi Düzenle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Görevi Düzenle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="task_save">
         <input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="project_id" value="<?= $task['project_id'] ?>">
         <div class="modal-govde">
@@ -289,18 +289,18 @@ page_start($task['title'], 'tasks');
         <div class="modal-alt">
             <button type="button" class="btn btn-tehlike" data-action="gorev_sil" data-id="<?= $id ?>" data-approval="Görev silinsin mi?" data-redirect="project.php?id=<?= $task['project_id'] ?>" style="margin-right:auto">Sil</button>
             <button type="button" class="btn" data-action="task_archive" data-id="<?= $id ?>" data-approval="<?= $task['is_archived'] ? 'Görev arşivden çıkarılsın mı?' : 'Görev arşive taşınsın mı?' ?>"><?= icon('box', 14) ?> <?= $task['is_archived'] ? 'Arşivden Çıkar' : 'Arşivle' ?></button>
-            <button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button>
+            <button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button>
         </div>
     </form></div>
 </div>
 
 <!-- Step owner assignment -->
 <div class="modal-katman" id="modalStepOwner">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Adım Sorumlusu</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Adım Sorumlusu</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="step_owner" data-refresh="evet">
         <input type="hidden" name="id" id="stepOwnerId">
         <div class="modal-govde"><div class="form-grup"><label class="form-etiket">Sorumlu Kişi</label><select name="owner_id" class="secim"><option value="">— Kaldır</option><?php foreach ($team as $k): ?><option value="<?= $k['id'] ?>"><?= e($k['name']) ?></option><?php endforeach; ?></select></div></div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Ata</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Ata</button></div>
     </form></div>
 </div>
 
@@ -309,7 +309,7 @@ page_start($task['title'], 'tasks');
 window.sadaLive = { context: 'task', id: <?= $id ?>, hash: '<?= live_hash_task($id) ?>' };
 const CHECK_SVG = '<svg width="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>';
 
-async function durumDegistir(durum) {
+async function statusChange(status) {
     const j = await api('task_status', { id: <?= $id ?>, status });
     if (j.ok) { toast('Durum güncellendi', 'basari'); liveRefresh(); setTimeout(() => location.reload(), 450); }
     else setTimeout(() => location.reload(), 1600); // if the lock rejected it, revert to the old value
@@ -355,7 +355,7 @@ async function checkAdd(e) {
         const bos = list.querySelector('.text-muted'); if (bos) bos.remove();
         const div = document.createElement('div');
         div.className = 'kontrol-oge';
-        div.innerHTML = `<input type="checkbox" onchange="kontrolToggle(${j.id}, this)"><span class="kontrol-metin"></span><button class="ikon-eylem tehlike" style="width:26px;height:26px" data-action="check_delete" data-id="${j.id}" data-onay="Madde silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="13"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
+        div.innerHTML = `<input type="checkbox" onchange="checkToggle(${j.id}, this)"><span class="kontrol-metin"></span><button class="ikon-eylem tehlike" style="width:26px;height:26px" data-action="check_delete" data-id="${j.id}" data-onay="Madde silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="13"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
         div.querySelector('.check-text').textContent = j.name;
         list.appendChild(div);
         checkSummary();
@@ -374,7 +374,7 @@ async function lockToggle() {
 }
 </script>
 <div class="modal-katman" id="modalAiSummary">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">🪄 Görev Özeti</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">🪄 Görev Özeti</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde"><div class="kucuk metin-2" id="aiSummaryText" style="white-space:pre-wrap;line-height:1.7">Özet hazırlanıyor...</div></div></div>
 </div>
 <script>

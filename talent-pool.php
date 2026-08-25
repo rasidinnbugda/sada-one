@@ -58,7 +58,7 @@ page_start('Çalışan Havuzu', 'pool');
 <?php endif; ?>
 
 <div class="modal-katman" id="modalPool">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="hBaslik">Havuza Kişi Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="hBaslik">Havuza Kişi Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="pool_save">
         <input type="hidden" name="id" id="h_id">
         <div class="modal-govde">
@@ -71,7 +71,7 @@ page_start('Çalışan Havuzu', 'pool');
             <div class="form-grup"><label class="form-etiket">CV (PDF/DOC)</label><input type="file" name="cv" class="girdi" accept=".pdf,.doc,.docx"><div class="form-ipucu" id="h_cvBilgi"></div></div>
             <div class="form-grup"><label class="form-etiket">Not</label><textarea name="note" id="h_note" class="metin-alani" placeholder="Gözlemler, ücret bilgisi, referans..."></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 

@@ -23,7 +23,7 @@ page_start('Akış Şablonları', 'workflows');
         <div class="satir-esnek arasi mb-2">
             <div><div class="kart-baslik" style="font-size:16px"><?= e($s['name']) ?></div><?php if ($s['description']): ?><div class="hucre-alt mt-1"><?= e($s['description']) ?></div><?php endif; ?></div>
             <div class="satir-esnek" style="gap:4px">
-                <button class="ikon-eylem" onclick='akisDuzenle(<?= json_encode($s, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
+                <button class="ikon-eylem" onclick='workflowEdit(<?= json_encode($s, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
                 <button class="ikon-eylem tehlike" data-action="workflow_delete" data-id="<?= $s['id'] ?>" data-approval="Şablon silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="M19 7l-.9 12a2 2 0 01-2 1.9H7.9a2 2 0 01-2-1.9L5 7m14 0H5m5 4v6m4-6v6"/></svg></button>
             </div>
         </div>
@@ -41,7 +41,7 @@ page_start('Akış Şablonları', 'workflows');
 <?php endif; ?>
 
 <div class="modal-katman" id="modalWorkflow">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="workflowTitle">Yeni Akış Şablonu</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="workflowTitle">Yeni Akış Şablonu</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="workflow_save" id="workflowForm">
         <input type="hidden" name="id" id="a_id"><input type="hidden" name="steps" id="a_steps">
         <div class="modal-govde">
@@ -53,7 +53,7 @@ page_start('Akış Şablonları', 'workflows');
                 <button type="button" class="btn btn-sm btn-hayalet mt-2" onclick="stepAdd()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Adım Ekle</button>
             </div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 
@@ -64,8 +64,8 @@ function adimSatiri(setting_value = '') {
     div.style.gap = '8px';
     div.setAttribute('data-siralanabilir', '');
     div.innerHTML = `<span class="sira-oklar">
-        <button type="button" class="sira-ok" data-sira-yon="yukari" title="Yukarı taşı"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7"/></svg></button>
-        <button type="button" class="sira-ok" data-sira-yon="asagi" title="Aşağı taşı"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg></button>
+        <button type="button" class="sira-ok" data-sort-dir="yukari" title="Yukarı taşı"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7"/></svg></button>
+        <button type="button" class="sira-ok" data-sort-dir="asagi" title="Aşağı taşı"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg></button>
     </span><input class="girdi adim-input" value="${setting_value.replace(/"/g,'&quot;')}" placeholder="Adım adı"><button type="button" class="ikon-eylem tehlike" onclick="this.parentElement.remove()"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="16"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
     document.getElementById('stepList').appendChild(div);
 }

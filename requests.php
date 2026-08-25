@@ -56,13 +56,13 @@ page_start('Talepler', 'requests');
 
 <!-- New request modal: pick form type → fill in the fields -->
 <div class="modal-katman" id="modalNewRequest">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Talep</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Talep</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde">
         <div id="talepAdim1">
             <div class="hucre-alt mb-3">Ne tür bir talep oluşturmak istiyorsunuz?</div>
             <div class="izgara izgara-2">
                 <?php foreach ($forms as $f): ?>
-                <button class="kart kart-tik" style="text-align:left;padding:16px" onclick="talepFormAc(<?= $f['id'] ?>)">
+                <button class="kart kart-tik" style="text-align:left;padding:16px" onclick="requestFormOpen(<?= $f['id'] ?>)">
                     <div class="kalin"><?= e($f['name']) ?></div>
                     <?php if ($f['description']): ?><div class="hucre-alt mt-1"><?= e($f['description']) ?></div><?php endif; ?>
                 </button>

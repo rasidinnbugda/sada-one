@@ -78,7 +78,7 @@ page_start('İçerik Takvimi', 'content');
             <div class="takvim-gun-no"><?= $day ?></div>
             <?php foreach ($contentGunleri[$day] ?? [] as $internal):
                 $statusColor = ['taslak' => 'var(--muted)', 'internal_approval' => 'var(--info)', 'customer_approval' => 'var(--warning)', 'revize' => 'var(--info)', 'onaylandi' => 'var(--basari)', 'yayinlandi' => 'var(--marka)'][$internal['status']]; ?>
-            <div class="takvim-etkinlik" draggable="<?= permission('icerik_yonet') ? 'true' : 'false' ?>" data-content="<?= $internal['id'] ?>" onclick="event.stopPropagation();icerikGoster(<?= $internal['id'] ?>)" style="border-color:<?= $statusColor ?>;background:color-mix(in srgb, <?= $statusColor ?> 14%, transparent);color:<?= $statusColor ?>" title="<?= e($internal['title']) ?> · <?= e($internal['client_name'] ?? '') ?>"><?= platform_badges($internal['platform'], true) ?> <?= e($internal['title']) ?></div>
+            <div class="takvim-etkinlik" draggable="<?= permission('icerik_yonet') ? 'true' : 'false' ?>" data-content="<?= $internal['id'] ?>" onclick="event.stopPropagation();contentShow(<?= $internal['id'] ?>)" style="border-color:<?= $statusColor ?>;background:color-mix(in srgb, <?= $statusColor ?> 14%, transparent);color:<?= $statusColor ?>" title="<?= e($internal['title']) ?> · <?= e($internal['client_name'] ?? '') ?>"><?= platform_badges($internal['platform'], true) ?> <?= e($internal['title']) ?></div>
             <?php endforeach; ?>
         </div>
         <?php endfor; ?>
@@ -94,7 +94,7 @@ page_start('İçerik Takvimi', 'content');
 
 <?php if (permission('icerik_yonet')): ?>
 <div class="modal-katman" id="modalContent">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">İçerik Planla</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">İçerik Planla</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="content_save" data-refresh="evet" id="contentForm">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Başlık <span class="zorunlu">*</span></label><input name="title" class="girdi" required></div>
@@ -120,14 +120,14 @@ page_start('İçerik Takvimi', 'content');
             <div class="form-grup"><label class="form-etiket">Durum</label><select name="status" class="secim"><?php foreach (CONTENT_STATUSES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
             <div class="form-grup"><label class="form-etiket">Açıklama / Metin</label><textarea name="description" class="metin-alani" placeholder="Gönderi metni, hashtag'ler..."></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Planla</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Planla</button></div>
     </form></div>
 </div>
 <?php endif; ?>
 
 <!-- Content detail -->
 <div class="modal-katman" id="modalContentDetay">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="idTitle"></div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="idTitle"></div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde" id="idBody"></div>
     </div>
 </div>
@@ -154,7 +154,7 @@ function contentShow(id) {
     const internal = contents[id]; if (!internal) return;
     document.getElementById('idTitle').textContent = internal.title;
     const platformList = (internal.platform || '').split(',').map(pl => `${platformIcon[pl] || ''} ${platforms[pl] || pl}`).join(' · ');
-    let statusSelect = `<select class="secim mt-2" onchange="icDurumDegistir(${id},this.value)">`;
+    let statusSelect = `<select class="secim mt-2" onchange="internalStatusChange(${id},this.value)">`;
     for (const k in internalStatus) statusSelect += `<option value="${k}" ${internal.status === k ? 'selected' : ''}>${internalStatus[k]}</option>`;
     statusSelect += `</select>`;
     let h = `<div class="dikey" style="gap:12px">
@@ -165,8 +165,8 @@ function contentShow(id) {
         <div><div class="hucre-alt mb-2">Durum</div>${statusSelect}</div>`;
     if (internal.description) h += `<div><div class="hucre-alt mb-2">İçerik</div><div class="kucuk metin-2" style="white-space:pre-wrap">${internal.description.replace(/</g, '&lt;')}</div></div>`;
     if (internal.task_id) h += `<a href="task.php?id=${internal.task_id}" class="btn btn-sm mt-2" style="margin-right:6px">Bağlı göreve git →</a>`;
-    if (contentManager) h += `<div class="satir-esnek mt-2" style="gap:8px"><input type="date" class="girdi" id="icTasiTarih" value="${internal.date}" style="max-width:150px"><input type="time" class="girdi" id="icTasiSaat" value="${(internal.time||'').slice(0,5)}" style="max-width:110px"><button class="btn btn-sm" onclick="icTasi(${id})">Tarihi Güncelle</button></div>`;
-    if (contentManager) h += `<button class="btn btn-tehlike btn-sm mt-2" onclick="icSil(${id})">İçeriği Sil</button>`;
+    if (contentManager) h += `<div class="satir-esnek mt-2" style="gap:8px"><input type="date" class="girdi" id="internalMoveDate" value="${internal.date}" style="max-width:150px"><input type="time" class="girdi" id="internalMoveTime" value="${(internal.time||'').slice(0,5)}" style="max-width:110px"><button class="btn btn-sm" onclick="internalMove(${id})">Tarihi Güncelle</button></div>`;
+    if (contentManager) h += `<button class="btn btn-tehlike btn-sm mt-2" onclick="internalDelete(${id})">İçeriği Sil</button>`;
     h += `</div>`;
     document.getElementById('idBody').innerHTML = h;
     if (window.ozelPickerRefresh) ozelPickerRefresh();

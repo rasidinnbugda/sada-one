@@ -139,7 +139,7 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
             $genislik = ($b['last_kol'] - $b['initial_kol'] + 1) / 7 * 100; ?>
         <div class="takvim-bant <?= $b['soldan_ongoing'] ? 'devam-sol' : '' ?> <?= $b['sagdan_ongoing'] ? 'devam-sag' : '' ?>"
              style="left:calc(<?= $sol ?>% + 3px);width:calc(<?= $genislik ?>% - 6px);top:<?= 30 + $b['lane'] * 26 ?>px;--bant-renk:<?= $color ?>"
-             onclick="etkinlikGoster(<?= $e['id'] ?>)" title="<?= e($e['title']) ?> · <?= format_date(substr($e['start'], 0, 10)) ?> → <?= format_date(substr($e['end'], 0, 10)) ?>">
+             onclick="eventShow(<?= $e['id'] ?>)" title="<?= e($e['title']) ?> · <?= format_date(substr($e['start'], 0, 10)) ?> → <?= format_date(substr($e['end'], 0, 10)) ?>">
             <?= $b['soldan_ongoing'] ? '◂ ' : '' ?><?= e($e['title']) ?><?= $b['sagdan_ongoing'] ? ' ▸' : '' ?>
         </div>
         <?php endforeach; ?>
@@ -148,10 +148,10 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
             if ($day === null): ?><div class="takvim-hucre bos"></div><?php continue; endif;
             $today = ($day == date('j') && $month == date('n') && $year == date('Y'));
             $dateStr = sprintf('%04d-%02d-%02d', $year, $month, $day); ?>
-        <div class="takvim-hucre <?= $today ? 'bugun' : '' ?>" data-date="<?= $dateStr ?>" onclick="etkinlikEkle('<?= $dateStr ?>')" style="cursor:pointer;padding-top:<?= 30 + $bantField ?>px">
+        <div class="takvim-hucre <?= $today ? 'bugun' : '' ?>" data-date="<?= $dateStr ?>" onclick="eventAdd('<?= $dateStr ?>')" style="cursor:pointer;padding-top:<?= 30 + $bantField ?>px">
             <div class="takvim-gun-no" style="position:absolute;top:8px;right:10px"><?= $day ?></div>
             <?php foreach ($tekGunluk[$day] ?? [] as $e): ?>
-            <div class="takvim-etkinlik <?= $e['type'] ?>" draggable="true" data-event="<?= $e['id'] ?>" onclick="event.stopPropagation();etkinlikGoster(<?= $e['id'] ?>)" title="<?= e($e['title']) ?>"><?= date('H:i', strtotime($e['start'])) ?> <?= e($e['title']) ?></div>
+            <div class="takvim-etkinlik <?= $e['type'] ?>" draggable="true" data-event="<?= $e['id'] ?>" onclick="event.stopPropagation();eventShow(<?= $e['id'] ?>)" title="<?= e($e['title']) ?>"><?= date('H:i', strtotime($e['start'])) ?> <?= e($e['title']) ?></div>
             <?php endforeach; ?>
         </div>
         <?php endforeach; ?>
@@ -169,7 +169,7 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
 
 <!-- Add event -->
 <div class="modal-katman" id="modalEvent">
-    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Yeni Etkinlik</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Yeni Etkinlik</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="event_save" data-refresh="evet" id="eventForm">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Başlık <span class="zorunlu">*</span></label><input name="title" class="girdi" required id="et_title"></div>
@@ -213,15 +213,15 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
             <?php endif; ?>
             <div class="form-grup"><label class="form-etiket">Not</label><textarea name="description" class="metin-alani"></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 
 <!-- Event detail -->
 <div class="modal-katman" id="modalEventDetay">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="edTitle"></div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="edTitle"></div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde" id="edBody"></div>
-    <div class="modal-alt"><button type="button" class="btn btn-tehlike" id="edDelete">Sil</button><button type="button" class="btn btn-hayalet" data-modal-kapat>Kapat</button></div>
+    <div class="modal-alt"><button type="button" class="btn btn-tehlike" id="edDelete">Sil</button><button type="button" class="btn btn-hayalet" data-modal-close>Kapat</button></div>
     </div>
 </div>
 
@@ -252,7 +252,7 @@ function eventShow(id) {
     if (e.equipment && e.equipment.length) {
         h += `<div><div class="satir-esnek arasi mb-2"><span class="hucre-alt">Ekipmanlar (${e.equipment.length})</span>`;
         const disarida = e.equipment.some(k => k.status === 'cekimde');
-        if (disarida) h += `<button class="mini-btn" onclick="ekipmanIade(${id})">Tümünü iade al</button>`;
+        if (disarida) h += `<button class="mini-btn" onclick="equipmentReturn(${id})">Tümünü iade al</button>`;
         h += `</div>`;
         e.equipment.forEach(k => {
             const badge = k.status === 'cekimde' ? '<span class="rozet r-bekliyor">Çekimde</span>' : '<span class="rozet r-onaylandi">Stüdyoda</span>';
@@ -263,7 +263,7 @@ function eventShow(id) {
     if (e.description) h += `<div><div class="hucre-alt mb-2">Not</div><div class="kucuk metin-2">${e.description.replace(/</g, '&lt;')}</div></div>`;
     if (e.shopping_list) h += `<div><div class="hucre-alt mb-2">🛒 Alınacaklar</div><div class="kucuk metin-2" style="white-space:pre-wrap">${e.shopping_list.replace(/</g, '&lt;')}</div></div>`;
     if (e.needs_list) h += `<div><div class="hucre-alt mb-2">📋 İhtiyaç Listesi</div><div class="kucuk metin-2" style="white-space:pre-wrap">${e.needs_list.replace(/</g, '&lt;')}</div></div>`;
-    h += `<div><div class="hucre-alt mb-2">Tarihi Değiştir</div><div class="satir-esnek sarma" style="gap:8px"><input type="datetime-local" class="girdi" id="etTasiBas" value="${e.start.replace(' ', 'T').slice(0,16)}" style="max-width:200px"><input type="datetime-local" class="girdi" id="etTasiBit" value="${e.end ? e.end.replace(' ', 'T').slice(0,16) : ''}" style="max-width:200px"><button class="btn btn-sm" onclick="etTasi(${id})">Güncelle</button></div></div>`;
+    h += `<div><div class="hucre-alt mb-2">Tarihi Değiştir</div><div class="satir-esnek sarma" style="gap:8px"><input type="datetime-local" class="girdi" id="etMoveStart" value="${e.start.replace(' ', 'T').slice(0,16)}" style="max-width:200px"><input type="datetime-local" class="girdi" id="etMoveEnd" value="${e.end ? e.end.replace(' ', 'T').slice(0,16) : ''}" style="max-width:200px"><button class="btn btn-sm" onclick="etMove(${id})">Güncelle</button></div></div>`;
     h += `</div>`;
     document.getElementById('edBody').innerHTML = h;
     if (window.ozelPickerRefresh) ozelPickerRefresh();
@@ -277,7 +277,7 @@ function eventShow(id) {
     modalOpen('modalEventDetay');
 }
 async function etMove(id) {
-    const bEl = document.getElementById('etMoveInitial'), tEl = document.getElementById('etMoveBit');
+    const bEl = document.getElementById("etMoveStart"), tEl = document.getElementById("etMoveEnd");
     const bV = bEl.dataset.setting_value ?? bEl.value, tV = tEl.dataset.setting_value ?? tEl.value;
     const j = await api('event_move', { id, start: bV.replace('T', ' '), end: tV.replace('T', ' ') });
     if (j.ok) { toast(j.message, 'basari'); setTimeout(() => location.reload(), 600); }

@@ -63,9 +63,9 @@ page_start('Randevular', 'appointments');
 
         <?php if (is_pm() && $r['status'] === 'bekliyor'): ?>
         <div class="dikey" style="gap:6px;flex-shrink:0;min-width:150px">
-            <button class="btn btn-marka btn-sm btn-blok" onclick="randevuOnayla(<?= $r['id'] ?>)">✓ Onayla</button>
-            <button class="btn btn-sm btn-blok" onclick="randevuAlternatif(<?= $r['id'] ?>)"><?= icon('repeat', 13) ?> Farklı Saat Öner</button>
-            <button class="btn btn-tehlike btn-sm btn-blok" onclick="randevuReddet(<?= $r['id'] ?>)">✕ Reddet</button>
+            <button class="btn btn-marka btn-sm btn-blok" onclick="appointmentApprove(<?= $r['id'] ?>)">✓ Onayla</button>
+            <button class="btn btn-sm btn-blok" onclick="appointmentAlternative(<?= $r['id'] ?>)"><?= icon('repeat', 13) ?> Farklı Saat Öner</button>
+            <button class="btn btn-tehlike btn-sm btn-blok" onclick="appointmentReject(<?= $r['id'] ?>)">✕ Reddet</button>
         </div>
         <?php elseif (is_customer() && $r['status'] === 'alternatif'): ?>
         <div class="dikey" style="gap:6px;flex-shrink:0">
@@ -79,7 +79,7 @@ page_start('Randevular', 'appointments');
 <?php if (is_customer()): ?>
 <!-- Appointment request modal -->
 <div class="modal-katman" id="modalAppointment">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Randevu Talep Et</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Randevu Talep Et</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="appointment_create">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Konu <span class="zorunlu">*</span></label><input name="topic" class="girdi" required placeholder="Örn. Ekim kampanyası planlaması"></div>
@@ -92,7 +92,7 @@ page_start('Randevular', 'appointments');
             <div class="form-grup"><label class="satir-esnek" style="gap:9px;cursor:pointer"><input type="checkbox" name="online_request" value="1" checked> <span class="kucuk"><b>Online görüşme tercih ederim</b> (Meet/Zoom linki tarafımıza iletilir)</span></label></div>
             <div class="form-grup"><label class="form-etiket">Not</label><textarea name="notes" class="metin-alani" placeholder="Görüşmek istediğiniz detaylar..."></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Talebi Gönder</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Talebi Gönder</button></div>
     </form></div>
 </div>
 <?php endif; ?>
@@ -100,35 +100,35 @@ page_start('Randevular', 'appointments');
 <?php if (is_pm()): ?>
 <!-- Approve modal -->
 <div class="modal-katman" id="modalROnay">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Randevuyu Onayla</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Randevuyu Onayla</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="appointment_respond">
         <input type="hidden" name="id" id="ro_id"><input type="hidden" name="operation" value="onayla">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Online Toplantı Linki</label><input name="online_link" class="girdi" placeholder="Meet/Zoom linki (online istekse)"><div class="form-ipucu">Girilirse müşteri "Katıl" butonunu görür.</div></div>
             <div class="form-grup"><label class="form-etiket">Not</label><input name="not" class="girdi" placeholder="Opsiyonel"></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Onayla & Takvime Ekle</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Onayla & Takvime Ekle</button></div>
     </form></div>
 </div>
 <!-- Alternative time modal -->
 <div class="modal-katman" id="modalRAlt">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Farklı Saat Öner</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Farklı Saat Öner</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="appointment_respond">
         <input type="hidden" name="id" id="ra_id"><input type="hidden" name="operation" value="alternatif">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Önerilen Tarih/Saat <span class="zorunlu">*</span></label><input type="datetime-local" name="alternative_date" class="girdi" required min="<?= date('Y-m-d\TH:i') ?>"></div>
             <div class="form-grup"><label class="form-etiket">Not</label><input name="not" class="girdi" placeholder="Örn. o saatte çekimdeyiz, bu saat uygun mu?"></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Öner</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Öner</button></div>
     </form></div>
 </div>
 <!-- Reject modal -->
 <div class="modal-katman" id="modalRRed">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Talebi Reddet</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Talebi Reddet</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="appointment_respond">
         <input type="hidden" name="id" id="rr_id"><input type="hidden" name="operation" value="reddet">
         <div class="modal-govde"><div class="form-grup"><label class="form-etiket">Neden <span class="zorunlu">*</span></label><input name="not" class="girdi" required placeholder="Müşteriye iletilecek açıklama"></div></div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-tehlike">Reddet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-tehlike">Reddet</button></div>
     </form></div>
 </div>
 <script>

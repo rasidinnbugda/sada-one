@@ -127,7 +127,7 @@ page_start('Finans', 'finance');
         <td class="kalin"><?= money($o['amount']) ?></td>
         <td class="kucuk"><?= format_date($o['date']) ?></td>
         <td>
-            <select class="secim" style="padding:5px 28px 5px 10px;font-size:12px;width:auto" onchange="odemeDurum(<?= $o['id'] ?>,this.value)">
+            <select class="secim" style="padding:5px 28px 5px 10px;font-size:12px;width:auto" onchange="paymentStatus(<?= $o['id'] ?>,this.value)">
                 <?php foreach (['bekliyor' => 'Bekliyor', 'odendi' => 'Ödendi', 'overdue' => 'Gecikti'] as $k => $v): ?><option value="<?= $k ?>" <?= $o['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
             </select>
         </td>
@@ -157,7 +157,7 @@ page_start('Finans', 'finance');
             <td><span class="rozet"><?= EXPENSE_TYPES[$gd['type']] ?></span></td>
             <td class="kalin" style="color:var(--tehlike)">−<?= money($gd['amount']) ?></td>
             <td class="kucuk"><?= format_date($gd['date']) ?></td>
-            <td><select class="secim" style="padding:5px 28px 5px 10px;font-size:12px;width:auto" onchange="giderDurum(<?= $gd['id'] ?>,this.value)"><option value="bekliyor" <?= $gd['status'] === 'bekliyor' ? 'selected' : '' ?>>Bekliyor</option><option value="odendi" <?= $gd['status'] === 'odendi' ? 'selected' : '' ?>>Ödendi</option></select></td>
+            <td><select class="secim" style="padding:5px 28px 5px 10px;font-size:12px;width:auto" onchange="expenseStatus(<?= $gd['id'] ?>,this.value)"><option value="bekliyor" <?= $gd['status'] === 'bekliyor' ? 'selected' : '' ?>>Bekliyor</option><option value="odendi" <?= $gd['status'] === 'odendi' ? 'selected' : '' ?>>Ödendi</option></select></td>
             <td><button class="ikon-eylem tehlike" data-action="expense_delete" data-id="<?= $gd['id'] ?>" data-approval="Gider silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="16"><path d="M19 7l-.9 12a2 2 0 01-2 1.9H7.9a2 2 0 01-2-1.9L5 7m14 0H5m5 4v6m4-6v6"/></svg></button></td>
         </tr>
         <?php endforeach; ?>
@@ -182,7 +182,7 @@ page_start('Finans', 'finance');
             <td class="kucuk"><?= e($bg['client_name'] ?? '—') ?></td>
             <td class="kalin"><?= money($bg['total']) ?></td>
             <td>
-                <select class="secim native-kal" style="padding:5px 28px 5px 10px;font-size:12px;width:auto" onchange="belgeDurum(<?= $bg['id'] ?>,this.value)">
+                <select class="secim native-kal" style="padding:5px 28px 5px 10px;font-size:12px;width:auto" onchange="documentStatus(<?= $bg['id'] ?>,this.value)">
                     <?php foreach (['taslak' => 'Taslak', 'gonderildi' => 'Gönderildi', 'onaylandi' => 'Onaylandı', 'reddedildi' => 'Reddedildi'] as $k => $v): ?><option value="<?= $k ?>" <?= $bg['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
                 </select>
             </td>
@@ -337,7 +337,7 @@ page_start('Finans', 'finance');
 </div><!-- /sekme-kap -->
 
 <div class="modal-katman" id="modalPayment">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Finans Kaydı</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Finans Kaydı</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="payment_save">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Başlık <span class="zorunlu">*</span></label><input name="title" class="girdi" required placeholder="Örn. Ekim ayı hizmet bedeli"></div>
@@ -352,12 +352,12 @@ page_start('Finans', 'finance');
             </div>
             <div class="form-grup"><label class="form-etiket">Açıklama</label><input name="description" class="girdi"></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 <!-- Add expense modal -->
 <div class="modal-katman" id="modalExpense">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Gider Kaydı</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Gider Kaydı</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="expense_save">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Başlık <span class="zorunlu">*</span></label><input name="title" class="girdi" required placeholder="Örn. Ofis kirası"></div>
@@ -372,13 +372,13 @@ page_start('Finans', 'finance');
             <div class="form-grup"><label class="satir-esnek" style="gap:9px;cursor:pointer"><input type="checkbox" name="repeat" value="aylik"> <span class="kucuk"><b>Her ay tekrarla</b> — kira/abonelik gibi giderler her ay başında otomatik oluşur</span></label></div>
             <div class="form-grup"><label class="form-etiket">Açıklama</label><input name="description" class="girdi"></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 
 <!-- Create quote/invoice modal -->
 <div class="modal-katman" id="modalDocument">
-    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Yeni Teklif / Fatura</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Yeni Teklif / Fatura</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="document_save" id="documentForm">
         <input type="hidden" name="items" id="b_items">
         <div class="modal-govde">
@@ -398,7 +398,7 @@ page_start('Finans', 'finance');
             </div>
             <div class="form-grup"><label class="form-etiket">Notlar</label><textarea name="notes" class="metin-alani" placeholder="Ödeme koşulları, teslim süresi vb."></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
     </form></div>
 </div>
 

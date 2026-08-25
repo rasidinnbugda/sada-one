@@ -44,14 +44,14 @@ page_start('Duyurular', 'duyurular');
 
 <?php if (is_pm()): ?>
 <div class="modal-katman" id="modalAnnouncement">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Duyuru</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Duyuru</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="announcement_save">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Başlık <span class="zorunlu">*</span></label><input name="title" class="girdi" required></div>
             <div class="form-grup"><label class="form-etiket">Metin</label><textarea name="text" class="metin-alani"></textarea></div>
             <div class="form-grup"><label class="satir-esnek" style="gap:9px;cursor:pointer"><input type="checkbox" name="is_important" value="1"> <span class="kucuk"><b>Önemli duyuru</b> — tüm ekibe bildirim gönderilir</span></label></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Yayınla</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Yayınla</button></div>
     </form></div>
 </div>
 <?php endif; ?>

@@ -85,7 +85,7 @@ page_start('Ekipman', 'ekipman');
                 <span class="kucuk kalin satir-esnek" style="gap:6px"><?= icon('sd_kart', 13) ?> <?= SD_DURUMLARI[$ek['sd_status'] ?: 'bos'] ?></span>
                 <span class="satir-esnek" style="gap:4px">
                     <?php if (($ek['sd_status'] ?: 'bos') === 'bos'): ?>
-                    <button class="mini-btn" onclick="sdDolu(<?= $ek['id'] ?>)">Dolu işaretle</button>
+                    <button class="mini-btn" onclick="sdFull(<?= $ek['id'] ?>)">Dolu işaretle</button>
                     <?php elseif ($ek['sd_status'] === 'dolu'): ?>
                     <button class="mini-btn" onclick="sdAktar(<?= $ek['id'] ?>)">Drive'a aktarıldı</button>
                     <?php else: ?>
@@ -101,18 +101,18 @@ page_start('Ekipman', 'ekipman');
         <div class="satir-esnek sarma mt-2" style="gap:6px">
             <?php if ($ek['status'] === 'studyoda'): ?>
             <button class="btn btn-sm" data-action="equipment_custody" data-id="<?= $ek['id'] ?>">Zimmet Al</button>
-            <?php if ($can_manage): ?><button class="btn btn-sm btn-hayalet" onclick="zimmetVer(<?= $ek['id'] ?>, '<?= e($ek['name']) ?>')">Başkasına Ver</button><?php endif; ?>
+            <?php if ($can_manage): ?><button class="btn btn-sm btn-hayalet" onclick="custodyGive(<?= $ek['id'] ?>, '<?= e($ek['name']) ?>')">Başkasına Ver</button><?php endif; ?>
             <?php elseif (in_array($ek['status'], ['zimmette', 'cekimde']) && ($ek['custody_user_id'] == $u['id'] || $can_manage)): ?>
             <button class="btn btn-sm" style="color:var(--basari)" data-action="equipment_return" data-id="<?= $ek['id'] ?>">İade Et</button>
             <?php endif; ?>
             <?php if (!in_array($ek['status'], ['arizali', 'bakimda'])): ?>
-            <button class="btn btn-sm btn-hayalet" onclick="arizaBildir(<?= $ek['id'] ?>)"><?= icon('warning', 13) ?> Arıza</button>
+            <button class="btn btn-sm btn-hayalet" onclick="faultNotify(<?= $ek['id'] ?>)"><?= icon('warning', 13) ?> Arıza</button>
             <?php else: ?>
             <button class="btn btn-sm" style="color:var(--basari)" data-action="equipment_fault" data-id="<?= $ek['id'] ?>" data-status="studyoda" data-approval="Ekipman kullanıma dönsün mü?">✓ Düzeldi</button>
             <?php endif; ?>
-            <button class="btn btn-sm btn-hayalet" onclick="gecmisGoster(<?= $ek['id'] ?>, '<?= e(($ek['code'] ? $ek['code'] . ' — ' : '') . $ek['name']) ?>')">Geçmiş</button>
+            <button class="btn btn-sm btn-hayalet" onclick="historyShow(<?= $ek['id'] ?>, '<?= e(($ek['code'] ? $ek['code'] . ' — ' : '') . $ek['name']) ?>')">Geçmiş</button>
             <?php if ($can_manage): ?>
-            <button class="ikon-eylem" onclick='ekipmanDuzenle(<?= json_encode($ek, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)' title="Düzenle"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="15"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
+            <button class="ikon-eylem" onclick='equipmentEdit(<?= json_encode($ek, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)' title="Düzenle"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="15"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
             <?php endif; ?>
         </div>
     </div>
@@ -123,7 +123,7 @@ page_start('Ekipman', 'ekipman');
 <?php if ($can_manage): ?>
 <!-- Add/edit equipment -->
 <div class="modal-katman" id="modalEquipment">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="equipmentTitle">Yeni Ekipman</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="equipmentTitle">Yeni Ekipman</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="equipment_save" id="equipmentForm">
         <input type="hidden" name="id" id="e_id">
         <div class="modal-govde">
@@ -141,7 +141,7 @@ page_start('Ekipman', 'ekipman');
         </div>
         <div class="modal-alt">
             <button type="button" class="btn btn-tehlike gizli" id="equipmentDeleteBtn" style="margin-right:auto">Sil</button>
-            <button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button>
+            <button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button>
         </div>
     </form></div>
 </div>
@@ -149,57 +149,57 @@ page_start('Ekipman', 'ekipman');
 
 <!-- Assign custody (to someone else) -->
 <div class="modal-katman" id="modalCustody">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="custodyTitle">Zimmet Ver</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="custodyTitle">Zimmet Ver</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="equipment_custody">
         <input type="hidden" name="id" id="z_id">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Kime?</label><select name="user_id" class="secim"><?php foreach ($team as $k): ?><option value="<?= $k['id'] ?>"><?= e($k['name']) ?></option><?php endforeach; ?></select></div>
             <div class="form-grup"><label class="form-etiket">Not</label><input name="description" class="girdi" placeholder="Örn. hafta sonu çekimi için"></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Zimmetle</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Zimmetle</button></div>
     </form></div>
 </div>
 
 <!-- Report fault -->
 <div class="modal-katman" id="modalFault">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Arıza / Bakım Bildir</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Arıza / Bakım Bildir</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="equipment_fault">
         <input type="hidden" name="id" id="a_id">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Durum</label><select name="status" class="secim"><option value="arizali">Arızalı</option><option value="bakimda">Bakımda</option></select></div>
             <div class="form-grup"><label class="form-etiket">Açıklama <span class="zorunlu">*</span></label><textarea name="not" class="metin-alani" required placeholder="Arıza/bakım detayı..."></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 
 <!-- SD: mark as full -->
 <div class="modal-katman" id="modalSdFull">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Kartı Dolu İşaretle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Kartı Dolu İşaretle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="sd_update_row">
         <input type="hidden" name="id" id="sd_id"><input type="hidden" name="operation" value="dolu">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Hangi çekim / içerik? <span class="zorunlu">*</span></label><input name="content" class="girdi" required placeholder="Örn. Marka X fuar çekimi, 15 Temmuz"><div class="form-ipucu">Bu bilgi kartın geçmişinde arşivlenir.</div></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 
 <!-- SD: transferred to Drive -->
 <div class="modal-katman" id="modalSdAktar">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Drive'a Aktarıldı</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Drive'a Aktarıldı</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="sd_update_row">
         <input type="hidden" name="id" id="sda_id"><input type="hidden" name="operation" value="aktarildi">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Drive Klasör Linki</label><input name="drive_link" class="girdi" placeholder="https://drive.google.com/..."><div class="form-ipucu">Opsiyonel — girilirse kartın üzerinde tıklanabilir link görünür.</div></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 
 <!-- Activity history -->
 <div class="modal-katman" id="modalHistory">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="historyTitle">Hareket Geçmişi</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="historyTitle">Hareket Geçmişi</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde" id="historyBody"><div class="bos-mini">Yükleniyor...</div></div>
     </div>
 </div>

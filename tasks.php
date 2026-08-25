@@ -54,7 +54,7 @@ page_start('Görevler', 'tasks');
 <?php if ($my_steps):
     $activeStepCount = count(array_filter($my_steps, fn($a3) => $a3['step_status'] === 'aktif')); ?>
 <div class="kart mb-3 katla kapali" data-collapse="my_steps" style="border-color:var(--marka)">
-    <button class="kart-baslik" data-katla-btn type="button" style="display:flex;align-items:center;gap:9px;margin:0">
+    <button class="kart-baslik" data-collapse-btn type="button" style="display:flex;align-items:center;gap:9px;margin:0">
         <span class="katla-ok"><svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" width="14"><path d="M19 9l-7 7-7-7"/></svg></span>
         <?= icon('roket', 16) ?> Adımlarım <span class="rozet r-devam" style="padding:1px 9px"><?= $activeStepCount ?> sıra sende</span><span class="hucre-alt">· <?= count($my_steps) ?> adım</span>
     </button>
@@ -174,7 +174,7 @@ page_start('Görevler', 'tasks');
 <script>
 // Live sync: if someone else adds/moves a task, the list refreshes
 window.sadaLive = { context: 'list', hash: '<?= live_hash_list() ?>' };
-async function gorunumSec(g) {
+async function viewSec(g) {
     await api('view_preference', { gorunum: g });
     const url = new URL(location.href);
     url.searchParams.set('view', g);

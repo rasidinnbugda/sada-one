@@ -98,7 +98,7 @@ page_start('Toplantı Takvimi', 'meetings');
 
 <!-- Schedule meeting -->
 <div class="modal-katman" id="modalMeeting">
-    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Toplantı Planla</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Toplantı Planla</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="event_save" data-refresh="evet" id="meetingForm">
         <input type="hidden" name="type" value="toplanti">
         <div class="modal-govde">
@@ -129,7 +129,7 @@ page_start('Toplantı Takvimi', 'meetings');
             </div>
             <div class="form-grup"><label class="form-etiket">Gündem / Not</label><textarea name="description" class="metin-alani"></textarea></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Planla</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Planla</button></div>
     </form></div>
 </div>
 <script>

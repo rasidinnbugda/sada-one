@@ -126,7 +126,7 @@ page_start($client['name'], 'clients');
                 <?php endif; ?>
                 <div class="satir-esnek arasi mt-2">
                     <span class="hucre-alt"><?= $last ? 'Son veri: ' . format_date($last['date']) : 'Henüz veri girilmedi' ?></span>
-                    <?php if (is_staff()): ?><button class="mini-btn" onclick="metrikGir(<?= $sh['id'] ?>, '<?= e($sh['username']) ?>')">+ Veri Gir</button><?php endif; ?>
+                    <?php if (is_staff()): ?><button class="mini-btn" onclick="metricGir(<?= $sh['id'] ?>, '<?= e($sh['username']) ?>')">+ Veri Gir</button><?php endif; ?>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -157,14 +157,14 @@ page_start($client['name'], 'clients');
         <?php endforeach; endif; ?>
 
         <div class="modal-katman" id="modalInfoNot">
-            <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="bnTitleTop">Bilgi Bölümü</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+            <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="bnTitleTop">Bilgi Bölümü</div><button class="modal-kapat" data-modal-close>✕</button></div>
             <form data-ajax="clientnote_save">
                 <input type="hidden" name="id" id="bn_id"><input type="hidden" name="client_id" value="<?= $id ?>">
                 <div class="modal-govde">
                     <div class="form-grup"><label class="form-etiket">Bölüm Başlığı <span class="zorunlu">*</span></label><input name="title" id="bn_title" class="girdi" required placeholder="Örn. Marka Sesi & Yazım Dili"></div>
                     <div class="form-grup"><label class="form-etiket">İçerik</label><textarea name="text" id="bn_text" class="metin-alani" style="min-height:150px"></textarea></div>
                 </div>
-                <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+                <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
             </form></div>
         </div>
         <script>
@@ -243,7 +243,7 @@ page_start($client['name'], 'clients');
         <?php if (permission('dosya_yonet')): ?>
         <!-- Add contract modal -->
         <div class="modal-katman" id="modalContract">
-            <div class="modal"><div class="modal-ust"><div class="modal-baslik">Sözleşme Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+            <div class="modal"><div class="modal-ust"><div class="modal-baslik">Sözleşme Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
             <form data-ajax="contract_save">
                 <input type="hidden" name="client_id" value="<?= $id ?>">
                 <div class="modal-govde">
@@ -256,7 +256,7 @@ page_start($client['name'], 'clients');
                     <div class="form-grup"><label class="form-etiket">Sözleşme Belgesi</label><input type="file" name="client" class="girdi"></div>
                     <div class="form-grup"><label class="form-etiket">Not</label><input name="description" class="girdi"></div>
                 </div>
-                <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+                <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
             </form></div>
         </div>
         <?php endif; ?>
@@ -271,7 +271,7 @@ $pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is
 if (permission('dosya_yonet')):
 ?>
 <div class="modal-katman" id="modalProject">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Proje — <?= e($client['name']) ?></div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Proje — <?= e($client['name']) ?></div><button class="modal-kapat" data-modal-close>✕</button></div>
         <form data-ajax="project_save">
             <input type="hidden" name="client_id" value="<?= $id ?>">
             <div class="modal-govde">
@@ -288,14 +288,14 @@ if (permission('dosya_yonet')):
                 <?php member_picker(array_column($clientMembers, 'id')); ?>
                 <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="description" class="metin-alani"></textarea></div>
             </div>
-            <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
+            <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
         </form>
     </div>
 </div>
 
 <!-- Edit client file modal -->
 <div class="modal-katman" id="modalClientDuzen">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Dosyayı Düzenle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Dosyayı Düzenle</div><button class="modal-kapat" data-modal-close>✕</button></div>
         <form data-ajax="client_save">
             <input type="hidden" name="id" value="<?= $id ?>">
             <div class="modal-govde">
@@ -331,7 +331,7 @@ if (permission('dosya_yonet')):
             </div>
             <div class="modal-alt">
                 <?php if (is_admin()): ?><button type="button" class="btn btn-tehlike" data-action="client_delete" data-id="<?= $id ?>" data-approval="Bu dosyayı silmek istediğinize emin misiniz?" style="margin-right:auto">Sil</button><?php endif; ?>
-                <button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button>
+                <button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button>
             </div>
         </form>
     </div>
@@ -347,7 +347,7 @@ document.getElementById('renkSecim2')?.addEventListener('change', () => {
 <?php if (permission('icerik_yonet')): ?>
 <!-- Add social account -->
 <div class="modal-katman" id="modalSocialAccount">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Sosyal Medya Hesabı Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Sosyal Medya Hesabı Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="social_account_add">
         <input type="hidden" name="client_id" value="<?= $id ?>">
         <div class="modal-govde">
@@ -357,7 +357,7 @@ document.getElementById('renkSecim2')?.addEventListener('change', () => {
             </div>
             <div class="form-grup"><label class="form-etiket">Profil Linki</label><input name="url" class="girdi" placeholder="instagram.com/markaadi"></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Ekle</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Ekle</button></div>
     </form></div>
 </div>
 <?php endif; ?>
@@ -365,7 +365,7 @@ document.getElementById('renkSecim2')?.addEventListener('change', () => {
 <?php if (is_staff()): ?>
 <!-- Enter metrics -->
 <div class="modal-katman" id="modalMetric">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="metricTitle">Veri Gir</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="metricTitle">Veri Gir</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="social_metric_add">
         <input type="hidden" name="account_id" id="mt_account">
         <div class="modal-govde">
@@ -378,7 +378,7 @@ document.getElementById('renkSecim2')?.addEventListener('change', () => {
                 <div class="form-grup"><label class="form-etiket">Etkileşim</label><input name="engagement" class="girdi" placeholder="Beğeni+yorum vb."></div>
             </div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 <?php endif; ?>

@@ -21,7 +21,7 @@ page_start('Form Şablonları', 'forms');
         <div class="satir-esnek arasi mb-2">
             <div><div class="kart-baslik" style="font-size:16px"><?= e($f['name']) ?> <?php if (!$f['is_active']): ?><span class="rozet r-iptal">Pasif</span><?php endif; ?></div><?php if ($f['description']): ?><div class="hucre-alt mt-1"><?= e($f['description']) ?></div><?php endif; ?></div>
             <div class="satir-esnek" style="gap:4px">
-                <button class="ikon-eylem" onclick='formDuzenle(<?= json_encode($f, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
+                <button class="ikon-eylem" onclick='formEdit(<?= json_encode($f, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
                 <button class="ikon-eylem tehlike" data-action="form_delete" data-id="<?= $f['id'] ?>" data-approval="Form silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="M19 7l-.9 12a2 2 0 01-2 1.9H7.9a2 2 0 01-2-1.9L5 7m14 0H5m5 4v6m4-6v6"/></svg></button>
             </div>
         </div>
@@ -36,7 +36,7 @@ page_start('Form Şablonları', 'forms');
 </div>
 
 <div class="modal-katman" id="modalForm">
-    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik" id="formTitle">Yeni Form Şablonu</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik" id="formTitle">Yeni Form Şablonu</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="form_save" id="formForm">
         <input type="hidden" name="id" id="f_id"><input type="hidden" name="fields" id="f_fields">
         <div class="modal-govde">
@@ -51,7 +51,7 @@ page_start('Form Şablonları', 'forms');
                 <button type="button" class="btn btn-sm btn-hayalet mt-2" onclick="fieldAdd()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Alan Ekle</button>
             </div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 
@@ -66,13 +66,13 @@ function alanSatiri(field = {}) {
     div.innerHTML = `
         <div class="satir-esnek" style="gap:8px;align-items:flex-start">
             <span class="sira-oklar" style="padding-top:8px">
-                <button type="button" class="sira-ok" data-sira-yon="yukari" title="Yukarı taşı"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7"/></svg></button>
-                <button type="button" class="sira-ok" data-sira-yon="asagi" title="Aşağı taşı"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg></button>
+                <button type="button" class="sira-ok" data-sort-dir="yukari" title="Yukarı taşı"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7"/></svg></button>
+                <button type="button" class="sira-ok" data-sort-dir="asagi" title="Aşağı taşı"><svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg></button>
             </span>
             <div style="flex:1">
                 <div class="form-satir" style="margin-bottom:8px">
                     <input class="girdi alan-etiket" placeholder="Alan etiketi" value="${(field.tag||'').replace(/"/g,'&quot;')}">
-                    <select class="secim alan-tip" onchange="secenekGoster(this)">${typeOps}</select>
+                    <select class="secim alan-tip" onchange="optionShow(this)">${typeOps}</select>
                 </div>
                 <textarea class="metin-alani alan-secenekler" placeholder="Seçenekler (her satıra bir tane)" style="min-height:60px;display:${field.type==='secim'?'block':'none'}">${field.options||''}</textarea>
                 <label class="satir-esnek kucuk mt-2" style="gap:7px;cursor:pointer"><input type="checkbox" class="alan-zorunlu" ${field.is_required!=0?'checked':''}> Zorunlu alan</label>

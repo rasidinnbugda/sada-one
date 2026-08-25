@@ -57,17 +57,17 @@ page_start('Onaylar', 'approvals');
         <?php if ($o['status'] === 'bekliyor' && (is_customer() || is_admin())): ?>
         <div class="dikey" style="gap:8px;flex-shrink:0;min-width:130px">
             <button class="btn btn-marka btn-sm btn-blok" style="background:var(--basari);color:#fff" data-action="approval_reply" data-id="<?= $o['id'] ?>" data-status="onaylandi">✓ Onayla</button>
-            <button class="btn btn-sm btn-blok" onclick="onayNot(<?= $o['id'] ?>,'revize')">↻ Revize İste</button>
-            <button class="btn btn-tehlike btn-sm btn-blok" onclick="onayNot(<?= $o['id'] ?>,'reddedildi')">✕ Reddet</button>
+            <button class="btn btn-sm btn-blok" onclick="approvalNot(<?= $o['id'] ?>,'revize')">↻ Revize İste</button>
+            <button class="btn btn-tehlike btn-sm btn-blok" onclick="approvalNot(<?= $o['id'] ?>,'reddedildi')">✕ Reddet</button>
         </div>
         <?php elseif ($o['status'] === 'bekliyor' && is_staff()): ?>
         <span class="rozet r-bekliyor" style="flex-shrink:0">Müşteri onayı bekleniyor</span>
         <?php elseif ($o['status'] === 'onaylandi' && is_customer()): ?>
         <div style="flex-shrink:0">
             <?php if (isset($verilenRatings[$o['id']])): ?>
-            <button class="btn btn-sm" onclick="puanVer('onay', <?= $o['id'] ?>, '<?= e($o['title']) ?>')" title="Puanı güncelle"><?= stars((float)$verilenRatings[$o['id']], 13) ?></button>
+            <button class="btn btn-sm" onclick="ratingGive('onay', <?= $o['id'] ?>, '<?= e($o['title']) ?>')" title="Puanı güncelle"><?= stars((float)$verilenRatings[$o['id']], 13) ?></button>
             <?php else: ?>
-            <button class="btn btn-marka btn-sm" onclick="puanVer('onay', <?= $o['id'] ?>, '<?= e($o['title']) ?>')"><?= icon('star', 13) ?> Değerlendir</button>
+            <button class="btn btn-marka btn-sm" onclick="ratingGive('onay', <?= $o['id'] ?>, '<?= e($o['title']) ?>')"><?= icon('star', 13) ?> Değerlendir</button>
             <?php endif; ?>
         </div>
         <?php endif; ?>
@@ -78,11 +78,11 @@ page_start('Onaylar', 'approvals');
 <?php endif; ?>
 
 <div class="modal-katman" id="modalApprovalNot">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="approvalNotTitle">Not Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="approvalNotTitle">Not Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="approval_reply">
         <input type="hidden" name="id" id="approvalNotId"><input type="hidden" name="status" id="approvalNotStatus">
         <div class="modal-govde"><div class="form-grup"><label class="form-etiket">Notunuz <span class="zorunlu">*</span></label><textarea name="not" class="metin-alani" required placeholder="Değişiklik taleplerinizi veya nedeninizi yazın..."></textarea></div></div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Gönder</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Gönder</button></div>
     </form></div>
 </div>
 <?php rating_modal(); ?>

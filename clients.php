@@ -74,7 +74,7 @@ page_start(is_customer() ? 'Dosyalarım' : 'Dosyalar', 'clients');
 <?php if (permission('dosya_yonet')): ?>
 <div class="modal-katman" id="modalClient">
     <div class="modal">
-        <div class="modal-ust"><div class="modal-baslik" id="clientModalTitle">Yeni Dosya</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+        <div class="modal-ust"><div class="modal-baslik" id="clientModalTitle">Yeni Dosya</div><button class="modal-kapat" data-modal-close>✕</button></div>
         <form data-ajax="client_save" id="clientForm">
             <input type="hidden" name="id" id="client_id">
             <div class="modal-govde">
@@ -111,7 +111,7 @@ page_start(is_customer() ? 'Dosyalarım' : 'Dosyalar', 'clients');
                     <div class="form-grup"><label class="form-etiket">Durum</label><select name="status" id="d_status" class="secim"><option value="aktif">Aktif</option><option value="pasif">Pasif</option></select></div>
                 </div>
             </div>
-            <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+            <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
         </form>
     </div>
 </div>

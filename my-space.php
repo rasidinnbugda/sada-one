@@ -43,7 +43,7 @@ page_start('Alanım', 'my_space');
                 <div class="satir-esnek arasi" style="align-items:flex-start">
                     <?php if ($n['title']): ?><div class="kalin" style="font-size:14.5px"><?= e($n['title']) ?></div><?php else: ?><span></span><?php endif; ?>
                     <div class="satir-esnek" style="gap:2px;flex-shrink:0">
-                        <button class="ikon-eylem" style="width:26px;height:26px" onclick='notDuzenle(<?= json_encode($n, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="14"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
+                        <button class="ikon-eylem" style="width:26px;height:26px" onclick='notEdit(<?= json_encode($n, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="14"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
                         <button class="ikon-eylem tehlike" style="width:26px;height:26px" data-action="not_delete" data-id="<?= $n['id'] ?>" data-approval="Not silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="14"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
                     </div>
                 </div>
@@ -108,7 +108,7 @@ page_start('Alanım', 'my_space');
 
 <!-- Add/edit note -->
 <div class="modal-katman" id="modalNot">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="notTitleTop">Yeni Not</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="notTitleTop">Yeni Not</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="not_save">
         <input type="hidden" name="id" id="n_id">
         <div class="modal-govde">
@@ -123,19 +123,19 @@ page_start('Alanım', 'my_space');
                 </div>
             </div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
     </form></div>
 </div>
 
 <!-- Add bookmark -->
 <div class="modal-katman" id="modalLink">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yer İmi Ekle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yer İmi Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="link_add">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Ad <span class="zorunlu">*</span></label><input name="name" class="girdi" required placeholder="Örn. Marka X Drive klasörü"></div>
             <div class="form-grup"><label class="form-etiket">Adres <span class="zorunlu">*</span></label><input name="url" class="girdi" required placeholder="https://..."></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Ekle</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Ekle</button></div>
     </form></div>
 </div>
 
@@ -177,7 +177,7 @@ async function isAdd(e) {
         const bos = document.getElementById('isBos'); if (bos) bos.remove();
         const div = document.createElement('div');
         div.className = 'kontrol-oge';
-        div.innerHTML = `<input type="checkbox" onchange="isToggle(${j.id}, this)"><span class="kontrol-metin"></span><button class="ikon-eylem tehlike" style="width:24px;height:24px" data-action="personal_is_delete" data-id="${j.id}" data-refresh="hayir" onclick="setTimeout(()=>{this.closest('.kontrol-oge').remove();isSayacGuncelle()},300)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="12"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
+        div.innerHTML = `<input type="checkbox" onchange="isToggle(${j.id}, this)"><span class="kontrol-metin"></span><button class="ikon-eylem tehlike" style="width:24px;height:24px" data-action="personal_is_delete" data-id="${j.id}" data-refresh="hayir" onclick="setTimeout(()=>{this.closest('.kontrol-oge').remove();isCounterUpdate()},300)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="12"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
         div.querySelector('.check-text').textContent = j.name;
         document.getElementById('isList').appendChild(div);
         isCounterUpdate();

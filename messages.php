@@ -130,7 +130,7 @@ page_start('Mesajlar', 'messages');
 
 <!-- Direct message (DM) modal -->
 <div class="modal-katman" id="modalDM">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Birebir Mesaj</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Birebir Mesaj</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde">
         <div class="form-grup"><input class="girdi" placeholder="Kişi ara..." data-search="#dmListe .dm-kisi"></div>
         <div class="dikey" style="gap:4px;max-height:340px;overflow-y:auto" id="dmList">
@@ -149,7 +149,7 @@ page_start('Mesajlar', 'messages');
 <?php if ($activeChannel): ?>
 <!-- Channel members modal -->
 <div class="modal-katman" id="modalMembers">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik"><?= e($activeChannel['name']) ?> — Üyeler</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik"><?= e($activeChannel['name']) ?> — Üyeler</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde">
         <?php if ($memberOlmayanlar && is_staff()): ?>
         <div class="satir-esnek mb-3" style="gap:8px">
@@ -187,7 +187,7 @@ async function memberAdd() {
 
 <?php if (is_staff()): ?>
 <div class="modal-katman" id="modalChannel">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Kanal</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Kanal</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="channel_create" id="channelForm">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Kanal Adı <span class="zorunlu">*</span></label><input name="name" class="girdi" required placeholder="Örn. Tasarım Ekibi"></div>
@@ -201,7 +201,7 @@ async function memberAdd() {
             </div>
             <input type="hidden" name="members" id="channelMembers">
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
     </form></div>
 </div>
 <?php endif; ?>

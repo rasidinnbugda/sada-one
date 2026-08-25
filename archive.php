@@ -60,7 +60,7 @@ page_start('Dosya Arşivi', 'archive');
 <?php endif; ?>
 
 <div class="modal-katman" id="modalUpload">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Dosya Yükle</div><button class="modal-kapat" data-modal-kapat>✕</button></div>
+    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Dosya Yükle</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <form data-ajax="archive_upload" data-refresh="evet">
         <div class="modal-govde">
             <div class="form-grup"><label class="form-etiket">Dosya <span class="zorunlu">*</span></label><input type="file" name="client" class="girdi" required><div class="form-ipucu">Maksimum 50MB. PHP/HTML/script dosyaları kabul edilmez.</div></div>
@@ -69,7 +69,7 @@ page_start('Dosya Arşivi', 'archive');
             <?php elseif ($clientFiltre): ?><input type="hidden" name="client_id" value="<?= $clientFiltre ?>"><?php endif; ?>
             <div class="form-grup"><label class="form-etiket">Proje (opsiyonel)</label><select name="project_id" class="secim"><option value="">—</option><?php foreach ($projects as $p): ?><option value="<?= $p['id'] ?>"><?= e($p['name']) ?></option><?php endforeach; ?></select></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-kapat>İptal</button><button type="submit" class="btn btn-marka">Yükle</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Yükle</button></div>
     </form></div>
 </div>
 <?php page_end(); ?>

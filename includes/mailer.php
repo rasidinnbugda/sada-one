@@ -6,6 +6,8 @@
  */
 
 function send_email(string $alici, string $topic, string $text): bool {
+    // Security: reject malformed addresses (also blocks CRLF header injection)
+    if (!filter_var($alici, FILTER_VALIDATE_EMAIL)) return false;
     $siteName = setting('site_adi', 'SADA One');
     $sender = setting('smtp_gonderen') ?: setting('smtp_kullanici');
 

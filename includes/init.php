@@ -25,6 +25,29 @@ function session_write(callable $fn): void {
 }
 mb_internal_encoding('UTF-8');
 date_default_timezone_set('Europe/Istanbul');
+
+/* Production error handling: never leak stack traces / paths / SQL to visitors.
+ * Errors are appended to storage/error.log (web-blocked); users get a plain page. */
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+if (is_dir(dirname(__DIR__) . '/storage') || @mkdir(dirname(__DIR__) . '/storage', 0755, true)) {
+    ini_set('error_log', dirname(__DIR__) . '/storage/error.log');
+}
+set_exception_handler(function (Throwable $e) {
+    error_log('[SADA] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    http_response_code(500);
+    if (defined('IS_AJAX')) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => 'Sunucu hatası oluştu; kayıt alındı. Sorun sürerse yöneticinize bildirin.'], JSON_UNESCAPED_UNICODE);
+    } else {
+        echo '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Hata</title></head>'
+            . '<body style="font-family:sans-serif;background:#0b0f0a;color:#eef4e6;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">'
+            . '<div style="text-align:center;max-width:360px"><div style="font-size:26px;font-weight:800;letter-spacing:2px">SADA<span style="color:#b1fb01">.</span></div>'
+            . '<p style="color:#b3c2a2;line-height:1.6">Beklenmeyen bir hata oluştu ve kayda alındı.<br>Sorun sürerse yöneticinize bildirin.</p>'
+            . '<a href="index.php" style="color:#b1fb01">Panele dön</a></div></body></html>';
+    }
+    exit;
+});
 // Personalized pages must never be cached by proxies/CDN (Hostinger cache, LiteSpeed):
 // a cached page from user A could otherwise be served to user B, or a stale page
 // could make the site look "stuck" in one browser while fresh in another.
@@ -49,6 +72,17 @@ function legacy_schema_check(): void {
         if (db()->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='dosyalar'")->fetchColumn()) {
             require_once __DIR__ . '/legacy-migration.php';
             legacy_localization(db());
+        }
+        // Self-healing schema: whenever the code version moves ahead of the DB,
+        // run the (idempotent) migrations once. Prevents "files updated but the
+        // schema wasn't" 500s after manual file uploads.
+        $st = db()->prepare("SELECT setting_value FROM settings WHERE setting_key='schema_version'");
+        $st->execute();
+        if ($st->fetchColumn() !== APP_VERSION) {
+            require_once __DIR__ . '/migration.php';
+            run_migrations(db());
+            db()->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('schema_version', ?) ON DUPLICATE KEY UPDATE setting_value=?")
+                ->execute([APP_VERSION, APP_VERSION]);
         }
     } catch (Throwable $e) { /* connection problems surface later with a clearer error */ }
 }
@@ -319,7 +353,7 @@ const PRIORITIES = ['dusuk' => 'Düşük', 'normal' => 'Normal', 'yuksek' => 'Y�
 const PROJECT_STATUSES = ['is_active' => 'Aktif', 'beklemede' => 'Beklemede', 'tamamlandi' => 'Tamamlandı', 'iptal' => 'İptal'];
 const CONTENT_STATUSES = ['taslak' => 'Taslak', 'internal_approval' => 'İç Onayda', 'customer_approval' => 'Müşteri Onayında', 'revize' => 'Revize', 'onaylandi' => 'Onaylandı', 'yayinlandi' => 'Yayınlandı'];
 const APPROVAL_STATUSES = ['bekliyor' => 'Bekliyor', 'onaylandi' => 'Onaylandı', 'revize' => 'Revize İstendi', 'reddedildi' => 'Reddedildi'];
-const REQUEST_STATUSES = ['new' => 'Yeni', 'inceleniyor' => 'İnceleniyor', 'gorev_olusturuldu' => 'Göreve Dönüştürüldü', 'tamamlandi' => 'Tamamlandı', 'reddedildi' => 'Reddedildi'];
+const REQUEST_STATUSES = ['yeni' => 'Yeni', 'inceleniyor' => 'İnceleniyor', 'gorev_olusturuldu' => 'Göreve Dönüştürüldü', 'tamamlandi' => 'Tamamlandı', 'reddedildi' => 'Reddedildi'];
 const PLATFORMS = ['instagram' => 'Instagram', 'facebook' => 'Facebook', 'x' => 'X (Twitter)', 'linkedin' => 'LinkedIn', 'youtube' => 'YouTube', 'tiktok' => 'TikTok', 'web' => 'Web Sitesi', 'diger' => 'Diğer'];
 const EVENT_TYPES = ['cekim' => 'Çekim', 'toplanti' => 'Toplantı', 'is_delivered' => 'Teslim', 'diger' => 'Diğer'];
 const ROLES = ['yonetici' => 'Yönetici', 'pm' => 'Proje Yöneticisi', 'ekip' => 'Ekip Üyesi', 'finans' => 'Finans', 'stajyer' => 'Stajyer', 'musteri' => 'Müşteri'];
@@ -327,8 +361,16 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.0';
+const APP_VERSION = '6.0.1';
 const VERSION_NOTES = [
+    '6.0.1' => [
+        'Modal kapatma (çarpı) düğmeleri ve panel genelinde onlarca ölü düğme onarıldı (randevu onayı, puanlama, etkinlik/içerik taşıma, ekipman işlemleri, ödeme/gider durumları, adım tamamlama, kullanıcı/akış düzenleme, yorum ve tepkiler...)',
+        'Bildirimler: "Okundu işaretle", bildirim silme, canlı sayaç rozeti ve mobil menü aç/kapat düzeltildi',
+        'Kanban sürükle-bırak geri alma ve sıralama okları (form/akış şablonları) düzeltildi',
+        'Aylık raporlar 500 hatasının kökü: şema sürümü artık her açılışta denetleniyor, eksik migration otomatik uygulanıyor',
+        'Ek talepler tablosu taşınırken veri kaybına yol açabilecek sıralama hatası giderildi',
+        'Güvenlik: üretimde hatalar ekrana değil storage/error.log\'a yazılır; dosya yüklemede gerçek içerik (MIME) denetimi; şifre en az 8 karakter; e-posta alıcı doğrulaması; HSTS ve Permissions-Policy başlıkları',
+    ],
     '6.0' => [
         'Google Drive takibi: çekim görüntüleri Drive\'a aktarılmadıysa panel uyarır; servis hesabı kurulunca klasörü kendisi denetleyip otomatik işaretler',
         'Dosyalara ve çekimlere Drive klasörü bağlanabiliyor; çekim listesinde "Aktarıldı/Aktarılmadı" durumu',
@@ -603,6 +645,14 @@ function file_upload(string $field): ?array {
     $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'ico', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
         'txt', 'csv', 'zip', 'rar', '7z', 'mp4', 'mov', 'avi', 'mp3', 'wav', 'aac', 'psd', 'ai', 'indd', 'srt', 'otf', 'ttf'];
     if (!in_array($extension, $allowed)) return null;
+    // Security: verify the actual content, not just the extension
+    if (function_exists('finfo_open')) {
+        $mime = (string)finfo_file(finfo_open(FILEINFO_MIME_TYPE), $f['tmp_name']);
+        // Never accept anything the server could interpret as script/markup
+        if (preg_match('~php|x-httpd|/html|xhtml|^text/xml|^application/xml|javascript~i', $mime)) return null;
+        // Image extensions must really contain image data
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']) && !str_starts_with($mime, 'image/')) return null;
+    }
     $newName = date('Ym') . '/' . bin2hex(random_bytes(8)) . '.' . $extension;
     $targetKlasor = ROOT . '/uploads/' . date('Ym');
     if (!is_dir($targetKlasor)) mkdir($targetKlasor, 0755, true);
