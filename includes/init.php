@@ -368,7 +368,7 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.4';
+const APP_VERSION = '6.4.1';
 const VERSION_NOTES = [
     '6.4' => [
         '@ ile kişi bahsetme (yorum, tartışma, DM) onarıldı — kişi listesi yanlış ada yazıldığı için açılır liste hiç dolmuyordu',

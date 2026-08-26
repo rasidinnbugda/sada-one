@@ -180,11 +180,13 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
                 <div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın.</div>
             </div>
             <div class="form-grup"><label class="form-etiket">Model</label>
-                <select name="gemini_model" class="secim">
-                    <?php foreach (['gemini-2.5-flash' => 'Gemini 2.5 Flash (hızlı — ücretsiz katman)', 'gemini-2.5-pro' => 'Gemini 2.5 Pro (yüksek kalite)'] as $mk => $mv): ?>
-                    <option value="<?= $mk ?>" <?= (setting('gemini_model') ?: 'gemini-2.5-flash') === $mk ? 'selected' : '' ?>><?= $mv ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <?php $gm = setting('gemini_model') ?: 'gemini-3.6-flash'; if (str_starts_with($gm, 'gemini-2.5')) $gm = 'gemini-3.6-flash'; ?>
+                <input name="gemini_model" class="girdi native-kal" list="geminiModeller" value="<?= e($gm) ?>" placeholder="gemini-3.6-flash">
+                <datalist id="geminiModeller">
+                    <option value="gemini-3.6-flash">Hızlı — ücretsiz katman</option>
+                    <option value="gemini-3.6-pro">Yüksek kalite</option>
+                </datalist>
+                <div class="form-ipucu">Google model adını değiştirirse (API hatasında yeni ad yazar) buraya yazmanız yeterli — güncelleme beklemeye gerek yok.</div>
             </div>
             </div>
             <script>function aiSaglayiciDegisti(v){document.getElementById('aiClaudeAlan').style.display=v==='gemini'?'none':'';document.getElementById('aiGeminiAlan').style.display=v==='gemini'?'':'none';}</script>

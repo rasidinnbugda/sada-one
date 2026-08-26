@@ -16,7 +16,12 @@ function ai_enabled(): bool {
 }
 
 function ai_model(): string {
-    if (ai_provider() === 'gemini') return setting('gemini_model') ?: 'gemini-2.5-flash';
+    if (ai_provider() === 'gemini') {
+        $m = setting('gemini_model') ?: 'gemini-3.6-flash';
+        // Google retired the 2.5 series for new API users; stored old values self-heal
+        if (str_starts_with($m, 'gemini-2.5')) $m = 'gemini-3.6-flash';
+        return $m;
+    }
     return setting('ai_model') ?: 'claude-opus-5';
 }
 
