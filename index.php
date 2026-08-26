@@ -36,7 +36,7 @@ if ($reportWarnings): ?>
 <?php endif;
 
 /* ---------- Release notes (dismissible) ---------- */
-if (($u['seen_version'] ?? '') !== APP_VERSION && isset(VERSION_NOTES[APP_VERSION])): ?>
+if (is_admin() && ($u['seen_version'] ?? '') !== APP_VERSION && isset(VERSION_NOTES[APP_VERSION])): ?>
 <div class="kart mb-3" id="versionCard" style="border-color:var(--marka);background:linear-gradient(135deg,var(--surface),var(--parlak))">
     <div class="satir-esnek arasi" style="align-items:flex-start;gap:12px">
         <div>

@@ -88,10 +88,10 @@ page_start('Kullanıcılar', 'users');
 <script>
 // Role default permissions (same as init.php)
 const roleDefault = {
-    pm:      { finans: 1, rapor: 1, kapasite: 1, dosya_yonet: 1, gorev_olustur: 1, gorev_sil: 1, icerik_yonet: 1, ekipman_yonet: 1, onay_gonder: 1, duyuru_yayinla: 1, takvim_yonet: 1, kanal_kur: 1, belge_olustur: 1, arsiv_sil: 1, talep_yonet: 1 },
-    ekip:    { finans: 0, rapor: 0, kapasite: 0, dosya_yonet: 0, gorev_olustur: 1, gorev_sil: 0, icerik_yonet: 1, ekipman_yonet: 0, onay_gonder: 1, duyuru_yayinla: 0, takvim_yonet: 1, kanal_kur: 1, belge_olustur: 0, arsiv_sil: 0, talep_yonet: 0 },
-    finans:  { finans: 1, rapor: 1, kapasite: 1, dosya_yonet: 0, gorev_olustur: 0, gorev_sil: 0, icerik_yonet: 0, ekipman_yonet: 0, onay_gonder: 0, duyuru_yayinla: 0, takvim_yonet: 0, kanal_kur: 1, belge_olustur: 1, arsiv_sil: 0, talep_yonet: 0 },
-    stajyer: { finans: 0, rapor: 0, kapasite: 0, dosya_yonet: 0, gorev_olustur: 0, gorev_sil: 0, icerik_yonet: 0, ekipman_yonet: 0, onay_gonder: 0, duyuru_yayinla: 0, takvim_yonet: 0, kanal_kur: 0, belge_olustur: 0, arsiv_sil: 0, talep_yonet: 0 },
+    pm:      { finans: 1, rapor: 1, kapasite: 1, dosya_yonet: 1, gorev_olustur: 1, gorev_sil: 1, icerik_yonet: 1, ekipman_yonet: 1, onay_gonder: 1, duyuru_yayinla: 1, takvim_yonet: 1, kanal_kur: 1, belge_olustur: 1, arsiv_sil: 1, talep_yonet: 1, finans_yonet: 1, randevu_yonet: 1, havuz_yonet: 1, mentorluk_yonet: 1, ai_kullan: 1 },
+    ekip:    { finans: 0, rapor: 0, kapasite: 0, dosya_yonet: 0, gorev_olustur: 1, gorev_sil: 0, icerik_yonet: 1, ekipman_yonet: 0, onay_gonder: 1, duyuru_yayinla: 0, takvim_yonet: 1, kanal_kur: 1, belge_olustur: 0, arsiv_sil: 0, talep_yonet: 0, finans_yonet: 0, randevu_yonet: 0, havuz_yonet: 0, mentorluk_yonet: 0, ai_kullan: 1 },
+    finans:  { finans: 1, rapor: 1, kapasite: 1, dosya_yonet: 0, gorev_olustur: 0, gorev_sil: 0, icerik_yonet: 0, ekipman_yonet: 0, onay_gonder: 0, duyuru_yayinla: 0, takvim_yonet: 0, kanal_kur: 1, belge_olustur: 1, arsiv_sil: 0, talep_yonet: 0, finans_yonet: 1, randevu_yonet: 0, havuz_yonet: 0, mentorluk_yonet: 0, ai_kullan: 1 },
+    stajyer: { finans: 0, rapor: 0, kapasite: 0, dosya_yonet: 0, gorev_olustur: 0, gorev_sil: 0, icerik_yonet: 0, ekipman_yonet: 0, onay_gonder: 0, duyuru_yayinla: 0, takvim_yonet: 0, kanal_kur: 0, belge_olustur: 0, arsiv_sil: 0, talep_yonet: 0, finans_yonet: 0, randevu_yonet: 0, havuz_yonet: 0, mentorluk_yonet: 0, ai_kullan: 0 },
 };
 function roleDegisti() {
     const role = document.getElementById('k_role').value;

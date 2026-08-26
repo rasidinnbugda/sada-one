@@ -87,7 +87,7 @@ case 'ai_test':
     json_out(['ok' => true, 'mesaj' => 'AI bağlantısı çalışıyor: ' . $r['text']]);
 
 case 'ai_report_draft':
-    if (is_intern() || is_customer()) deny();
+    require_permission('ai_kullan');
     require_once __DIR__ . '/includes/ai.php';
     if (!ai_enabled()) json_out(['ok' => false, 'error' => 'AI anahtarı tanımlı değil (Ayarlar → Yapay Zeka).']);
     $clientId = (int)$g('client_id');
@@ -110,7 +110,7 @@ case 'ai_report_draft':
     json_out(['ok' => true, 'draft' => ['summary' => (string)$draft['ozet'], 'work_done' => (string)($draft['yapilanlar'] ?? ''), 'metrics' => (string)($draft['metrikler'] ?? ''), 'plan' => (string)($draft['plan'] ?? '')]]);
 
 case 'ai_idea_generate':
-    if (is_customer()) deny();
+    require_permission('ai_kullan');
     require_once __DIR__ . '/includes/ai.php';
     if (!ai_enabled()) json_out(['ok' => false, 'error' => 'AI anahtarı tanımlı değil (Ayarlar → Yapay Zeka).']);
     $topic = trim($g('topic'));
@@ -122,7 +122,7 @@ case 'ai_idea_generate':
     json_out(['ok' => true, 'ideas' => array_slice(array_values($list['fikirler']), 0, 8)]);
 
 case 'ai_summarize':
-    if (is_customer()) deny();
+    require_permission('ai_kullan');
     require_once __DIR__ . '/includes/ai.php';
     if (!ai_enabled()) json_out(['ok' => false, 'error' => 'AI anahtarı tanımlı değil (Ayarlar → Yapay Zeka).']);
     $taskId = (int)$g('task_id');
@@ -149,7 +149,7 @@ case 'version_check':
 
 /* ==================== v14: SOP MODULES ==================== */
 case 'mentorship_save':
-    if (!is_admin() && $u['role'] !== 'pm') deny();
+    require_permission('mentorluk_yonet');
     $data = [
         'member_id' => (int)$g('member_id'), 'field' => trim($g('field')),
         'mentor_id' => (int)$g('mentor_id') ?: null, 'project_id' => (int)$g('project_id') ?: null,
@@ -174,7 +174,7 @@ case 'mentorship_delete':
     json_out(['ok' => true, 'refresh' => true]);
 
 case 'pool_save':
-    if (is_intern() || is_customer()) deny();
+    require_permission('havuz_yonet');
     $data = [
         'name' => trim($g('name')), 'skill' => trim($g('skill')) ?: null,
         'worked_before' => (int)(bool)$g('worked_before'), 'contact' => trim($g('contact')) ?: null,
@@ -189,7 +189,7 @@ case 'pool_save':
     json_out(['ok' => true, 'mesaj' => 'Havuz kaydı güncellendi.', 'refresh' => true]);
 
 case 'pool_delete':
-    if (!is_admin() && $u['role'] !== 'pm') deny();
+    require_permission('havuz_yonet');
     q("DELETE FROM talent_pool WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'refresh' => true]);
 
@@ -713,7 +713,8 @@ case 'step_complete':
     $step = row("SELECT * FROM task_steps WHERE id=?", [$stepId]);
     if (!$step) json_out(['ok' => false, 'error' => 'Adım bulunamadı.']);
     $task = row("SELECT * FROM tasks WHERE id=?", [$step['task_id']]);
-    $newStatus = $step['status'] === 'tamam' ? 'bekliyor' : 'tamam';
+    // Reverting makes this the current (active) step again, not a plain pending one
+    $newStatus = $step['status'] === 'tamam' ? 'aktif' : 'tamam';
     // Sequential step rule: this step cannot be completed until earlier steps are done
     if ($newStatus === 'tamam' && empty($task['lock_bypassed'])) {
         $oncekiEksik = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND sort_order<? AND status!='tamam'", [$step['task_id'], $step['sort_order']]);
@@ -731,8 +732,9 @@ case 'step_complete':
             if ($ownerId) notify((int)$ownerId, 'Akışta sıra sizde', $task['title'], 'task.php?id=' . $step['task_id'], 'gorev');
         }
     } else {
-        // Steps completed after the reverted one drop back to 'bekliyor' (consistency)
-        q("UPDATE task_steps SET status='bekliyor', done_date=NULL WHERE task_id=? AND sort_order>? AND status='tamam'", [$step['task_id'], $step['sort_order']]);
+        // Everything after the reverted step drops back to 'bekliyor' — including the
+        // step the completion had promoted to 'aktif', so the arrow returns here
+        q("UPDATE task_steps SET status='bekliyor', done_date=NULL WHERE task_id=? AND sort_order>? AND status IN ('tamam','aktif')", [$step['task_id'], $step['sort_order']]);
         q("UPDATE tasks SET status='devam', completion=NULL WHERE id=? AND status='tamamlandi'", [$step['task_id']]);
     }
     // Return the current workflow state (for refresh-free UI updates)
@@ -1429,7 +1431,7 @@ case 'appointment_create':
     json_out(['ok' => true, 'mesaj' => 'Randevu talebiniz iletildi. Onaylanınca haber verilecek.']);
 
 case 'appointment_respond':
-    require_pm();
+    require_permission('randevu_yonet');
     $r = row("SELECT * FROM appointments WHERE id=?", [(int)$g('id')]);
     if (!$r) json_out(['ok' => false, 'error' => 'Randevu bulunamadı.']);
     $operation = $g('operation'); // onayla | alternatif | reddet
@@ -1709,7 +1711,7 @@ case 'arsiv_sil':
 
 /* ==================== FINANCE ==================== */
 case 'payment_save':
-    require_permission('finans');
+    require_permission('finans_yonet');
     $data = [
         'project_id' => (int)$g('project_id'), 'type' => $g('type', 'fatura'), 'title' => trim($g('title')),
         'amount' => (float)str_replace(',', '.', $g('amount', '0')), 'date' => $g('date') ?: date('Y-m-d'),
@@ -1725,18 +1727,18 @@ case 'payment_save':
     json_out(['ok' => true, 'mesaj' => 'Finans kaydı eklendi.']);
 
 case 'payment_status':
-    require_permission('finans');
+    require_permission('finans_yonet');
     update_row('payments', ['status' => $g('status')], 'id=?', [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Durum güncellendi.']);
 
 case 'payment_delete':
-    require_permission('finans');
+    require_permission('finans_yonet');
     q("DELETE FROM payments WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Kayıt silindi.']);
 
 /* ==================== EXPENSES ==================== */
 case 'expense_save':
-    require_permission('finans');
+    require_permission('finans_yonet');
     $data = [
         'type' => isset(EXPENSE_TYPES[$g('type')]) ? $g('type') : 'diger',
         'title' => trim($g('title')),
@@ -1756,12 +1758,12 @@ case 'expense_save':
     json_out(['ok' => true, 'mesaj' => 'Gider eklendi.']);
 
 case 'expense_status':
-    require_permission('finans');
+    require_permission('finans_yonet');
     update_row('expenses', ['status' => $g('status') === 'odendi' ? 'odendi' : 'bekliyor'], 'id=?', [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Durum güncellendi.']);
 
 case 'expense_delete':
-    require_permission('finans');
+    require_permission('finans_yonet');
     q("DELETE FROM expenses WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Gider silindi.']);
 

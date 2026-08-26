@@ -205,6 +205,11 @@ const PERMISSION_KEYS = [
     'arsiv_sil' => 'Arşivden dosya silme',
     'talep_yonet' => 'Talepleri yönetme',
     'butce_gor' => 'Proje bütçelerini görme (istasyon)',
+    'finans_yonet' => 'Finans kaydı ekleme/düzenleme/silme',
+    'randevu_yonet' => 'Randevuları yanıtlama (onay/red/alternatif)',
+    'havuz_yonet' => 'Çalışan havuzu yönetimi',
+    'mentorluk_yonet' => 'Gelişim & mentörlük yönetimi',
+    'ai_kullan' => 'Yapay zeka özelliklerini kullanma',
 ];
 
 function permission(string $setting_key): bool {
@@ -217,10 +222,10 @@ function permission(string $setting_key): bool {
     if (is_array($ozel) && array_key_exists($setting_key, $ozel)) return (bool)$ozel[$setting_key];
     // Role defaults
     $default = [
-        'pm'      => ['finans' => 1, 'rapor' => 1, 'kapasite' => 1, 'dosya_yonet' => 1, 'gorev_olustur' => 1, 'gorev_sil' => 1, 'icerik_yonet' => 1, 'ekipman_yonet' => 1, 'onay_gonder' => 1, 'duyuru_yayinla' => 1, 'takvim_yonet' => 1, 'kanal_kur' => 1, 'belge_olustur' => 1, 'arsiv_sil' => 1, 'talep_yonet' => 1],
-        'ekip'    => ['finans' => 0, 'rapor' => 0, 'kapasite' => 0, 'dosya_yonet' => 0, 'gorev_olustur' => 1, 'gorev_sil' => 0, 'icerik_yonet' => 1, 'ekipman_yonet' => 0, 'onay_gonder' => 1, 'duyuru_yayinla' => 0, 'takvim_yonet' => 1, 'kanal_kur' => 1, 'belge_olustur' => 0, 'arsiv_sil' => 0, 'talep_yonet' => 0],
-        'finans'  => ['finans' => 1, 'rapor' => 1, 'kapasite' => 1, 'dosya_yonet' => 0, 'gorev_olustur' => 0, 'gorev_sil' => 0, 'icerik_yonet' => 0, 'ekipman_yonet' => 0, 'onay_gonder' => 0, 'duyuru_yayinla' => 0, 'takvim_yonet' => 0, 'kanal_kur' => 1, 'belge_olustur' => 1, 'arsiv_sil' => 0, 'talep_yonet' => 0],
-        'stajyer' => ['finans' => 0, 'rapor' => 0, 'kapasite' => 0, 'dosya_yonet' => 0, 'gorev_olustur' => 0, 'gorev_sil' => 0, 'icerik_yonet' => 0, 'ekipman_yonet' => 0, 'onay_gonder' => 0, 'duyuru_yayinla' => 0, 'takvim_yonet' => 0, 'kanal_kur' => 0, 'belge_olustur' => 0, 'arsiv_sil' => 0, 'talep_yonet' => 0],
+        'pm'      => ['finans' => 1, 'rapor' => 1, 'kapasite' => 1, 'dosya_yonet' => 1, 'gorev_olustur' => 1, 'gorev_sil' => 1, 'icerik_yonet' => 1, 'ekipman_yonet' => 1, 'onay_gonder' => 1, 'duyuru_yayinla' => 1, 'takvim_yonet' => 1, 'kanal_kur' => 1, 'belge_olustur' => 1, 'arsiv_sil' => 1, 'talep_yonet' => 1, 'finans_yonet' => 1, 'randevu_yonet' => 1, 'havuz_yonet' => 1, 'mentorluk_yonet' => 1, 'ai_kullan' => 1],
+        'ekip'    => ['finans' => 0, 'rapor' => 0, 'kapasite' => 0, 'dosya_yonet' => 0, 'gorev_olustur' => 1, 'gorev_sil' => 0, 'icerik_yonet' => 1, 'ekipman_yonet' => 0, 'onay_gonder' => 1, 'duyuru_yayinla' => 0, 'takvim_yonet' => 1, 'kanal_kur' => 1, 'belge_olustur' => 0, 'arsiv_sil' => 0, 'talep_yonet' => 0, 'finans_yonet' => 0, 'randevu_yonet' => 0, 'havuz_yonet' => 0, 'mentorluk_yonet' => 0, 'ai_kullan' => 1],
+        'finans'  => ['finans' => 1, 'rapor' => 1, 'kapasite' => 1, 'dosya_yonet' => 0, 'gorev_olustur' => 0, 'gorev_sil' => 0, 'icerik_yonet' => 0, 'ekipman_yonet' => 0, 'onay_gonder' => 0, 'duyuru_yayinla' => 0, 'takvim_yonet' => 0, 'kanal_kur' => 1, 'belge_olustur' => 1, 'arsiv_sil' => 0, 'talep_yonet' => 0, 'finans_yonet' => 1, 'randevu_yonet' => 0, 'havuz_yonet' => 0, 'mentorluk_yonet' => 0, 'ai_kullan' => 1],
+        'stajyer' => ['finans' => 0, 'rapor' => 0, 'kapasite' => 0, 'dosya_yonet' => 0, 'gorev_olustur' => 0, 'gorev_sil' => 0, 'icerik_yonet' => 0, 'ekipman_yonet' => 0, 'onay_gonder' => 0, 'duyuru_yayinla' => 0, 'takvim_yonet' => 0, 'kanal_kur' => 0, 'belge_olustur' => 0, 'arsiv_sil' => 0, 'talep_yonet' => 0, 'finans_yonet' => 0, 'randevu_yonet' => 0, 'havuz_yonet' => 0, 'mentorluk_yonet' => 0, 'ai_kullan' => 0],
     ];
     return (bool)($default[$u['role']][$setting_key] ?? 0);
 }
@@ -363,8 +368,14 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.3';
+const APP_VERSION = '6.4';
 const VERSION_NOTES = [
+    '6.4' => [
+        '@ ile kişi bahsetme (yorum, tartışma, DM) onarıldı — kişi listesi yanlış ada yazıldığı için açılır liste hiç dolmuyordu',
+        'İş akışı adımları onarıldı: tamamlama/geri alma artık ekranda anında görünüyor; geri alınan adım yeniden "sıradaki adım" oluyor, sonrakiler bekliyor durumuna dönüyor',
+        'Sürüm yenilik kartı artık yalnızca yöneticilere gösteriliyor',
+        'Yetkiler detaylandırıldı — 5 yeni izin: finans kaydı düzenleme (görüntülemeden ayrıldı), randevu yanıtlama, çalışan havuzu yönetimi, mentörlük yönetimi, yapay zeka kullanımı. Hepsi kullanıcı bazında açılıp kapatılabilir',
+    ],
     '6.3' => [
         'Sekmeler kökten onarıldı: sayfa sekmelerinde (proje, finans...) eski içerik ekranda kalıp yenisi altına açılıyordu; sağ alttaki Alanım panelinin sekmeleri hiç değişmiyordu — ikisi de düzeldi',
         'Aynı kök sorunun (çeviri kalıntısı sınıf adları) son 31 örneği tek taramada bulunup temizlendi: görev kontrol listesi işaretleme, takvim etkinlik pencereleri, form/proje şablonu düzenleme satırları, kanal üyeleri, renk seçimleri ve daha fazlası',

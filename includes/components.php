@@ -180,7 +180,7 @@ function mention_script(): void {
     $people = is_customer()
         ? rows("SELECT id, name FROM users WHERE is_active=1 AND role!='musteri' ORDER BY name")
         : rows("SELECT id, name FROM users WHERE is_active=1 ORDER BY name");
-    echo '<script>window.sadaKisiler = ' . json_encode($people, JSON_UNESCAPED_UNICODE) . ';</script>';
+    echo '<script>window.sadaPeople = ' . json_encode($people, JSON_UNESCAPED_UNICODE) . ';</script>';
 }
 
 /** Renders a single comment (root or reply) */

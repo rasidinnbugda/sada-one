@@ -322,7 +322,7 @@ async function stepComplete(id) {
     if (!j.ok) return;
     toast(j.message, 'basari', 1800);
     j.steps.forEach(a => {
-        const el = document.querySelector(`[data-adim="${a.id}"]`);
+        const el = document.querySelector(`[data-step="${a.id}"]`);
         if (!el) return;
         el.classList.toggle('tamam', a.status === 'tamam');
         el.classList.toggle('aktif', a.status === 'aktif');
