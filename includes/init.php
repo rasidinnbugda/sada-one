@@ -361,8 +361,13 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.0.2';
+const APP_VERSION = '6.0.3';
 const VERSION_NOTES = [
+    '6.0.3' => [
+        'Modal başlık ve Kaydet/İptal şeritleri şeffaf kalıyordu; altlarından kayan form görünüyordu — artık modalın zeminini kullanıyorlar',
+        'Modal köşeleri: sabit duran başlık/alt şeritler kare zemin boyayıp yuvarlak köşeleri bozuyordu, düzeltildi (her temanın kendi köşe yarıçapına uyuyor)',
+        'Modal içi kaydırma çubuğu da inceltildi; boştayken görünmüyor',
+    ],
     '6.0.2' => [
         'Açılır menüler (bildirimler, profil, hızlı oluştur) artık tekrar basınca ve dışarı tıklayınca kapanıyor',
         'Üst bardaki global arama tamamen çalışır hale geldi — sonuç paneli görünmüyordu',

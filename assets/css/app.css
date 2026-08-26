@@ -348,6 +348,7 @@
 [data-theme="glass-light"] .arama-sonuc, [data-theme="glass-light"] .dock-panel,
 [data-theme="glass-light"] .mention-acilir, [data-theme="glass-light"] .modal {
     background: var(--overlay);
+    --modal-bg: var(--overlay);
     backdrop-filter: blur(30px) saturate(1.7);
     -webkit-backdrop-filter: blur(30px) saturate(1.7);
     box-shadow: 0 18px 48px -16px var(--golge), inset 0 1px 0 rgba(255, 255, 255, .16);
@@ -359,13 +360,14 @@
     border-radius: 22px;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 8px 32px -12px var(--golge);
 }
-[data-theme="liquid-glass"] .modal, [data-theme="liquid-glass-light"] .modal { border-radius: 26px; }
+[data-theme="liquid-glass"] .modal, [data-theme="liquid-glass-light"] .modal { --modal-r: 26px; }
 [data-theme="glass"] .kart, [data-theme="glass-light"] .kart {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15), 0 10px 36px -14px var(--golge);
 }
 /* Claymorphism: puffy, soft, double-shadow surfaces */
 [data-theme="clay"] .kart, [data-theme="clay"] .stat-kart, [data-theme="clay"] .kanban-sutun, [data-theme="clay"] .modal {
     border: none;
+    --modal-r: 24px;
     border-radius: 24px;
     box-shadow: 0 14px 28px -10px rgba(37, 99, 235, .18),
         inset 0 -4px 8px rgba(37, 99, 235, .07),
@@ -424,30 +426,30 @@ svg { flex-shrink: 0; }
    that same ring reads as a mismatched halo around the thumb. Inside panels the
    bar goes thin and borderless, and only surfaces while the area is hovered. */
 .kenar-nav, .bildirim-liste, .kanban-liste, .kanal-liste, .osec-liste, .osaat-liste,
-.arama-sonuc, .dock-icerik, .mention-acilir, .sohbet-govde {
+.arama-sonuc, .dock-icerik, .mention-acilir, .sohbet-govde, .modal {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
 }
 .kenar-nav:hover, .bildirim-liste:hover, .kanban-liste:hover, .kanal-liste:hover,
 .osec-liste:hover, .osaat-liste:hover, .arama-sonuc:hover, .dock-icerik:hover,
-.mention-acilir:hover, .sohbet-govde:hover {
+.mention-acilir:hover, .sohbet-govde:hover, .modal:hover {
     scrollbar-color: var(--border-2) transparent;
 }
 .kenar-nav::-webkit-scrollbar, .bildirim-liste::-webkit-scrollbar,
 .kanban-liste::-webkit-scrollbar, .kanal-liste::-webkit-scrollbar,
 .osec-liste::-webkit-scrollbar, .osaat-liste::-webkit-scrollbar,
 .arama-sonuc::-webkit-scrollbar, .dock-icerik::-webkit-scrollbar,
-.mention-acilir::-webkit-scrollbar, .sohbet-govde::-webkit-scrollbar { width: 6px; height: 6px; }
+.mention-acilir::-webkit-scrollbar, .sohbet-govde::-webkit-scrollbar, .modal::-webkit-scrollbar { width: 6px; height: 6px; }
 .kenar-nav::-webkit-scrollbar-track, .bildirim-liste::-webkit-scrollbar-track,
 .kanban-liste::-webkit-scrollbar-track, .kanal-liste::-webkit-scrollbar-track,
 .osec-liste::-webkit-scrollbar-track, .osaat-liste::-webkit-scrollbar-track,
 .arama-sonuc::-webkit-scrollbar-track, .dock-icerik::-webkit-scrollbar-track,
-.mention-acilir::-webkit-scrollbar-track, .sohbet-govde::-webkit-scrollbar-track { background: transparent; }
+.mention-acilir::-webkit-scrollbar-track, .sohbet-govde::-webkit-scrollbar-track, .modal::-webkit-scrollbar-track { background: transparent; }
 .kenar-nav::-webkit-scrollbar-thumb, .bildirim-liste::-webkit-scrollbar-thumb,
 .kanban-liste::-webkit-scrollbar-thumb, .kanal-liste::-webkit-scrollbar-thumb,
 .osec-liste::-webkit-scrollbar-thumb, .osaat-liste::-webkit-scrollbar-thumb,
 .arama-sonuc::-webkit-scrollbar-thumb, .dock-icerik::-webkit-scrollbar-thumb,
-.mention-acilir::-webkit-scrollbar-thumb, .sohbet-govde::-webkit-scrollbar-thumb {
+.mention-acilir::-webkit-scrollbar-thumb, .sohbet-govde::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
     background: transparent; border: none; border-radius: 99px;
     transition: background .2s ease;
 }
@@ -455,14 +457,14 @@ svg { flex-shrink: 0; }
 .kanban-liste:hover::-webkit-scrollbar-thumb, .kanal-liste:hover::-webkit-scrollbar-thumb,
 .osec-liste:hover::-webkit-scrollbar-thumb, .osaat-liste:hover::-webkit-scrollbar-thumb,
 .arama-sonuc:hover::-webkit-scrollbar-thumb, .dock-icerik:hover::-webkit-scrollbar-thumb,
-.mention-acilir:hover::-webkit-scrollbar-thumb, .sohbet-govde:hover::-webkit-scrollbar-thumb {
+.mention-acilir:hover::-webkit-scrollbar-thumb, .sohbet-govde:hover::-webkit-scrollbar-thumb, .modal:hover::-webkit-scrollbar-thumb {
     background: var(--border-2);
 }
 .kenar-nav::-webkit-scrollbar-thumb:hover, .bildirim-liste::-webkit-scrollbar-thumb:hover,
 .kanban-liste::-webkit-scrollbar-thumb:hover, .kanal-liste::-webkit-scrollbar-thumb:hover,
 .osec-liste::-webkit-scrollbar-thumb:hover, .osaat-liste::-webkit-scrollbar-thumb:hover,
 .arama-sonuc::-webkit-scrollbar-thumb:hover, .dock-icerik::-webkit-scrollbar-thumb:hover,
-.mention-acilir::-webkit-scrollbar-thumb:hover, .sohbet-govde::-webkit-scrollbar-thumb:hover {
+.mention-acilir::-webkit-scrollbar-thumb:hover, .sohbet-govde::-webkit-scrollbar-thumb:hover, .modal::-webkit-scrollbar-thumb:hover {
     background: var(--muted);
 }
 
@@ -773,17 +775,25 @@ table.tablo { width: 100%; border-collapse: collapse; }
 .modal-katman.acik { opacity: 1; visibility: visible; }
 .modal-katman::before { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.42); backdrop-filter: blur(7px); }
 .modal {
-    position: relative; background: var(--surface); border: 1px solid var(--border-2);
-    border-radius: 20px; width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto;
+    /* Published for the sticky bars below — they may sit at any depth */
+    --modal-bg: var(--surface);
+    --modal-r: 20px;
+    position: relative; background: var(--modal-bg); border: 1px solid var(--border-2);
+    border-radius: var(--modal-r); width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto;
     box-shadow: 0 22px 52px -20px rgba(0,0,0,.38);
     transform: translateY(14px) scale(.96); transition: transform .3s var(--yay);
 }
 .modal-katman.acik .modal { transform: none; }
 .modal-genis { max-width: 780px; }
-.modal-ust { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 2; }
+.modal-ust { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--modal-bg); border-radius: var(--modal-r) var(--modal-r) 0 0; z-index: 2; }
+/* The sticky bars paint their own background on top of the modal, so they must
+   take the modal's colour rather than --surface: in the glass themes --surface
+   is a 7% white and the scrolling form shows straight through them. `inherit`
+   stays correct in every theme. They inherit the corner radius too, then flatten
+   the inner edge — a square background would otherwise cover the rounded corners. */
 .modal-baslik { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600; }
 .modal-govde { padding: 22px 24px; }
-.modal-alt { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--surface); }
+.modal-alt { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--modal-bg); border-radius: 0 0 var(--modal-r) var(--modal-r); z-index: 2; }
 .modal-kapat { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 20px; transition: background var(--gecis); }
 .modal-kapat:hover { background: var(--surface-2); color: var(--text); }
 
