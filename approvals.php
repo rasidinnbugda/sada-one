@@ -26,7 +26,7 @@ page_start('Onaylar', 'approvals');
 </div>
 
 <div class="filtre-bar">
-    <div class="pill-filtre" data-pill-grup="#onayListe .onay-kart">
+    <div class="pill-filtre" data-pill-grup="#approvalList .onay-kart">
         <button class="pill aktif" data-setting_value="">Tümü</button>
         <?php foreach (APPROVAL_STATUSES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>

@@ -28,7 +28,7 @@ page_start('Talepler', 'requests');
 
 <?php if (is_staff()): ?>
 <div class="filtre-bar">
-    <div class="pill-filtre" data-pill-grup="#talepListe .talep-sat">
+    <div class="pill-filtre" data-pill-grup="#requestList .talep-sat">
         <button class="pill aktif" data-setting_value="">Tümü</button>
         <?php foreach (REQUEST_STATUSES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>

@@ -27,11 +27,11 @@ page_start('Yönetici Takip', 'ytakip');
 </div>
 
 <div class="filtre-bar">
-    <div class="pill-filtre" data-pill-grup="#ytTablo tbody tr">
+    <div class="pill-filtre" data-pill-grup="#ytTable tbody tr">
         <button class="pill aktif" data-setting_value="">Tümü</button>
         <?php foreach (TASK_STATUSES as $min => $dv): ?><button class="pill" data-setting_value="<?= $min ?>"><?= $dv ?></button><?php endforeach; ?>
     </div>
-    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Görev ara..." data-search="#ytTablo tbody tr"></div>
+    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Görev ara..." data-search="#ytTable tbody tr"></div>
 </div>
 
 <div class="tablo-sar"><table class="tablo" id="ytTable">

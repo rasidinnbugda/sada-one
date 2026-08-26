@@ -132,7 +132,7 @@ page_start('Mesajlar', 'messages');
 <div class="modal-katman" id="modalDM">
     <div class="modal"><div class="modal-ust"><div class="modal-baslik">Birebir Mesaj</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde">
-        <div class="form-grup"><input class="girdi" placeholder="Kişi ara..." data-search="#dmListe .dm-kisi"></div>
+        <div class="form-grup"><input class="girdi" placeholder="Kişi ara..." data-search="#dmList .dm-kisi"></div>
         <div class="dikey" style="gap:4px;max-height:340px;overflow-y:auto" id="dmList">
             <?php foreach ($dmPeople as $person): ?>
             <button class="satir-esnek dm-kisi" style="gap:11px;padding:9px 11px;border-radius:11px;text-align:left;transition:background .2s" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''" data-action="dm_open" data-user_id="<?= $person['id'] ?>" data-refresh="hayir" data-search="<?= e($person['name']) ?>">

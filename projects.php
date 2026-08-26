@@ -31,8 +31,8 @@ page_start(is_staff() ? 'Projeler' : 'Projelerim', 'projects');
 </div>
 
 <div class="filtre-bar">
-    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Proje ara..." data-search="#projeIzgara .proje-kart"></div>
-    <div class="pill-filtre" data-pill-grup="#projeIzgara .proje-kart">
+    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Proje ara..." data-search="#projectIzgara .proje-kart"></div>
+    <div class="pill-filtre" data-pill-grup="#projectIzgara .proje-kart">
         <button class="pill aktif" data-setting_value="">Tümü</button>
         <?php foreach (PROJECT_TYPES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>

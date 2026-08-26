@@ -20,12 +20,12 @@ page_start('Çalışan Havuzu', 'pool');
 </div>
 
 <div class="filtre-bar">
-    <div class="pill-filtre" data-pill-grup="#havuzListe tbody tr">
+    <div class="pill-filtre" data-pill-grup="#poolList tbody tr">
         <button class="pill aktif" data-setting_value="">Tümü (<?= count($people) ?>)</button>
         <button class="pill" data-setting_value="1">Çalışıldı</button>
         <button class="pill" data-setting_value="0">Henüz Çalışılmadı</button>
     </div>
-    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="İsim veya yetkinlik ara..." data-search="#havuzListe tbody tr"></div>
+    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="İsim veya yetkinlik ara..." data-search="#poolList tbody tr"></div>
 </div>
 
 <?php if (!$people): ?>

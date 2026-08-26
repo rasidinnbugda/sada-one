@@ -25,7 +25,7 @@ page_start('Dosya Arşivi', 'archive');
 </div>
 
 <div class="filtre-bar">
-    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Dosya ara..." data-search="#arsivIzgara .arsiv-kart"></div>
+    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Dosya ara..." data-search="#archiveIzgara .arsiv-kart"></div>
     <?php if ($clients): ?>
     <select class="secim" style="max-width:240px" onchange="location.href='?client='+this.value">
         <option value="0">Tüm Dosyalar</option>

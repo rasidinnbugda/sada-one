@@ -361,8 +361,14 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.0.4';
+const APP_VERSION = '6.1';
 const VERSION_NOTES = [
+    '6.1' => [
+        'Kullanıcılar sayfasında arama ve rol filtresi onarıldı — ayrıca aynı sorun 10 sayfada daha vardı (dosyalar, projeler, görevler, ekipman, onaylar, talepler, arşiv, mesajlar, yetenek havuzu, yönetici takip); hepsinde arama/filtre yeniden çalışıyor',
+        'Kullanıcı bazlı özel izinler artık gerçekten çalışıyor: düzenleme modalındaki izin ızgarası rol varsayılanlarını doğru gösteriyor, işaretlemeler kaydediliyor ve rol varsayılanlarını kişi bazında geçersiz kılıyor',
+        'Müşteri kullanıcısının erişebileceği dosya seçimi de aynı sebepten kaydedilmiyordu; düzeltildi',
+        'Kullanıcı silme eklendi: görev atamaları, üyelikler ve kişisel veriler temizlenir; yorumlar ve geçmiş kayıtlar okunabilir kalır. Kendinizi ve son aktif yöneticiyi silmek engellidir',
+    ],
     '6.0.4' => [
         'Uzun (kaydırılabilir) modallarda köşe yuvarlaklığının kaybolması düzeltildi — kaydırma çubuğu dahil her şey artık yuvarlak köşeye kırpılıyor',
         'Özel seçim kutuları (Tür gibi) düz metin gibi görünüyordu; artık kenarlıklı, ok işaretli gerçek kutu görünümünde',

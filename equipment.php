@@ -40,8 +40,8 @@ page_start('Ekipman', 'ekipman');
 </div>
 
 <div class="filtre-bar">
-    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Ekipman ara..." data-search="#ekipmanListe .ekipman-kart"></div>
-    <div class="pill-filtre" data-pill-grup="#ekipmanListe .ekipman-kart">
+    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Ekipman ara..." data-search="#equipmentList .ekipman-kart"></div>
+    <div class="pill-filtre" data-pill-grup="#equipmentList .ekipman-kart">
         <button class="pill aktif" data-setting_value="">Tümü</button>
         <?php foreach (EQUIPMENT_CATEGORIES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>

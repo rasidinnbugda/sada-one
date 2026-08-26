@@ -96,7 +96,7 @@ page_start('Görevler', 'tasks');
         <a href="?<?= http_build_query(array_filter(['filtre' => 'archive', 'project' => $projectFiltre, 'view' => $view])) ?>" class="pill <?= $filtre === 'archive' ? 'aktif' : '' ?>">Arşiv</a>
     </div>
     <?php if ($view === 'tablo'): ?>
-    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Görev ara..." data-search="#gorevTablo tbody tr"></div>
+    <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Görev ara..." data-search="#taskTable tbody tr"></div>
     <?php endif; ?>
     <?php if ($projectFiltre): ?><a href="tasks.php?view=<?= $view ?>" class="btn btn-sm btn-hayalet">Filtreyi Temizle ✕</a><?php endif; ?>
 </div>

@@ -1845,6 +1845,27 @@ case 'user_status':
     update_row('users', ['is_active' => (int)$g('is_active')], 'id=?', [(int)$g('id')]);
     json_out(['ok' => true, 'mesaj' => 'Durum güncellendi.']);
 
+case 'user_delete':
+    require_admin();
+    $id = (int)$g('id');
+    if ($id === (int)$u['id']) json_out(['ok' => false, 'error' => 'Kendi hesabınızı silemezsiniz.']);
+    $target = row("SELECT id, name, role FROM users WHERE id=?", [$id]);
+    if (!$target) json_out(['ok' => false, 'error' => 'Kullanıcı bulunamadı.']);
+    if ($target['role'] === 'yonetici' && !val("SELECT COUNT(*) FROM users WHERE role='yonetici' AND is_active=1 AND id!=?", [$id]))
+        json_out(['ok' => false, 'error' => 'Son aktif yönetici silinemez.']);
+    // Memberships, assignments and personal data go with the account.
+    // Authored content (comments, tasks, uploads, time entries) is kept — the
+    // pages LEFT JOIN users, so history stays readable without the account.
+    foreach (['customer_clients', 'task_assignees', 'task_watchers', 'channel_members',
+              'project_members', 'client_members', 'notifications',
+              'personal_todos', 'personal_links', 'personal_notes'] as $t)
+        q("DELETE FROM `$t` WHERE user_id=?", [$id]);
+    q("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", [$id]);
+    q("UPDATE clients SET manager_id=NULL WHERE manager_id=?", [$id]);
+    q("DELETE FROM users WHERE id=?", [$id]);
+    log_activity('Kullanıcı silindi: ' . $target['name']);
+    json_out(['ok' => true, 'mesaj' => 'Kullanıcı silindi.']);
+
 /* ==================== WORKFLOW TEMPLATES (admin) ==================== */
 case 'workflow_save':
     require_admin();

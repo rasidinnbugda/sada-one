@@ -37,9 +37,9 @@ page_start(is_customer() ? 'Dosyalarım' : 'Dosyalar', 'clients');
 <div class="filtre-bar">
     <div class="arama-kutu">
         <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
-        <input class="girdi" placeholder="Dosya ara..." data-search="#dosyaIzgara .dosya-kart">
+        <input class="girdi" placeholder="Dosya ara..." data-search="#clientIzgara .dosya-kart">
     </div>
-    <div class="pill-filtre" data-pill-grup="#dosyaIzgara .dosya-kart">
+    <div class="pill-filtre" data-pill-grup="#clientIzgara .dosya-kart">
         <button class="pill aktif" data-setting_value="">Tümü</button>
         <?php foreach (CLIENT_TYPES as $k => $v): ?><button class="pill" data-setting_value="<?= $k ?>"><?= $v ?></button><?php endforeach; ?>
     </div>
