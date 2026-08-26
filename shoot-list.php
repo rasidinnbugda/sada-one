@@ -5,6 +5,8 @@
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
+require_once __DIR__ . '/includes/google-drive.php';
+$driveReady = drive_configured();
 $u = require_staff();
 
 $historyShow = isset($_GET['history']);
@@ -48,7 +50,12 @@ page_start('Çekim Listesi', 'shoots');
                 <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn">Drive ↗</a><?php endif; ?>
                 <?php elseif (strtotime($c['start']) < time()): ?>
                 <span class="rozet r-gecikti" title="Görüntüler henüz Drive'da görünmüyor">📁 Aktarılmadı</span>
+                <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn">Klasöre yükle ↗</a>
+                <?php elseif ($driveReady): ?><button class="mini-btn" data-action="drive_folder_create" data-id="<?= $c['id'] ?>" data-refresh="evet">Klasör oluştur</button><?php endif; ?>
                 <button class="mini-btn" onclick="driveMark(<?= $c['id'] ?>)">Aktarıldı işaretle</button>
+                <?php else: ?>
+                <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn" title="Çekim dosyaları bu klasöre yüklenecek">📁 Drive klasörü ↗</a>
+                <?php elseif ($driveReady): ?><button class="mini-btn" data-action="drive_folder_create" data-id="<?= $c['id'] ?>" data-refresh="evet">📁 Klasör oluştur</button><?php endif; ?>
                 <?php endif; ?>
                 <?php if (permission('takvim_yonet')): ?>
                 <button class="btn btn-sm" onclick='ckEdit(<?= json_encode(['id' => $c['id'], 'shopping_list' => $c['shopping_list'], 'needs_list' => $c['needs_list']], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 13) ?> Listeyi Düzenle</button>

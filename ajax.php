@@ -44,6 +44,25 @@ case 'drive_folder_test':
     if (!$r['ok']) json_out(['ok' => false, 'error' => 'Klasör okunamadı: ' . $r['error'] . ' (Klasörü servis hesabı e-postasıyla paylaştınız mı?)']);
     json_out(['ok' => true, 'mesaj' => 'Klasör erişilebilir ✓' . ($r['sample'] ? ' (örnek dosya: ' . $r['sample'] . ')' : ' (klasör şu an boş)')]);
 
+case 'drive_disconnect':
+    require_admin();
+    q("DELETE FROM settings WHERE setting_key IN ('google_refresh_token','google_drive_email','google_drive_token')");
+    log_activity('Google Drive bağlantısı kesildi');
+    json_out(['ok' => true, 'mesaj' => 'Google bağlantısı kesildi.']);
+
+case 'drive_folder_create':
+    // Create (or complete) the Drive folder of an existing shoot
+    require_staff();
+    require_once __DIR__ . '/includes/google-drive.php';
+    $ev = row("SELECT e.*, c.name client_name, c.drive_folder_id client_folder
+        FROM events e LEFT JOIN clients c ON c.id = COALESCE(e.client_id, (SELECT client_id FROM projects WHERE id=e.project_id))
+        WHERE e.id=? AND e.type='cekim'", [(int)$g('id')]);
+    if (!$ev) json_out(['ok' => false, 'error' => 'Çekim bulunamadı.']);
+    if ($ev['drive_folder_id']) json_out(['ok' => false, 'error' => 'Bu çekimin zaten bir klasörü var.']);
+    $r = event_drive_folder($ev);
+    if (!$r) json_out(['ok' => false, 'error' => 'Klasör oluşturulamadı: ' . ($GLOBALS['drive_last_error'] ?? 'Drive bağlantısını kontrol edin.')]);
+    json_out(['ok' => true, 'mesaj' => 'Drive klasörü oluşturuldu.', 'link' => $r['link']]);
+
 case 'drive_mark':
     // Manually mark a shoot as transferred (with an optional Drive link)
     if (!is_staff()) deny();
@@ -1033,6 +1052,18 @@ case 'event_save':
     $data['created_by'] = $u['id']; $data['created'] = $now;
     $eventId = insert('events', $data);
     $syncEventExpense($eventId);
+    // Shoot planned → its Drive upload folder is created right away (best effort)
+    $folderMessage = '';
+    if ($data['type'] === 'cekim' && empty($data['drive_folder_id'])) {
+        require_once __DIR__ . '/includes/google-drive.php';
+        if (drive_configured()) {
+            $ev = row("SELECT e.*, c.name client_name, c.drive_folder_id client_folder
+                FROM events e LEFT JOIN clients c ON c.id = COALESCE(e.client_id, (SELECT client_id FROM projects WHERE id=e.project_id))
+                WHERE e.id=?", [$eventId]);
+            $r = $ev ? event_drive_folder($ev) : null;
+            $folderMessage = $r ? ' Drive klasörü oluşturuldu.' : '';
+        }
+    }
     if (is_array($participantIds)) {
         foreach (array_unique(array_map('intval', $participantIds)) as $kid) {
             if (!$kid) continue;
@@ -1052,7 +1083,7 @@ case 'event_save':
         log_equipment($eid, 'shoot_output', $data['title'], (int)$u['id'], $eventId);
     }
     $messageEk = $atlanabilen ? ' (müsait olmayanlar atlandı: ' . implode(', ', $atlanabilen) . ')' : '';
-    json_out(['ok' => true, 'mesaj' => 'Etkinlik eklendi.' . $messageEk]);
+    json_out(['ok' => true, 'mesaj' => 'Etkinlik eklendi.' . $folderMessage . $messageEk]);
 
 case 'event_delete':
     require_staff();
@@ -1068,7 +1099,7 @@ case 'message_send':
     // Membership check
     if (!val("SELECT COUNT(*) FROM channel_members WHERE channel_id=? AND user_id=?", [$channelId, $u['id']]))
         json_out(['ok' => false, 'error' => 'Bu kanala erişiminiz yok.']);
-    $id = insert('messages', ['channel_id' => $channelId, 'user_id' => $u['id'], 'mesaj' => $message, 'created' => $now]);
+    $id = insert('messages', ['channel_id' => $channelId, 'user_id' => $u['id'], 'message' => $message, 'created' => $now]);
     update_row('channel_members', ['last_read' => $now], 'channel_id=? AND user_id=?', [$channelId, $u['id']]);
     // Notify other members
     foreach (rows("SELECT user_id FROM channel_members WHERE channel_id=? AND user_id!=?", [$channelId, $u['id']]) as $member) {
@@ -1302,10 +1333,27 @@ case 'sd_update_row':
         $link = trim($g('drive_link'));
         update_row('equipment', ['sd_status' => 'aktarildi', 'sd_drive_link' => $link ?: null], 'id=?', [$ek['id']]);
         log_equipment($ek['id'], 'sd_aktarildi', trim(($ek['sd_content'] ?: '') . ($link ? ' → ' . $link : '')));
-        json_out(['ok' => true, 'mesaj' => "Drive'a aktarıldı olarak işaretlendi."]);
+        // The linked shoot inherits the transfer: mark it too (manual link = transferred)
+        $shoot = sd_last_shoot((int)$ek['id']);
+        if ($shoot) {
+            update_row('events', $link ? ['drive_status' => 'aktarildi', 'drive_link' => $link] : ['drive_status' => 'aktarildi'], 'id=?', [$shoot['id']]);
+        }
+        json_out(['ok' => true, 'mesaj' => "Drive'a aktarıldı olarak işaretlendi." . ($shoot ? ' Bağlı çekim de aktarıldı sayıldı: ' . $shoot['title'] : '')]);
     }
     if ($operation === 'bosalt') {
         if ($ek['sd_status'] === 'dolu') json_out(['ok' => false, 'error' => "Dikkat: içerik henüz Drive'a aktarılmadı! Önce aktarımı işaretleyin."]);
+        // The card looks transferred, but is the SHOOT confirmed in Drive? If not, warn loudly.
+        $shoot = sd_last_shoot((int)$ek['id']);
+        if ($shoot) {
+            foreach (array_filter(array_unique([(int)$shoot['manager_id'], (int)$shoot['created_by']])) as $uid) {
+                notify($uid, '⚠️ SD kart boşaltıldı — çekim Drive\'da doğrulanmadı',
+                    '"' . $ek['name'] . '" kartı boşaltıldı ama "' . $shoot['title'] . '" çekiminin dosyaları henüz Drive\'da görülmedi.',
+                    'shoot-list.php', 'gorev');
+            }
+            log_equipment($ek['id'], 'sd_bosaltildi', 'UYARI: bağlı çekim (' . $shoot['title'] . ') Drive\'da doğrulanmadan boşaltıldı');
+            update_row('equipment', ['sd_status' => 'bos', 'sd_content' => null, 'sd_drive_link' => null], 'id=?', [$ek['id']]);
+            json_out(['ok' => true, 'mesaj' => '⚠️ Kart boşaltıldı ama "' . $shoot['title'] . '" çekimi Drive\'da doğrulanmadı — yöneticiye uyarı gönderildi.']);
+        }
         // Content + link are stored in the history log, the card is reset
         log_equipment($ek['id'], 'sd_bosaltildi', trim(($ek['sd_content'] ?: '') . ($ek['sd_drive_link'] ? ' (arşiv: ' . $ek['sd_drive_link'] . ')' : '')));
         update_row('equipment', ['sd_status' => 'bos', 'sd_content' => null, 'sd_drive_link' => null], 'id=?', [$ek['id']]);
@@ -1926,6 +1974,13 @@ case 'setting_save':
         'smtp_host' => 'smtp_host', 'smtp_port' => 'smtp_port', 'smtp_user' => 'smtp_kullanici',
         'smtp_sender' => 'smtp_gonderen', 'email_notification' => 'eposta_bildirim',
         'ai_model' => 'ai_model'];
+    // Google OAuth client: id is plain, the secret only overwrites on a fresh value
+    if (isset($_POST['google_client_id'])) {
+        q("INSERT INTO settings (setting_key,setting_value) VALUES ('google_client_id',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['google_client_id']), trim($_POST['google_client_id'])]);
+    }
+    if (!empty($_POST['google_client_secret']) && !str_starts_with($_POST['google_client_secret'], '••')) {
+        q("INSERT INTO settings (setting_key,setting_value) VALUES ('google_client_secret',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['google_client_secret']), trim($_POST['google_client_secret'])]);
+    }
     // AI key: only overwrite when a new value is typed (placeholder dots stay put)
     if (!empty($_POST['anthropic_api_key']) && !str_starts_with($_POST['anthropic_api_key'], '••')) {
         q("INSERT INTO settings (setting_key,setting_value) VALUES ('anthropic_api_key',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['anthropic_api_key']), trim($_POST['anthropic_api_key'])]);

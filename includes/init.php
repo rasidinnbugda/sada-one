@@ -284,6 +284,8 @@ function csrf_check(): void {
 function e($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 function json_out($data, int $code = 200): void {
+    // The endpoints answer with 'mesaj', the front-end reads j.message — serve both
+    if (is_array($data) && isset($data['mesaj']) && !isset($data['message'])) $data['message'] = $data['mesaj'];
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
@@ -361,8 +363,16 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.1';
+const APP_VERSION = '6.2';
 const VERSION_NOTES = [
+    '6.2' => [
+        'Drive artık JSON dosyası olmadan bağlanıyor: Ayarlar → Drive kartına Client ID + Secret girip "Google ile Bağlan"a basmanız yeterli — klasörler kendi Drive hesabınızda açılır (JSON servis hesabı alternatif olarak duruyor)',
+        'Çekim planlanınca Drive yükleme klasörü otomatik oluşturuluyor (müşterinin Drive klasörü altında; yoksa panel kök klasöründe) ve çekim kartına bağlanıyor',
+        'Çekim listesinde gelecek çekimlerde "klasöre yükle" linki; klasörü olmayan çekimler için tek tık "Klasör oluştur" düğmesi',
+        'Çekimin üstünden 24 saat geçip görüntüler Drive\'da görülmezse ekip + dosya yöneticisi uyarılıyor (bildirim + e-posta); Drive bağlıysa klasör otomatik denetlenip "aktarıldı" işaretleniyor',
+        'SD kart çekimle bağlantılı: kart "Drive\'a aktarıldı" işaretlenince bağlı çekim de aktarıldı sayılıyor; çekim Drive\'da doğrulanmadan kart boşaltılırsa dosya yöneticisine uyarı gidiyor',
+        'Panel genelinde başarı bildirimleri (yeşil mesajlar) görünmüyordu, düzeltildi; sohbette mesaj gönderme hatası giderildi',
+    ],
     '6.1' => [
         'Kullanıcılar sayfasında arama ve rol filtresi onarıldı — ayrıca aynı sorun 10 sayfada daha vardı (dosyalar, projeler, görevler, ekipman, onaylar, talepler, arşiv, mesajlar, yetenek havuzu, yönetici takip); hepsinde arama/filtre yeniden çalışıyor',
         'Kullanıcı bazlı özel izinler artık gerçekten çalışıyor: düzenleme modalındaki izin ızgarası rol varsayılanlarını doğru gösteriyor, işaretlemeler kaydediliyor ve rol varsayılanlarını kişi bazında geçersiz kılıyor',
@@ -652,6 +662,20 @@ function full_url(string $path): string {
     return $protokol . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/' . ltrim($path, '/');
 }
 
+/**
+ * The most recent shoot (last 30 days) an SD card was checked out to whose
+ * footage has NOT been confirmed in Drive yet — the hook for the SD warnings.
+ */
+function sd_last_shoot(int $equipmentId): ?array {
+    $r = row("SELECT e.id, e.title, e.created_by, c.manager_id
+        FROM event_equipment ee JOIN events e ON e.id=ee.event_id
+        LEFT JOIN clients c ON c.id = COALESCE(e.client_id, (SELECT client_id FROM projects WHERE id=e.project_id))
+        WHERE ee.equipment_id=? AND e.type='cekim' AND e.drive_status='bekliyor'
+        AND e.start > DATE_SUB(NOW(), INTERVAL 30 DAY)
+        ORDER BY e.start DESC LIMIT 1", [$equipmentId]);
+    return $r ?: null;
+}
+
 function log_activity(string $description, ?string $refType = null, ?int $refId = null): void {
     insert('activities', [
         'user_id' => (int)(user()['id'] ?? 0), 'ref_type' => $refType, 'ref_id' => $refId,
@@ -910,7 +934,7 @@ function run_recurring_jobs(bool $force = false): int {
         $overdueList = rows("SELECT g.title, g.due_date, u.name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id WHERE g.is_archived=0 AND g.status!='tamamlandi' AND g.due_date < CURDATE() ORDER BY g.due_date LIMIT 15");
         $todayShoots = rows("SELECT title, start FROM events WHERE type='cekim' AND DATE(start)=CURDATE()");
         $pendingApprovals = (int)val("SELECT COUNT(*) FROM approvals WHERE status='bekliyor'");
-        $missingDrive = (int)val("SELECT COUNT(*) FROM events WHERE type='cekim' AND drive_status='bekliyor' AND COALESCE(`end`, start) < DATE_SUB(NOW(), INTERVAL 12 HOUR) AND start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        $missingDrive = (int)val("SELECT COUNT(*) FROM events WHERE type='cekim' AND drive_status='bekliyor' AND COALESCE(`end`, start) < DATE_SUB(NOW(), INTERVAL 24 HOUR) AND start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
         if ($overdueList || $todayShoots || $pendingApprovals || $missingDrive) {
             $ozet = "Günaydın! " . date('d.m.Y') . " özeti:\n\n";
             if ($overdueList) { $ozet .= "GECİKEN GÖREVLER (" . count($overdueList) . "):\n"; foreach ($overdueList as $o2) $ozet .= "- " . $o2['title'] . ' (' . ($o2['name'] ?: 'atanmamış') . ', son: ' . format_date($o2['due_date']) . ")\n"; $ozet .= "\n"; }
@@ -938,7 +962,7 @@ function run_recurring_jobs(bool $force = false): int {
             (SELECT GROUP_CONCAT(ep.user_id) FROM event_participants ep WHERE ep.event_id=e.id) participant_ids
             FROM events e LEFT JOIN clients c ON c.id = COALESCE(e.client_id, (SELECT client_id FROM projects WHERE id=e.project_id))
             WHERE e.type='cekim' AND e.drive_status='bekliyor'
-            AND COALESCE(e.`end`, e.start) < DATE_SUB(NOW(), INTERVAL 12 HOUR)
+            AND COALESCE(e.`end`, e.start) < DATE_SUB(NOW(), INTERVAL 24 HOUR)
             AND e.start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
         foreach ($pendingShoots as $sh) {
             $folder = $sh['drive_folder_id'] ?: $sh['client_folder'];

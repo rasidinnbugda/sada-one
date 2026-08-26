@@ -4,6 +4,8 @@ require_once __DIR__ . '/includes/layout.php';
 $u = require_admin();
 
 page_start('Ayarlar', 'settings');
+if (isset($_GET['drive_ok'])) echo '<script>addEventListener("DOMContentLoaded",()=>toast("Google bağlandı: ' . e($_GET['drive_ok']) . '","basari",5000))</script>';
+if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded",()=>toast("Drive bağlantı hatası: ' . e($_GET['drive_err']) . '","hata",7000))</script>';
 ?>
 <div class="sayfa-ust"><div><div class="sayfa-baslik">Sistem Ayarları</div><div class="sayfa-alt">Genel yapılandırma ve e-posta gönderimi</div></div></div>
 
@@ -96,34 +98,59 @@ page_start('Ayarlar', 'settings');
     <!-- Google Drive integration -->
     <div class="kart">
         <div class="kart-baslik mb-2">📁 Google Drive Entegrasyonu</div>
-        <div class="hucre-alt mb-3">Çekimlerin Drive'a aktarılıp aktarılmadığını panel otomatik denetler. Kurulum bir kez yapılır.</div>
-        <?php $driveKurulu = is_file(ROOT . '/storage/google-service.json'); ?>
-        <?php if ($driveKurulu): ?>
-        <div class="satir-esnek mb-2" style="gap:10px;padding:10px 14px;background:var(--parlak);border-radius:10px">
-            <span class="kucuk">✅ Servis hesabı anahtarı yüklü.</span>
+        <div class="hucre-alt mb-3">Çekim planlanınca Drive klasörü otomatik açılır; görüntülerin yüklenip yüklenmediği panel tarafından denetlenir.</div>
+        <?php $oauthBagli = setting('google_refresh_token') !== ''; $serviceKurulu = is_file(ROOT . '/storage/google-service.json'); ?>
+        <?php if ($oauthBagli): ?>
+        <div class="satir-esnek arasi mb-3" style="gap:10px;padding:12px 14px;background:var(--parlak);border-radius:10px">
+            <span class="kucuk">✅ Bağlı Google hesabı: <b><?= e(setting('google_drive_email') ?: '—') ?></b></span>
+            <span class="satir-esnek" style="gap:8px">
+                <button type="button" class="btn btn-sm" data-action="drive_test" data-refresh="hayir">Test Et</button>
+                <button type="button" class="btn btn-sm btn-hayalet" data-action="drive_disconnect" data-approval="Google bağlantısı kesilsin mi? Otomatik klasör oluşturma ve denetim durur.">Bağlantıyı Kes</button>
+            </span>
         </div>
-        <?php endif; ?>
+        <?php else: ?>
         <form data-ajax="setting_save" data-refresh="evet">
-            <div class="form-grup"><label class="form-etiket">Servis Hesabı Anahtarı (JSON)</label>
-                <input type="file" name="google_service_key" class="girdi" accept=".json">
+            <div class="form-satir">
+                <div class="form-grup"><label class="form-etiket">Client ID</label>
+                    <input name="google_client_id" class="girdi" value="<?= e(setting('google_client_id')) ?>" placeholder="....apps.googleusercontent.com"></div>
+                <div class="form-grup"><label class="form-etiket">Client Secret</label>
+                    <input type="password" name="google_client_secret" class="girdi" placeholder="<?= setting('google_client_secret') ? '••••••••••••' : 'GOCSPX-...' ?>"></div>
             </div>
+            <div class="form-grup"><label class="form-etiket">Yönlendirme Adresi (Google Console'a eklenecek)</label>
+                <input class="girdi" readonly value="<?= e(full_url('oauth-google.php')) ?>" onclick="this.select()"></div>
             <div class="satir-esnek" style="gap:10px">
-                <button type="submit" class="btn btn-marka">Kaydet</button>
-                <button type="button" class="btn" data-action="drive_test" data-refresh="hayir">Bağlantıyı Test Et</button>
+                <button type="submit" class="btn">Kaydet</button>
+                <?php if (setting('google_client_id') !== '' && setting('google_client_secret') !== ''): ?>
+                <a href="oauth-google.php?baslat=1" class="btn btn-marka">Google ile Bağlan</a>
+                <?php endif; ?>
             </div>
         </form>
         <div class="metin-2 kucuk mt-3" style="line-height:1.8">
-            <b>Kurulum (≈15 dk, ücretsiz):</b><br>
+            <b>Kurulum (≈10 dk, ücretsiz — JSON dosyası gerekmez):</b><br>
             <b>1.</b> <a href="https://console.cloud.google.com" target="_blank" style="color:var(--marka)">console.cloud.google.com</a> → yeni proje oluşturun (örn. "sada-one").<br>
-            <b>2.</b> <b>API'ler ve Hizmetler → Kitaplık</b> → "Google Drive API"yi bulup <b>Etkinleştir</b>'e basın.<br>
-            <b>3.</b> <b>API'ler ve Hizmetler → Kimlik Bilgileri → Kimlik bilgisi oluştur → Hizmet hesabı</b> → ad verin, oluşturun (rol seçmeye gerek yok).<br>
-            <b>4.</b> Hizmet hesabına tıklayın → <b>Anahtarlar → Anahtar ekle → JSON</b> → inen dosyayı yukarıdan yükleyin.<br>
-            <b>5.</b> Takip edilecek Drive klasörlerini, hizmet hesabının e-posta adresiyle (<code>...@...iam.gserviceaccount.com</code>) <b>Görüntüleyen</b> olarak paylaşın.<br>
-            <b>6.</b> Dosya (müşteri) kartındaki <b>Drive Klasörü</b> alanına klasör linkini yapıştırın — hepsi bu.
+            <b>2.</b> <b>API'ler ve Hizmetler → Kitaplık</b> → "Google Drive API"yi <b>Etkinleştir</b>in.<br>
+            <b>3.</b> <b>OAuth izin ekranı</b> → Workspace kullanıyorsanız tür olarak <b>Internal</b> seçin (doğrulama gerekmez); değilse External seçip kendi adresinizi test kullanıcısı ekleyin.<br>
+            <b>4.</b> <b>Kimlik Bilgileri → Kimlik bilgisi oluştur → OAuth istemci kimliği → Web uygulaması</b> → "Yetkili yönlendirme URI'leri" alanına yukarıdaki adresi yapıştırın.<br>
+            <b>5.</b> Oluşan <b>Client ID</b> ve <b>Client Secret</b>'ı yukarı yapıştırıp <b>Kaydet</b>, ardından <b>Google ile Bağlan</b>'a basın.<br>
+            Klasörler bağladığınız hesabın Drive'ında açılır; ek paylaşım gerekmez.
         </div>
+        <?php endif; ?>
+        <details class="mt-3">
+            <summary class="kucuk metin-muted" style="cursor:pointer">Alternatif: servis hesabı (JSON anahtar) ile bağlanma<?= $serviceKurulu ? ' — ✅ anahtar yüklü' : '' ?></summary>
+            <form data-ajax="setting_save" data-refresh="evet" class="mt-2">
+                <div class="form-grup"><label class="form-etiket">Servis Hesabı Anahtarı (JSON)</label>
+                    <input type="file" name="google_service_key" class="girdi" accept=".json">
+                    <div class="form-ipucu">Bu yöntemde klasörler ancak robota <b>Düzenleyen</b> yetkisiyle paylaşılmış klasörlerin içinde açılabilir. Takip klasörlerini servis hesabının e-postasıyla paylaşmayı unutmayın.</div>
+                </div>
+                <div class="satir-esnek" style="gap:10px">
+                    <button type="submit" class="btn">Kaydet</button>
+                    <?php if (!$oauthBagli && $serviceKurulu): ?><button type="button" class="btn" data-action="drive_test" data-refresh="hayir">Bağlantıyı Test Et</button><?php endif; ?>
+                </div>
+            </form>
+        </details>
     </div>
 
-    <!-- AI integration -->
+<!-- AI integration -->
     <div class="kart">
         <div class="kart-baslik mb-2">🪄 Yapay Zeka (Claude)</div>
         <div class="hucre-alt mb-3">Aylık rapor taslağı, içerik fikri üretimi ve görev özetleme için kullanılır. Kullanım başına ücretlendirilir; anahtar <a href="https://console.anthropic.com" target="_blank" style="color:var(--marka)">console.anthropic.com</a>'dan alınır.</div>
