@@ -585,7 +585,7 @@
             sel.style.display = 'none';
             const tetik = document.createElement('button');
             tetik.type = 'button';
-            tetik.className = 'select osec-tetik';
+            tetik.className = 'secim osec-tetik';
             if (ozgunStil) tetik.style.cssText += ozgunStil;
             const write = () => { tetik.textContent = sel.selectedOptions[0]?.textContent.trim() || 'Seçin...'; };
             write();

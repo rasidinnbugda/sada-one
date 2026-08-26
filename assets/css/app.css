@@ -780,7 +780,8 @@ table.tablo { width: 100%; border-collapse: collapse; }
     --modal-r: 20px;
     position: relative; background: var(--modal-bg); border: 1px solid var(--border-2);
     border-radius: var(--modal-r); width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto;
-    box-shadow: 0 22px 52px -20px rgba(0,0,0,.38);
+    clip-path: inset(0 round var(--modal-r));
+    filter: drop-shadow(0 22px 34px rgba(0, 0, 0, .30));
     transform: translateY(14px) scale(.96); transition: transform .3s var(--yay);
 }
 .modal-katman.acik .modal { transform: none; }

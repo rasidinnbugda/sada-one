@@ -361,8 +361,12 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.0.3';
+const APP_VERSION = '6.0.4';
 const VERSION_NOTES = [
+    '6.0.4' => [
+        'Uzun (kaydırılabilir) modallarda köşe yuvarlaklığının kaybolması düzeltildi — kaydırma çubuğu dahil her şey artık yuvarlak köşeye kırpılıyor',
+        'Özel seçim kutuları (Tür gibi) düz metin gibi görünüyordu; artık kenarlıklı, ok işaretli gerçek kutu görünümünde',
+    ],
     '6.0.3' => [
         'Modal başlık ve Kaydet/İptal şeritleri şeffaf kalıyordu; altlarından kayan form görünüyordu — artık modalın zeminini kullanıyorlar',
         'Modal köşeleri: sabit duran başlık/alt şeritler kare zemin boyayıp yuvarlak köşeleri bozuyordu, düzeltildi (her temanın kendi köşe yarıçapına uyuyor)',
