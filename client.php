@@ -339,7 +339,7 @@ if (permission('dosya_yonet')):
 <script>
 function clientEdit() { modalOpen('modalClientDuzen'); }
 document.getElementById('renkSecim2')?.addEventListener('change', () => {
-    document.querySelectorAll('.color-radio2').forEach(r => r.nextElementSibling.style.borderColor = r.checked ? 'var(--text)' : 'transparent');
+    document.querySelectorAll('.renk-radio2').forEach(r => r.nextElementSibling.style.borderColor = r.checked ? 'var(--text)' : 'transparent');
 });
 </script>
 <?php endif; /* /dosya_yonet modals */ ?>

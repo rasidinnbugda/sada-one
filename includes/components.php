@@ -281,7 +281,7 @@ async function reaction(commentId, emoji) {
     let chip = document.querySelector(`.tepki-cip[data-yorum="${commentId}"][data-emoji="${CSS.escape(emoji)}"]`);
     if (j.adet === 0) { if (chip) chip.remove(); }
     else if (chip) {
-        chip.querySelector('.reaction-adet').textContent = j.adet;
+        chip.querySelector('.tepki-adet').textContent = j.adet;
         chip.classList.toggle('benim', !!j.mine);
     } else {
         chip = document.createElement('button');

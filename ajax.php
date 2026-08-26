@@ -44,6 +44,15 @@ case 'drive_folder_test':
     if (!$r['ok']) json_out(['ok' => false, 'error' => 'Klasör okunamadı: ' . $r['error'] . ' (Klasörü servis hesabı e-postasıyla paylaştınız mı?)']);
     json_out(['ok' => true, 'mesaj' => 'Klasör erişilebilir ✓' . ($r['sample'] ? ' (örnek dosya: ' . $r['sample'] . ')' : ' (klasör şu an boş)')]);
 
+case 'drive_files':
+    require_login();
+    require_once __DIR__ . '/includes/google-drive.php';
+    $ev = row("SELECT id, drive_folder_id, drive_link FROM events WHERE id=? AND type='cekim'", [(int)$g('id')]);
+    if (!$ev || !$ev['drive_folder_id']) json_out(['ok' => false, 'error' => 'Klasör bağlı değil.']);
+    $r = drive_list_files($ev['drive_folder_id']);
+    if (!$r['ok']) json_out(['ok' => false, 'error' => $r['error']]);
+    json_out(['ok' => true, 'files' => $r['files'], 'folder' => $ev['drive_link'] ?: ('https://drive.google.com/drive/folders/' . $ev['drive_folder_id'])]);
+
 case 'drive_disconnect':
     require_admin();
     q("DELETE FROM settings WHERE setting_key IN ('google_refresh_token','google_drive_email','google_drive_token')");
@@ -1973,13 +1982,17 @@ case 'setting_save':
     $fieldToKey = ['site_name' => 'site_adi', 'default_theme' => 'varsayilan_tema', 'smtp_is_active' => 'smtp_aktif',
         'smtp_host' => 'smtp_host', 'smtp_port' => 'smtp_port', 'smtp_user' => 'smtp_kullanici',
         'smtp_sender' => 'smtp_gonderen', 'email_notification' => 'eposta_bildirim',
-        'ai_model' => 'ai_model'];
+        'ai_model' => 'ai_model', 'ai_provider' => 'ai_provider', 'gemini_model' => 'gemini_model'];
     // Google OAuth client: id is plain, the secret only overwrites on a fresh value
     if (isset($_POST['google_client_id'])) {
         q("INSERT INTO settings (setting_key,setting_value) VALUES ('google_client_id',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['google_client_id']), trim($_POST['google_client_id'])]);
     }
     if (!empty($_POST['google_client_secret']) && !str_starts_with($_POST['google_client_secret'], '••')) {
         q("INSERT INTO settings (setting_key,setting_value) VALUES ('google_client_secret',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['google_client_secret']), trim($_POST['google_client_secret'])]);
+    }
+    // Gemini key: only overwrite when a new value is typed
+    if (!empty($_POST['gemini_api_key']) && !str_starts_with($_POST['gemini_api_key'], '••')) {
+        q("INSERT INTO settings (setting_key,setting_value) VALUES ('gemini_api_key',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['gemini_api_key']), trim($_POST['gemini_api_key'])]);
     }
     // AI key: only overwrite when a new value is typed (placeholder dots stay put)
     if (!empty($_POST['anthropic_api_key']) && !str_starts_with($_POST['anthropic_api_key'], '••')) {

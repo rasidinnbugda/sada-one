@@ -263,7 +263,7 @@ function page_end(): void {
         <button class="dock-sekme" data-dock="notes">Notlar</button>
         <button class="dock-sekme" data-dock="links">Linkler</button>
     </div>
-    <div class="dock-icerik aktif" id="dock-isler">
+    <div class="dock-icerik aktif" id="dock-todos">
         <div class="dikey" style="gap:2px" id="dockIsList">
             <?php foreach ($dockTodos as $di): ?>
             <div class="kontrol-oge"><input type="checkbox" onchange="dockIsToggle(<?= $di['id'] ?>, this)"><span class="kontrol-metin kucuk"><?= e($di['name']) ?></span></div>
@@ -275,11 +275,11 @@ function page_end(): void {
             <button type="submit" class="btn btn-sm">+</button>
         </form>
     </div>
-    <div class="dock-icerik" id="dock-karalama">
+    <div class="dock-icerik" id="dock-scratchpad">
         <textarea class="metin-alani" id="dockScratchpad" style="min-height:200px;font-size:13px" placeholder="Karalama — otomatik kaydedilir"><?= e($u['scratchpad'] ?? '') ?></textarea>
         <div class="hucre-alt mt-1" id="dockScratchpadStatus">otomatik kaydedilir</div>
     </div>
-    <div class="dock-icerik" id="dock-notlar">
+    <div class="dock-icerik" id="dock-notes">
         <?php foreach ($dockNotes as $dn): ?>
         <div style="padding:9px 11px;background:var(--surface-2);border-radius:10px;margin-bottom:6px">
             <?php if ($dn['title']): ?><div class="kucuk kalin"><?= e($dn['title']) ?></div><?php endif; ?>
@@ -289,7 +289,7 @@ function page_end(): void {
         <?php if (!$dockNotes): ?><div class="metin-muted kucuk">Henüz not yok.</div><?php endif; ?>
         <a href="my-space.php" class="mini-btn">Alanım'da düzenle →</a>
     </div>
-    <div class="dock-icerik" id="dock-linkler">
+    <div class="dock-icerik" id="dock-links">
         <?php foreach ($dockLinks as $dl): ?>
         <a href="<?= e($dl['url']) ?>" target="_blank" class="satir-esnek kucuk kalin" style="gap:8px;padding:8px 10px;background:var(--surface-2);border-radius:9px;margin-bottom:5px;color:var(--marka)"><?= e($dl['name']) ?></a>
         <?php endforeach; ?>
@@ -301,11 +301,11 @@ function page_end(): void {
 document.getElementById('dockBtn').addEventListener('click', () => document.getElementById('dockPanel').classList.toggle('acik'));
 document.querySelectorAll('.dock-sekme').forEach(s => s.addEventListener('click', () => {
     document.querySelectorAll('.dock-sekme').forEach(x => x.classList.remove('aktif'));
-    document.querySelectorAll('.dock-content').forEach(x => x.classList.remove('aktif'));
+    document.querySelectorAll('.dock-icerik').forEach(x => x.classList.remove('aktif'));
     s.classList.add('aktif');
     document.getElementById('dock-' + s.dataset.dock).classList.add('aktif');
 }));
-async function dockIsToggle(id, box) { await api('personal_is_toggle', { id }); box.closest('.check-oge').style.opacity = '.4'; }
+async function dockIsToggle(id, box) { await api('personal_is_toggle', { id }); box.closest('.kontrol-oge').style.opacity = '.4'; }
 async function dockIsAdd(e) {
     e.preventDefault();
     const g = document.getElementById('dockIsNew'); const name = g.value.trim(); if (!name) return false;
@@ -315,7 +315,7 @@ async function dockIsAdd(e) {
         const div = document.createElement('div');
         div.className = 'kontrol-oge';
         div.innerHTML = `<input type="checkbox" onchange="dockIsToggle(${j.id}, this)"><span class="kontrol-metin kucuk"></span>`;
-        div.querySelector('.check-text').textContent = j.name;
+        div.querySelector('.kontrol-metin').textContent = j.name;
         document.getElementById('dockIsList').appendChild(div);
     }
     return false;

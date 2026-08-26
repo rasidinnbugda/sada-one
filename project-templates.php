@@ -108,9 +108,9 @@ function psEdit(ps) {
     modalOpen('modalPS');
 }
 document.getElementById('psForm').addEventListener('submit', () => {
-    const tasks = Array.from(document.querySelectorAll('.ps-row_item')).map(s => ({
-        title: s.querySelector('.ps-title').value.trim(),
-        workflow_id: parseInt(s.querySelector('.ps-workflow').value) || 0,
+    const tasks = Array.from(document.querySelectorAll('.ps-satir')).map(s => ({
+        title: s.querySelector('.ps-baslik').value.trim(),
+        workflow_id: parseInt(s.querySelector('.ps-akis').value) || 0,
         priority: s.querySelector('.ps-onc').value,
     })).filter(g => g.title);
     document.getElementById('ps_tasks').value = JSON.stringify(tasks);

@@ -236,7 +236,7 @@ document.getElementById('ev_project').addEventListener('change', function () {
 });
 document.getElementById('eventForm').addEventListener('submit', () => {
     const field = document.getElementById('et_equipment');
-    if (field) field.value = JSON.stringify(Array.from(document.querySelectorAll('.equipment-box:checked')).map(c => c.value));
+    if (field) field.value = JSON.stringify(Array.from(document.querySelectorAll('.ekipman-kutu:checked')).map(c => c.value));
 });
 function eventShow(id) {
     const e = events[id]; if (!e) return;
@@ -284,10 +284,10 @@ async function etMove(id) {
 }
 // Move single-day events by drag and drop
 let surEt = null;
-document.querySelectorAll('.calendar-event[data-event]').forEach(chip => {
+document.querySelectorAll('.takvim-etkinlik[data-event]').forEach(chip => {
     chip.addEventListener('dragstart', e => { surEt = chip.dataset.event; e.stopPropagation(); });
 });
-document.querySelectorAll('.calendar-hucre[data-date]').forEach(hucre => {
+document.querySelectorAll('.takvim-hucre[data-date]').forEach(hucre => {
     hucre.addEventListener('dragover', e => { if (surEt) { e.preventDefault(); hucre.style.borderColor = 'var(--marka)'; } });
     hucre.addEventListener('dragleave', () => hucre.style.borderColor = '');
     hucre.addEventListener('drop', async e => {

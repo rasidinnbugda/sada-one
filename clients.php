@@ -124,7 +124,7 @@ function clientFormSifirla() {
 }
 // Color selection highlight
 function colorHighlight() {
-    document.querySelectorAll('.color-radio').forEach(r => {
+    document.querySelectorAll('.renk-radio').forEach(r => {
         r.nextElementSibling.style.borderColor = r.checked ? 'var(--text)' : 'transparent';
     });
 }

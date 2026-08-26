@@ -508,9 +508,9 @@ function stRoleAdd(role = '', person = '') {
     list.appendChild(div);
 }
 function stRoleWrite() {
-    const roles = Array.from(document.querySelectorAll('.st-role')).map(s => ({
-        role: s.querySelector('.st-role-name').value.trim(),
-        person: s.querySelector('.st-role-person').value,
+    const roles = Array.from(document.querySelectorAll('.ist-rol')).map(s => ({
+        role: s.querySelector('.ist-rol-ad').value.trim(),
+        person: s.querySelector('.ist-rol-kisi').value,
     })).filter(r => r.role || r.person);
     const gizli = document.getElementById('st_roles');
     if (gizli) gizli.value = JSON.stringify(roles);
@@ -537,7 +537,7 @@ async function pkToggle(id, field, btn) {
 async function pkDelete(id, btn) {
     if (!confirm('Kontrol kalemi silinsin mi?')) return;
     const j = await api('pcheck_delete', { id });
-    if (j.ok) btn.closest('.row_item-esnek').remove();
+    if (j.ok) btn.closest('.satir-esnek').remove();
 }
 async function pkOwner(id) {
     let option = 'Sorumlu seçin:\n0 — Sorumsuz bırak\n';

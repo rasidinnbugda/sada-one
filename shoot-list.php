@@ -48,9 +48,10 @@ page_start('Çekim Listesi', 'shoots');
                 <?php if ($c['drive_status'] === 'aktarildi'): ?>
                 <span class="rozet r-tamamlandi" title="Görüntüler Drive'da">📁 Aktarıldı</span>
                 <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn">Drive ↗</a><?php endif; ?>
+                <?php if ($c['drive_folder_id'] && $driveReady): ?><span class="drive-dosyalar" data-drive-event="<?= $c['id'] ?>"></span><?php endif; ?>
                 <?php elseif (strtotime($c['start']) < time()): ?>
                 <span class="rozet r-gecikti" title="Görüntüler henüz Drive'da görünmüyor">📁 Aktarılmadı</span>
-                <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn">Klasöre yükle ↗</a>
+                <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn">Klasöre yükle ↗</a><?php if ($c['drive_folder_id'] && $driveReady): ?><span class="drive-dosyalar" data-drive-event="<?= $c['id'] ?>"></span><?php endif; ?>
                 <?php elseif ($driveReady): ?><button class="mini-btn" data-action="drive_folder_create" data-id="<?= $c['id'] ?>" data-refresh="evet">Klasör oluştur</button><?php endif; ?>
                 <button class="mini-btn" onclick="driveMark(<?= $c['id'] ?>)">Aktarıldı işaretle</button>
                 <?php else: ?>
@@ -110,5 +111,15 @@ function ckEdit(c) {
     document.getElementById('ck_needs').value = c.needs_list || '';
     modalOpen('modalShootList');
 }
+</script>
+<script>
+// Drive folder contents, loaded async so the page itself stays fast
+document.querySelectorAll('.drive-dosyalar').forEach(async kutu => {
+    const j = await api('drive_files', { id: kutu.dataset.driveEvent }).catch(() => null);
+    if (!j || !j.ok || !j.files.length) return;
+    kutu.innerHTML = j.files.slice(0, 6).map(d =>
+        `<a href="${esc(d.link)}" target="_blank" class="mini-btn" title="${esc(d.name)}">${d.mime.includes('video') ? '🎬' : d.mime.includes('image') ? '🖼️' : '📄'} ${esc(d.name.length > 22 ? d.name.slice(0, 20) + '…' : d.name)}</a>`
+    ).join(' ') + (j.files.length > 6 ? ` <a href="${esc(j.folder)}" target="_blank" class="mini-btn">+${j.files.length - 6} dosya ↗</a>` : '');
+});
 </script>
 <?php page_end(); ?>

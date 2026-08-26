@@ -418,10 +418,10 @@ function itemAdd(k = {}) {
 }
 itemAdd();
 document.getElementById('documentForm').addEventListener('submit', () => {
-    const items = Array.from(document.querySelectorAll('.item-row_item')).map(s => ({
-        name: s.querySelector('.k-name').value.trim(),
+    const items = Array.from(document.querySelectorAll('.kalem-satir')).map(s => ({
+        name: s.querySelector('.k-ad').value.trim(),
         adet: s.querySelector('.k-adet').value,
-        price: s.querySelector('.k-price').value,
+        price: s.querySelector('.k-fiyat').value,
     })).filter(k => k.name);
     document.getElementById('b_items').value = JSON.stringify(items);
 });

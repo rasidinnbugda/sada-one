@@ -118,7 +118,7 @@ function mDuzenle(k) {
 }
 async function mCikti(id, btn) {
     const box = btn.closest('div').nextElementSibling;
-    const mevcut = box.querySelector('.text-muted') ? '' : box.textContent.trim();
+    const mevcut = box.querySelector('.metin-muted') ? '' : box.textContent.trim();
     const newNote = prompt('Çıktı & değerlendirme notu:', mevcut);
     if (newNote === null) return;
     const j = await api('mentorship_output', { id, output: newNote });

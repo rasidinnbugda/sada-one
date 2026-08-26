@@ -152,9 +152,16 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
 
 <!-- AI integration -->
     <div class="kart">
-        <div class="kart-baslik mb-2">🪄 Yapay Zeka (Claude)</div>
-        <div class="hucre-alt mb-3">Aylık rapor taslağı, içerik fikri üretimi ve görev özetleme için kullanılır. Kullanım başına ücretlendirilir; anahtar <a href="https://console.anthropic.com" target="_blank" style="color:var(--marka)">console.anthropic.com</a>'dan alınır.</div>
-        <form data-ajax="setting_save" data-refresh="hayir">
+        <div class="kart-baslik mb-2">🪄 Yapay Zeka</div>
+        <div class="hucre-alt mb-3">Aylık rapor taslağı, içerik fikri üretimi ve görev özetleme için kullanılır. Claude anahtarı <a href="https://console.anthropic.com" target="_blank" style="color:var(--marka)">console.anthropic.com</a>'dan, Gemini anahtarı <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--marka)">aistudio.google.com</a>'dan alınır (Gemini Flash'ın günlük kotalı ücretsiz katmanı vardır).</div>
+        <form data-ajax="setting_save" data-refresh="evet">
+            <div class="form-grup"><label class="form-etiket">Sağlayıcı</label>
+                <select name="ai_provider" class="secim" onchange="aiSaglayiciDegisti(this.value)">
+                    <option value="claude" <?= setting('ai_provider') !== 'gemini' ? 'selected' : '' ?>>Claude (Anthropic) — önerilen kalite</option>
+                    <option value="gemini" <?= setting('ai_provider') === 'gemini' ? 'selected' : '' ?>>Gemini (Google) — ücretsiz katman mevcut</option>
+                </select>
+            </div>
+            <div id="aiClaudeAlan" style="<?= setting('ai_provider') === 'gemini' ? 'display:none' : '' ?>">
             <div class="form-grup"><label class="form-etiket">Anthropic API Anahtarı</label>
                 <input type="password" name="anthropic_api_key" class="girdi" placeholder="<?= setting('anthropic_api_key') ? '••••••••••••' : 'sk-ant-...' ?>">
                 <div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın.</div>
@@ -166,6 +173,21 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
                     <?php endforeach; ?>
                 </select>
             </div>
+            </div>
+            <div id="aiGeminiAlan" style="<?= setting('ai_provider') === 'gemini' ? '' : 'display:none' ?>">
+            <div class="form-grup"><label class="form-etiket">Gemini API Anahtarı</label>
+                <input type="password" name="gemini_api_key" class="girdi" placeholder="<?= setting('gemini_api_key') ? '••••••••••••' : 'AIza...' ?>">
+                <div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın.</div>
+            </div>
+            <div class="form-grup"><label class="form-etiket">Model</label>
+                <select name="gemini_model" class="secim">
+                    <?php foreach (['gemini-2.5-flash' => 'Gemini 2.5 Flash (hızlı — ücretsiz katman)', 'gemini-2.5-pro' => 'Gemini 2.5 Pro (yüksek kalite)'] as $mk => $mv): ?>
+                    <option value="<?= $mk ?>" <?= (setting('gemini_model') ?: 'gemini-2.5-flash') === $mk ? 'selected' : '' ?>><?= $mv ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            </div>
+            <script>function aiSaglayiciDegisti(v){document.getElementById('aiClaudeAlan').style.display=v==='gemini'?'none':'';document.getElementById('aiGeminiAlan').style.display=v==='gemini'?'':'none';}</script>
             <div class="satir-esnek" style="gap:10px">
                 <button type="submit" class="btn btn-marka">Kaydet</button>
                 <button type="button" class="btn" data-action="ai_test" data-refresh="hayir">Bağlantıyı Test Et</button>

@@ -177,6 +177,31 @@ function drive_create_folder(string $name, ?string $parentId = null, ?string $to
     return ['id' => $j['id'], 'link' => 'https://drive.google.com/drive/folders/' . $j['id']];
 }
 
+/**
+ * List a folder's files (newest first). Returns
+ * ['ok' => bool, 'files' => [['name','link','mime','created'],...], 'error' => ?string].
+ */
+function drive_list_files(string $folderId, int $limit = 12): array {
+    $token = drive_token($error);
+    if (!$token) return ['ok' => false, 'files' => [], 'error' => $error];
+    $url = 'https://www.googleapis.com/drive/v3/files?' . http_build_query([
+        'q' => sprintf("'%s' in parents and trashed=false", addslashes($folderId)),
+        'pageSize' => $limit, 'orderBy' => 'createdTime desc',
+        'fields' => 'files(id,name,mimeType,webViewLink,createdTime)',
+        'supportsAllDrives' => 'true', 'includeItemsFromAllDrives' => 'true',
+    ]);
+    $j = json_decode((string)drive_http($url, null, ["Authorization: Bearer $token"]), true);
+    if (!is_array($j) || isset($j['error'])) {
+        return ['ok' => false, 'files' => [], 'error' => mb_substr((string)($j['error']['message'] ?? 'API yanıtı alınamadı'), 0, 200)];
+    }
+    $files = [];
+    foreach (($j['files'] ?? []) as $d) {
+        $files[] = ['name' => $d['name'], 'link' => $d['webViewLink'] ?? '#',
+            'mime' => $d['mimeType'] ?? '', 'created' => $d['createdTime'] ?? ''];
+    }
+    return ['ok' => true, 'files' => $files, 'error' => null];
+}
+
 /** The panel's root shoots folder — created once, its id kept in settings. */
 function drive_ensure_root(?string $token = null): ?string {
     $root = setting('google_drive_root');

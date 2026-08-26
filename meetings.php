@@ -134,7 +134,7 @@ page_start('Toplantı Takvimi', 'meetings');
 </div>
 <script>
 document.getElementById('meetingForm').addEventListener('submit', () => {
-    document.getElementById('t_participants').value = JSON.stringify(Array.from(document.querySelectorAll('.participant-box:checked')).map(c => c.value));
+    document.getElementById('t_participants').value = JSON.stringify(Array.from(document.querySelectorAll('.katilimci-kutu:checked')).map(c => c.value));
 });
 // Auto-fill the client when a project is selected
 document.getElementById('tp_project').addEventListener('change', function () {

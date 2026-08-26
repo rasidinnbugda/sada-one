@@ -82,7 +82,7 @@ function alanSatiri(field = {}) {
     document.getElementById('fieldList').appendChild(div);
     if (window.ozelPickerRefresh) ozelPickerRefresh();
 }
-function optionShow(sel) { sel.closest('.field-row_item').querySelector('.field-options').style.display = sel.value === 'secim' ? 'block' : 'none'; }
+function optionShow(sel) { sel.closest('.alan-satir').querySelector('.alan-secenekler').style.display = sel.value === 'secim' ? 'block' : 'none'; }
 function fieldAdd() { alanSatiri(); }
 function formSifirla() {
     document.getElementById('formForm').reset();
@@ -102,11 +102,11 @@ function formEdit(f) {
     modalOpen('modalForm');
 }
 document.getElementById('formForm').addEventListener('submit', () => {
-    const fields = Array.from(document.querySelectorAll('.field-row_item')).map(s => ({
-        tag: s.querySelector('.field-tag').value.trim(),
-        type: s.querySelector('.field-type').value,
-        options: s.querySelector('.field-options').value.trim(),
-        is_required: s.querySelector('.field-is_required').checked ? 1 : 0
+    const fields = Array.from(document.querySelectorAll('.alan-satir')).map(s => ({
+        tag: s.querySelector('.alan-etiket').value.trim(),
+        type: s.querySelector('.alan-tip').value,
+        options: s.querySelector('.alan-secenekler').value.trim(),
+        is_required: s.querySelector('.alan-zorunlu').checked ? 1 : 0
     })).filter(a => a.tag);
     document.getElementById('f_fields').value = JSON.stringify(fields);
 });

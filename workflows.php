@@ -87,7 +87,7 @@ function workflowEdit(s) {
     modalOpen('modalWorkflow');
 }
 document.getElementById('workflowForm').addEventListener('submit', () => {
-    const steps = Array.from(document.querySelectorAll('.step-input')).map(i => i.value.trim()).filter(Boolean);
+    const steps = Array.from(document.querySelectorAll('.adim-input')).map(i => i.value.trim()).filter(Boolean);
     document.getElementById('a_steps').value = JSON.stringify(steps);
 });
 </script>

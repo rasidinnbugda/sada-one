@@ -363,8 +363,14 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.2';
+const APP_VERSION = '6.3';
 const VERSION_NOTES = [
+    '6.3' => [
+        'Sekmeler kökten onarıldı: sayfa sekmelerinde (proje, finans...) eski içerik ekranda kalıp yenisi altına açılıyordu; sağ alttaki Alanım panelinin sekmeleri hiç değişmiyordu — ikisi de düzeldi',
+        'Aynı kök sorunun (çeviri kalıntısı sınıf adları) son 31 örneği tek taramada bulunup temizlendi: görev kontrol listesi işaretleme, takvim etkinlik pencereleri, form/proje şablonu düzenleme satırları, kanal üyeleri, renk seçimleri ve daha fazlası',
+        'Google Gemini desteği: Ayarlar → Yapay Zeka bölümünden sağlayıcı olarak Claude veya Gemini seçilebilir; Gemini Flash için günlük kotalı ücretsiz katman kullanılabilir',
+        'Çekim klasöründeki Drive dosyaları artık çekim listesinde otomatik görünüyor (ilk 6 dosya, tıklayınca Drive\'da açılır; fazlası için klasör linki)',
+    ],
     '6.2' => [
         'Drive artık JSON dosyası olmadan bağlanıyor: Ayarlar → Drive kartına Client ID + Secret girip "Google ile Bağlan"a basmanız yeterli — klasörler kendi Drive hesabınızda açılır (JSON servis hesabı alternatif olarak duruyor)',
         'Çekim planlanınca Drive yükleme klasörü otomatik oluşturuluyor (müşterinin Drive klasörü altında; yoksa panel kök klasöründe) ve çekim kartına bağlanıyor',

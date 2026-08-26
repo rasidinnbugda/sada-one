@@ -298,7 +298,7 @@ if ($announcements && $wAcik('duyurular')): ?>
 </div>
 <script>
 async function widgetSave() {
-    const selected = Array.from(document.querySelectorAll('.widget-box:checked')).map(c => c.value);
+    const selected = Array.from(document.querySelectorAll('.widget-kutu:checked')).map(c => c.value);
     const j = await api('widget_save', { widgets: selected });
     if (j.ok) { toast(j.message, 'basari'); setTimeout(() => location.reload(), 550); }
 }

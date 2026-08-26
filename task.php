@@ -326,7 +326,7 @@ async function stepComplete(id) {
         if (!el) return;
         el.classList.toggle('tamam', a.status === 'tamam');
         el.classList.toggle('aktif', a.status === 'aktif');
-        el.querySelector('.workflow-yuvarlak').innerHTML = a.status === 'tamam' ? CHECK_SVG : el.dataset.sort_order;
+        el.querySelector('.akis-yuvarlak').innerHTML = a.status === 'tamam' ? CHECK_SVG : el.dataset.sort_order;
     });
     document.getElementById('stepCounter').textContent = j.is_done_adet + '/' + j.total + ' adım tamamlandı';
     // If the task is completed, sync the status picker and badge
@@ -352,11 +352,11 @@ async function checkAdd(e) {
     if (j.ok) {
         girdi.value = '';
         const list = document.getElementById('checkList');
-        const bos = list.querySelector('.text-muted'); if (bos) bos.remove();
+        const bos = list.querySelector('.metin-muted'); if (bos) bos.remove();
         const div = document.createElement('div');
         div.className = 'kontrol-oge';
         div.innerHTML = `<input type="checkbox" onchange="checkToggle(${j.id}, this)"><span class="kontrol-metin"></span><button class="ikon-eylem tehlike" style="width:26px;height:26px" data-action="check_delete" data-id="${j.id}" data-onay="Madde silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="13"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
-        div.querySelector('.check-text').textContent = j.name;
+        div.querySelector('.kontrol-metin').textContent = j.name;
         list.appendChild(div);
         checkSummary();
         liveRefresh();
@@ -365,7 +365,7 @@ async function checkAdd(e) {
 }
 async function checkToggle(id, box) {
     const j = await api('check_toggle', { id });
-    if (j.ok) { box.closest('.check-oge').classList.toggle('tamam', box.checked); checkSummary(); liveRefresh(); }
+    if (j.ok) { box.closest('.kontrol-oge').classList.toggle('tamam', box.checked); checkSummary(); liveRefresh(); }
     else box.checked = !box.checked;
 }
 async function lockToggle() {

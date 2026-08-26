@@ -248,7 +248,7 @@ if (channelId) setInterval(async () => {
 // Channel member selection
 const channelForm = document.getElementById('channelForm');
 if (channelForm) channelForm.addEventListener('submit', () => {
-    const selected = Array.from(document.querySelectorAll('.channelMember:checked')).map(c => c.value);
+    const selected = Array.from(document.querySelectorAll('.kanalUye:checked')).map(c => c.value);
     document.getElementById('channelMembers').value = JSON.stringify(selected);
 });
 

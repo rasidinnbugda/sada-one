@@ -143,7 +143,7 @@ function contentAdd(date) { const el = document.getElementById('internal_date');
 const internalForm = document.getElementById('contentForm');
 if (internalForm) {
     internalForm.addEventListener('submit', () => {
-        document.getElementById('internal_platforms').value = JSON.stringify(Array.from(document.querySelectorAll('.platform-box:checked')).map(c => c.value));
+        document.getElementById('internal_platforms').value = JSON.stringify(Array.from(document.querySelectorAll('.platform-kutu:checked')).map(c => c.value));
     });
     document.getElementById('internal_project').addEventListener('change', function () {
         const client = this.selectedOptions[0]?.dataset.client;
@@ -181,10 +181,10 @@ async function internalMove(id) {
 }
 // Drag and drop: move content to another day
 let surContent = null;
-document.querySelectorAll('.calendar-event[data-content]').forEach(chip => {
+document.querySelectorAll('.takvim-etkinlik[data-content]').forEach(chip => {
     chip.addEventListener('dragstart', e => { surContent = chip.dataset.content; e.stopPropagation(); });
 });
-document.querySelectorAll('.calendar-hucre[data-date]').forEach(hucre => {
+document.querySelectorAll('.takvim-hucre[data-date]').forEach(hucre => {
     hucre.addEventListener('dragover', e => { if (surContent) { e.preventDefault(); hucre.style.borderColor = 'var(--marka)'; } });
     hucre.addEventListener('dragleave', () => hucre.style.borderColor = '');
     hucre.addEventListener('drop', async e => {

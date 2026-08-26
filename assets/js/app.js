@@ -87,7 +87,7 @@
         if (!sekme) return;
         const kap = sekme.closest('.sekme-kap') || document;
         $$('[data-sekme]', kap).forEach(s => s.classList.remove('aktif'));
-        $$('.sekme-content', kap).forEach(s => s.classList.remove('aktif'));
+        $$('.sekme-icerik', kap).forEach(s => s.classList.remove('aktif'));
         sekme.classList.add('aktif');
         const target = $('#sekme-' + sekme.dataset.sekme, kap);
         if (target) target.classList.add('aktif');
@@ -317,7 +317,7 @@
             const ids = Array.from(list.querySelectorAll('.kanban-kart')).map(k => k.dataset.task);
             const j = await api('task_sort', { id: taskId, status: newStatus, ids });
             if (j.ok) {
-                if (newStatus !== oldStatus) toast('Görev "' + sutun.querySelector('.kanban-title').textContent + '" durumuna taşındı', 'basari', 2200);
+                if (newStatus !== oldStatus) toast('Görev "' + sutun.querySelector('.kanban-baslik').textContent + '" durumuna taşındı', 'basari', 2200);
             } else {
                 // Rejected by the lock etc.: put the card back into its old column
                 card.dataset.status = oldStatus;

@@ -76,7 +76,7 @@ page_start('Alanım', 'my_space');
                 <div class="kontrol-oge <?= $is['is_done'] ? 'tamam' : '' ?>">
                     <input type="checkbox" <?= $is['is_done'] ? 'checked' : '' ?> onchange="isToggle(<?= $is['id'] ?>, this)">
                     <span class="kontrol-metin"><?= e($is['name']) ?></span>
-                    <button class="ikon-eylem tehlike" style="width:24px;height:24px" data-action="personal_is_delete" data-id="<?= $is['id'] ?>" data-refresh="hayir" onclick="setTimeout(()=>{this.closest('.check-oge').remove();isCounterUpdate()},300)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="12"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button class="ikon-eylem tehlike" style="width:24px;height:24px" data-action="personal_is_delete" data-id="<?= $is['id'] ?>" data-refresh="hayir" onclick="setTimeout(()=>{this.closest('.kontrol-oge').remove();isCounterUpdate()},300)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="12"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 <?php endforeach; ?>
                 <?php if (!$todos): ?><div class="metin-muted kucuk" style="padding:6px 0" id="isBos">Henüz madde yok.</div><?php endif; ?>
@@ -141,8 +141,8 @@ page_start('Alanım', 'my_space');
 
 <script>
 /* Note color selection highlight */
-document.querySelectorAll('.not-color').forEach(n => n.addEventListener('click', () => {
-    document.querySelectorAll('.not-color').forEach(x => x.style.borderColor = 'transparent');
+document.querySelectorAll('.not-renk').forEach(n => n.addEventListener('click', () => {
+    document.querySelectorAll('.not-renk').forEach(x => x.style.borderColor = 'transparent');
     n.style.borderColor = 'var(--text)';
 }));
 function notSifirla() {
@@ -178,7 +178,7 @@ async function isAdd(e) {
         const div = document.createElement('div');
         div.className = 'kontrol-oge';
         div.innerHTML = `<input type="checkbox" onchange="isToggle(${j.id}, this)"><span class="kontrol-metin"></span><button class="ikon-eylem tehlike" style="width:24px;height:24px" data-action="personal_is_delete" data-id="${j.id}" data-refresh="hayir" onclick="setTimeout(()=>{this.closest('.kontrol-oge').remove();isCounterUpdate()},300)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="12"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
-        div.querySelector('.check-text').textContent = j.name;
+        div.querySelector('.kontrol-metin').textContent = j.name;
         document.getElementById('isList').appendChild(div);
         isCounterUpdate();
     }
@@ -186,7 +186,7 @@ async function isAdd(e) {
 }
 async function isToggle(id, box) {
     const j = await api('personal_is_toggle', { id });
-    if (j.ok) { box.closest('.check-oge').classList.toggle('tamam', box.checked); isCounterUpdate(); }
+    if (j.ok) { box.closest('.kontrol-oge').classList.toggle('tamam', box.checked); isCounterUpdate(); }
     else box.checked = !box.checked;
 }
 
