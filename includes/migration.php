@@ -108,6 +108,7 @@ function migration_commands(): array {
     "ALTER TABLE events ADD COLUMN drive_folder_id VARCHAR(120) DEFAULT NULL",
     "ALTER TABLE events ADD COLUMN drive_link VARCHAR(500) DEFAULT NULL",
     "ALTER TABLE events ADD COLUMN drive_status ENUM('bekliyor','aktarildi') NOT NULL DEFAULT 'bekliyor'",
+        "ALTER TABLE events ADD COLUMN drive_files_seen TINYINT(1) NOT NULL DEFAULT 0",
     ];
 }
 

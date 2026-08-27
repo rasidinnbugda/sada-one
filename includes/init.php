@@ -368,8 +368,14 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.4.1';
+const APP_VERSION = '6.5';
 const VERSION_NOTES = [
+    '6.5' => [
+        'Çekim klasöründeki dosyalar artık tür özetiyle görünüyor (🎬 3 video · 🖼️ 12 fotoğraf) ve tek tık Drive\'da açılıyor',
+        'Yeni onay akışı: klasörde dosya görülünce panel otomatik "aktarıldı" demiyor — ekibe "yüklenmesi gereken her şey yüklendi mi?" diye soruyor; onay çekim listesindeki ✔ Tümü yüklendi düğmesiyle veriliyor',
+        'Onay verilmeden geçen her gün nazik bir hatırlatma, hiç dosya yoksa sert uyarı gidiyor',
+        'Hata düzeltmesi: otomatik açılan klasörün linki "elle eklenen link" sayılıp çekimi kendiliğinden aktarıldı işaretliyordu — artık yalnızca gerçek insan onayı sayılıyor',
+    ],
     '6.4' => [
         '@ ile kişi bahsetme (yorum, tartışma, DM) onarıldı — kişi listesi yanlış ada yazıldığı için açılır liste hiç dolmuyordu',
         'İş akışı adımları onarıldı: tamamlama/geri alma artık ekranda anında görünüyor; geri alınan adım yeniden "sıradaki adım" oluyor, sonrakiler bekliyor durumuna dönüyor',
@@ -974,7 +980,7 @@ function run_recurring_jobs(bool $force = false): int {
         require_once __DIR__ . '/google-drive.php';
         $driveOn = drive_configured();
         $driveToken = $driveOn ? drive_token() : null;
-        $pendingShoots = rows("SELECT e.id, e.title, e.start, e.created_by, e.drive_folder_id, e.drive_link,
+        $pendingShoots = rows("SELECT e.id, e.title, e.start, e.created_by, e.drive_folder_id, e.drive_link, e.drive_files_seen,
             c.drive_folder_id client_folder, c.manager_id,
             (SELECT GROUP_CONCAT(ep.user_id) FROM event_participants ep WHERE ep.event_id=e.id) participant_ids
             FROM events e LEFT JOIN clients c ON c.id = COALESCE(e.client_id, (SELECT client_id FROM projects WHERE id=e.project_id))
@@ -983,33 +989,43 @@ function run_recurring_jobs(bool $force = false): int {
             AND e.start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
         foreach ($pendingShoots as $sh) {
             $folder = $sh['drive_folder_id'] ?: $sh['client_folder'];
-            // Fully automatic check
+            $who = array_filter(array_unique(array_merge(
+                array_map('intval', explode(',', (string)$sh['participant_ids'])),
+                [(int)$sh['created_by'], (int)$sh['manager_id']])));
+            $uyar = function (string $title, string $text) use ($who) {
+                foreach ($who as $uid) {
+                    notify($uid, $title, $text, 'shoot-list.php', 'gorev');
+                    $mail = val("SELECT email FROM users WHERE id=? AND is_active=1", [$uid]);
+                    if ($mail) send_email($mail, $title, $text . "\n\nÇekim listesi: " . full_url('shoot-list.php'));
+                }
+            };
+            // A link counts as human confirmation only when someone actually ADDED it —
+            // auto-created folders store their own URL in drive_link, that must not count
+            $autoLink = $sh['drive_folder_id'] ? 'https://drive.google.com/drive/folders/' . $sh['drive_folder_id'] : null;
+            if ($sh['drive_link'] && $sh['drive_link'] !== $autoLink) {
+                update_row('events', ['drive_status' => 'aktarildi'], 'id=?', [$sh['id']]);
+                continue;
+            }
+            // Files in the folder are a signal, not proof of completeness: the panel ASKS
+            // the crew to confirm everything expected is uploaded, instead of auto-marking
             if ($driveToken && $folder) {
                 $afterIso = gmdate('Y-m-d\TH:i:s\Z', strtotime($sh['start']));
                 $r = drive_files_after($folder, $afterIso, $driveToken);
                 if ($r['ok'] && $r['count'] > 0) {
-                    update_row('events', ['drive_status' => 'aktarildi'], 'id=?', [$sh['id']]);
-                    if ($sh['manager_id']) notify((int)$sh['manager_id'], '✅ Drive aktarımı doğrulandı', '"' . $sh['title'] . '" çekiminin dosyaları Drive klasöründe görüldü (' . $r['count'] . '+ dosya).', 'shoot-list.php', 'gorev');
+                    if (empty($sh['drive_files_seen'])) {
+                        update_row('events', ['drive_files_seen' => 1], 'id=?', [$sh['id']]);
+                        $uyar('📁 Klasörde dosyalar görüldü: ' . $sh['title'],
+                            '"' . $sh['title'] . '" çekiminin klasöründe ' . $r['count'] . '+ dosya var. Yüklenmesi gereken HER ŞEY yüklendiyse çekim listesinden "Tümü yüklendi" olarak işaretleyin.');
+                    } else {
+                        $uyar('⏳ Yükleme onayı bekleniyor: ' . $sh['title'],
+                            'Klasörde dosyalar var ama "tümü yüklendi" onayı verilmedi. Eksik kalmadıysa çekim listesinden işaretleyin.');
+                    }
                     continue;
                 }
             }
-            // Semi-automatic: a manually added link also counts as transferred
-            if ($sh['drive_link']) {
-                update_row('events', ['drive_status' => 'aktarildi'], 'id=?', [$sh['id']]);
-                continue;
-            }
-            // Still nothing → warn the crew (+ the client manager)
-            $who = array_filter(array_unique(array_merge(
-                array_map('intval', explode(',', (string)$sh['participant_ids'])),
-                [(int)$sh['created_by'], (int)$sh['manager_id']])));
-            foreach ($who as $uid) {
-                notify($uid, '📁 Drive aktarımı bekleniyor: ' . $sh['title'],
-                    format_date($sh['start'], true) . ' tarihli çekimin görüntüleri henüz Drive\'a aktarılmadı. Aktardıysanız çekim listesinden işaretleyin.',
-                    'shoot-list.php', 'gorev');
-                $mail = val("SELECT email FROM users WHERE id=? AND is_active=1", [$uid]);
-                if ($mail) send_email($mail, '📁 Drive aktarımı bekleniyor: ' . $sh['title'],
-                    format_date($sh['start'], true) . " tarihli çekimin görüntüleri henüz Drive'a aktarılmadı.\n\nÇekim listesi: " . full_url('shoot-list.php'));
-            }
+            // Hiç dosya yok → sert uyarı
+            $uyar('📁 Drive aktarımı bekleniyor: ' . $sh['title'],
+                format_date($sh['start'], true) . ' tarihli çekimin görüntüleri henüz Drive\'a aktarılmadı. Aktardıysanız çekim listesinden işaretleyin.');
         }
     }
 

@@ -49,9 +49,16 @@ case 'drive_files':
     require_once __DIR__ . '/includes/google-drive.php';
     $ev = row("SELECT id, drive_folder_id, drive_link FROM events WHERE id=? AND type='cekim'", [(int)$g('id')]);
     if (!$ev || !$ev['drive_folder_id']) json_out(['ok' => false, 'error' => 'Klasör bağlı değil.']);
-    $r = drive_list_files($ev['drive_folder_id']);
+    $r = drive_list_files($ev['drive_folder_id'], 25);
     if (!$r['ok']) json_out(['ok' => false, 'error' => $r['error']]);
-    json_out(['ok' => true, 'files' => $r['files'], 'folder' => $ev['drive_link'] ?: ('https://drive.google.com/drive/folders/' . $ev['drive_folder_id'])]);
+    $counts = ['video' => 0, 'image' => 0, 'other' => 0];
+    foreach ($r['files'] as $d) {
+        if (str_starts_with($d['mime'], 'video/')) $counts['video']++;
+        elseif (str_starts_with($d['mime'], 'image/')) $counts['image']++;
+        else $counts['other']++;
+    }
+    json_out(['ok' => true, 'files' => $r['files'], 'counts' => $counts, 'total' => count($r['files']),
+        'folder' => $ev['drive_link'] ?: ('https://drive.google.com/drive/folders/' . $ev['drive_folder_id'])]);
 
 case 'drive_disconnect':
     require_admin();
@@ -76,7 +83,10 @@ case 'drive_mark':
     // Manually mark a shoot as transferred (with an optional Drive link)
     if (!is_staff()) deny();
     $eventId = (int)$g('id');
-    update_row('events', ['drive_status' => 'aktarildi', 'drive_link' => trim($g('drive_link')) ?: null], 'id=?', [$eventId]);
+    // Only touch the link when a new one is supplied — a bare confirm keeps the folder link
+    $set = ['drive_status' => 'aktarildi'];
+    if (trim($g('drive_link')) !== '') $set['drive_link'] = trim($g('drive_link'));
+    update_row('events', $set, 'id=?', [$eventId]);
     json_out(['ok' => true, 'mesaj' => 'Çekim "Drive\'a aktarıldı" olarak işaretlendi.', 'refresh' => true]);
 
 case 'ai_test':
