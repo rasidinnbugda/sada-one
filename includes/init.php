@@ -368,7 +368,7 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.7';
+const APP_VERSION = '6.7.1';
 const VERSION_NOTES = [
     '6.7' => [
         'Rapor maili tasarımı baştan: kapak görseli, dönem etiketi, "Markanız İçin Ürettik" kartları, kırmızı "Bu Ayın Favorisi" bloğu (görsel + öne çıkan sayı), 2x2 istatistik kartları (artış/azalış oklu) ve dosya sorumlusunun iletişimiyle kapanış',

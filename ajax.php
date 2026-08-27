@@ -2099,7 +2099,11 @@ case 'setting_save':
     foreach ($fieldToKey as $fieldName => $setting_key) {
         if (isset($_POST[$fieldName])) q("INSERT INTO settings (setting_key,setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?", [$setting_key, $_POST[$fieldName], $_POST[$fieldName]]);
     }
-    if (!empty($_POST['smtp_password'])) q("INSERT INTO settings (setting_key,setting_value) VALUES ('smtp_sifre',?) ON DUPLICATE KEY UPDATE setting_value=?", [$_POST['smtp_password'], $_POST['smtp_password']]);
+    if (!empty($_POST['smtp_password']) && !str_starts_with($_POST['smtp_password'], '••')) {
+        // Google app passwords are displayed with spaces (xxxx xxxx xxxx xxxx) — remove them
+        $smtpSifre = preg_replace('/\s+/u', '', $_POST['smtp_password']);
+        q("INSERT INTO settings (setting_key,setting_value) VALUES ('smtp_sifre',?) ON DUPLICATE KEY UPDATE setting_value=?", [$smtpSifre, $smtpSifre]);
+    }
     // Logo & favicon upload
     foreach (['site_logo' => ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'site_favicon' => ['png', 'ico', 'jpg', 'jpeg', 'gif', 'webp'],
               'site_logo_dark' => ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'site_favicon_dark' => ['png', 'ico', 'jpg', 'jpeg', 'gif', 'webp']] as $fieldName => $allowed_ones) {
@@ -2127,7 +2131,8 @@ case 'test_email':
     require_once __DIR__ . '/includes/mailer.php';
     // Apply temporary settings (test without saving)
     $ok = send_email($u['email'], 'SADA Test E-postası', "Bu bir test e-postasıdır.\nSMTP ayarlarınız çalışıyor. 🎉");
-    json_out(['ok' => $ok, 'mesaj' => $ok ? 'Test e-postası gönderildi: ' . $u['email'] : 'Gönderilemedi. SMTP ayarlarını kontrol edin.', 'error' => $ok ? '' : 'SMTP gönderimi başarısız.']);
+    $neden = $ok ? '' : ('Gönderilemedi' . (!empty($GLOBALS['smtp_last_error']) ? ' — sunucu yanıtı: ' . $GLOBALS['smtp_last_error'] : '. SMTP ayarlarını kontrol edin.'));
+    json_out(['ok' => $ok, 'mesaj' => $ok ? 'Test e-postası gönderildi: ' . $u['email'] : $neden, 'error' => $neden]);
 
 /* ==================== PROFILE ==================== */
 case 'profile_save':

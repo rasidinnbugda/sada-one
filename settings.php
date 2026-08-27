@@ -83,7 +83,7 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
                 <div class="form-grup"><label class="form-etiket">Port</label><input name="smtp_port" class="girdi" value="<?= e(setting('smtp_port')) ?>" placeholder="465"></div>
             </div>
             <div class="form-grup"><label class="form-etiket">Kullanıcı (E-posta)</label><input name="smtp_user" class="girdi" value="<?= e(setting('smtp_kullanici')) ?>" placeholder="panel@sizindomain.com"></div>
-            <div class="form-grup"><label class="form-etiket">Şifre</label><input type="password" name="smtp_password" class="girdi" placeholder="<?= setting('smtp_sifre') ? '••••••••' : 'E-posta şifresi' ?>"><div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın.</div></div>
+            <div class="form-grup"><label class="form-etiket">Şifre</label><input type="password" name="smtp_password" class="girdi" placeholder="<?= setting('smtp_sifre') ? '••••••••' : 'E-posta şifresi' ?>"><div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın. Gmail için <b>uygulama şifresi</b> kullanın (normal şifre çalışmaz); boşluklarıyla yapıştırabilirsiniz, panel temizler.</div></div>
             <div class="form-grup"><label class="form-etiket">Gönderen Adresi</label><input name="smtp_sender" class="girdi" value="<?= e(setting('smtp_gonderen')) ?>" placeholder="panel@sizindomain.com"></div>
             <div class="form-grup"><label class="form-etiket">Ek Gönderen Adresleri <span class="metin-muted" style="font-weight:400">(virgülle ayırın — isteğe bağlı)</span></label>
                 <input name="mail_aliases" class="girdi" value="<?= e(setting('mail_takma_adlar')) ?>" placeholder="rapor@ajans.com, info@ajans.com">
