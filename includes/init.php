@@ -368,8 +368,14 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.5.2';
+const APP_VERSION = '6.6';
 const VERSION_NOTES = [
+    '6.6' => [
+        'Aylık rapor artık tek tıkla şık bir HTML müşteri mailine dönüşüyor: Aylık Raporlar → 📧 Müşteri Maili — önizleme, alıcı/konu düzenleme ve panelden gönderim',
+        'Mail, markalı tasarımla raporun özet/çalışmalar/metrik/plan bölümlerini içeriyor; iç finans verileri müşteriye gitmiyor',
+        'Farklı gönderen adresleri: Ayarlar → SMTP → Ek Gönderen Adresleri — Gmail\'de "şu adres olarak gönder" yetkisi verilmiş Workspace adreslerinizden gönderim yapılabiliyor',
+        'Gönderim tarihçesi raporda görünüyor (kime, ne zaman)',
+    ],
     '6.5' => [
         'Çekim klasöründeki dosyalar artık tür özetiyle görünüyor (🎬 3 video · 🖼️ 12 fotoğraf) ve tek tık Drive\'da açılıyor',
         'Yeni onay akışı: klasörde dosya görülünce panel otomatik "aktarıldı" demiyor — ekibe "yüklenmesi gereken her şey yüklendi mi?" diye soruyor; onay çekim listesindeki ✔ Tümü yüklendi düğmesiyle veriliyor',

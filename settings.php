@@ -85,6 +85,10 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
             <div class="form-grup"><label class="form-etiket">Kullanıcı (E-posta)</label><input name="smtp_user" class="girdi" value="<?= e(setting('smtp_kullanici')) ?>" placeholder="panel@sizindomain.com"></div>
             <div class="form-grup"><label class="form-etiket">Şifre</label><input type="password" name="smtp_password" class="girdi" placeholder="<?= setting('smtp_sifre') ? '••••••••' : 'E-posta şifresi' ?>"><div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın.</div></div>
             <div class="form-grup"><label class="form-etiket">Gönderen Adresi</label><input name="smtp_sender" class="girdi" value="<?= e(setting('smtp_gonderen')) ?>" placeholder="panel@sizindomain.com"></div>
+            <div class="form-grup"><label class="form-etiket">Ek Gönderen Adresleri <span class="metin-muted" style="font-weight:400">(virgülle ayırın — isteğe bağlı)</span></label>
+                <input name="mail_aliases" class="girdi" value="<?= e(setting('mail_takma_adlar')) ?>" placeholder="rapor@ajans.com, info@ajans.com">
+                <div class="form-ipucu">Rapor mailleri bu adreslerden gönderilebilir. Şart: her adres, Gmail'de bağlı hesabın <b>Ayarlar → Hesaplar → Şu adres olarak gönder</b> listesine eklenmiş olmalı; yoksa Google göndereni ana adrese çevirir.</div>
+            </div>
             <div class="form-grup"><label class="satir-esnek" style="gap:9px;cursor:pointer"><input type="checkbox" name="email_notification" value="1" <?= setting('eposta_bildirim') === '1' ? 'checked' : '' ?>> Görev/onay bildirimlerini e-posta ile de gönder</label></div>
             <div class="satir-esnek mt-2" style="gap:10px">
                 <button type="submit" class="btn btn-marka">Kaydet</button>

@@ -118,6 +118,10 @@ page_start('Aylık Raporlar', 'mreports');
             <div class="satir-esnek" style="gap:10px">
                 <button type="submit" class="btn" onclick="this.form.querySelectorAll('input[name=status]').forEach(x => x.remove())">Taslak Kaydet</button>
                 <button type="submit" class="btn btn-marka" onclick="this.form.querySelectorAll('input[name=status]').forEach(x => x.remove()); const i = document.createElement('input'); i.type = 'hidden'; i.name = 'status'; i.value = 'tamamlandi'; this.form.appendChild(i)">Tamamlandı Olarak Kaydet</button>
+                <?php if ($is_active): ?>
+                <button type="button" class="btn" onclick="reportMailAc(<?= $secClient ?>, '<?= e($secPeriod) ?>')">📧 Müşteri Maili</button>
+                <?php if (!empty($is_active['sent_at'])): ?><span class="rozet r-tamamlandi kucuk" title="<?= e($is_active['sent_to'] ?? '') ?>">Gönderildi: <?= format_date($is_active['sent_at'], true) ?></span><?php endif; ?>
+                <?php endif; ?>
             </div>
         </form>
         <?php endif; ?>
@@ -137,6 +141,52 @@ async function aiDraft(clientId, period) {
     }
     st.textContent = 'Taslak dolduruldu — kontrol edip kaydedin.';
     toast('AI taslağı hazır. Düzenleyip kaydetmeyi unutmayın.', 'basari');
+}
+</script>
+<div class="modal-katman" id="modalReportMail">
+    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">📧 Müşteri Rapor Maili</div><button class="modal-kapat" data-modal-close>✕</button></div>
+    <div class="modal-govde">
+        <div class="form-satir">
+            <div class="form-grup"><label class="form-etiket">Alıcı</label><input class="girdi" id="rm_to" placeholder="musteri@firma.com"></div>
+            <div class="form-grup"><label class="form-etiket">Gönderen</label><select class="secim native-kal" id="rm_from"></select></div>
+        </div>
+        <div class="form-grup"><label class="form-etiket">Konu</label><input class="girdi" id="rm_subject"></div>
+        <div class="form-grup"><label class="form-etiket">Önizleme</label>
+            <iframe id="rm_preview" style="width:100%;height:420px;border:1px solid var(--border);border-radius:12px;background:#eef1f6"></iframe>
+        </div>
+    </div>
+    <div class="modal-alt">
+        <span class="kucuk metin-muted" id="rm_sent_info" style="margin-right:auto"></span>
+        <button type="button" class="btn btn-hayalet" data-modal-close>Vazgeç</button>
+        <button type="button" class="btn btn-marka" id="rm_send" onclick="reportMailGonder()">Gönder</button>
+    </div>
+    </div>
+</div>
+<script>
+let rmClient = 0, rmPeriod = '';
+async function reportMailAc(clientId, period) {
+    rmClient = clientId; rmPeriod = period;
+    const j = await api('report_mail_preview', { client_id: clientId, period });
+    if (!j.ok) return;
+    document.getElementById('rm_to').value = j.to || '';
+    document.getElementById('rm_subject').value = j.subject;
+    document.getElementById('rm_from').innerHTML = j.senders.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    document.getElementById('rm_preview').srcdoc = j.html;
+    document.getElementById('rm_sent_info').textContent = j.sent_at ? 'Daha önce gönderildi: ' + j.sent_at : '';
+    modalOpen('modalReportMail');
+}
+async function reportMailGonder() {
+    const btn = document.getElementById('rm_send');
+    if (!confirm('Rapor maili "' + document.getElementById('rm_to').value + '" adresine gönderilsin mi?')) return;
+    btn.disabled = true; btn.textContent = 'Gönderiliyor...';
+    const j = await api('report_mail_send', {
+        client_id: rmClient, period: rmPeriod,
+        to: document.getElementById('rm_to').value,
+        from: document.getElementById('rm_from').value,
+        subject: document.getElementById('rm_subject').value
+    });
+    btn.disabled = false; btn.textContent = 'Gönder';
+    if (j.ok) { toast(j.message, 'basari'); modalClose(document.getElementById('modalReportMail')); setTimeout(() => location.reload(), 700); }
 }
 </script>
 <?php page_end(); ?>

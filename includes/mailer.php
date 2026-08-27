@@ -30,6 +30,23 @@ function send_email(string $alici, string $topic, string $text): bool {
     return smtp_send($alici, $topic, $html, $sender, $siteName);
 }
 
+/**
+ * Send a fully custom HTML e-mail (no wrapper template), optionally from a
+ * Send-As alias of the connected Workspace account. Gmail only honours the
+ * From when the alias is authorized under "Send mail as" — otherwise it
+ * silently rewrites it to the authenticated address.
+ */
+function send_email_html(string $to, string $subject, string $html, ?string $from = null): bool {
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
+    $sender = $from && filter_var($from, FILTER_VALIDATE_EMAIL) ? $from : (setting('smtp_gonderen') ?: setting('smtp_kullanici'));
+    $siteName = setting('site_adi', 'SADA One');
+    if (setting('smtp_aktif') !== '1' || !setting('smtp_host') || !$sender) {
+        $basliklar = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: $siteName <$sender>";
+        return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $html, $basliklar);
+    }
+    return smtp_send($to, $subject, $html, $sender, $siteName);
+}
+
 function smtp_send(string $alici, string $topic, string $html, string $sender, string $sendName): bool {
     $host = setting('smtp_host');
     $port = (int)setting('smtp_port', '465');

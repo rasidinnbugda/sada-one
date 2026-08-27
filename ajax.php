@@ -44,6 +44,46 @@ case 'drive_folder_test':
     if (!$r['ok']) json_out(['ok' => false, 'error' => 'Klasör okunamadı: ' . $r['error'] . ' (Klasörü servis hesabı e-postasıyla paylaştınız mı?)']);
     json_out(['ok' => true, 'mesaj' => 'Klasör erişilebilir ✓' . ($r['sample'] ? ' (örnek dosya: ' . $r['sample'] . ')' : ' (klasör şu an boş)')]);
 
+case 'report_mail_preview':
+    require_permission('rapor');
+    require_once __DIR__ . '/includes/report-mail.php';
+    $report = row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [(int)$g('client_id'), $g('period')]);
+    $client = row("SELECT * FROM clients WHERE id=?", [(int)$g('client_id')]);
+    if (!$report || !$client) json_out(['ok' => false, 'error' => 'Önce raporu kaydedin.']);
+    $ana = setting('smtp_gonderen') ?: setting('smtp_kullanici');
+    $senders = array_values(array_filter(array_unique(array_merge([$ana],
+        array_map('trim', explode(',', (string)setting('mail_takma_adlar')))))));
+    [$py, $pa] = explode('-', $g('period'));
+    json_out(['ok' => true,
+        'html' => report_mail_html($report, $client, $g('period')),
+        'subject' => $client['name'] . ' — ' . MONTHS[(int)$pa] . " $py Aylık Raporu",
+        'to' => $client['contact_email'] ?: '',
+        'senders' => $senders,
+        'sent_at' => $report['sent_at'] ? format_date($report['sent_at'], true) : null,
+    ]);
+
+case 'report_mail_send':
+    require_permission('rapor');
+    require_once __DIR__ . '/includes/report-mail.php';
+    require_once __DIR__ . '/includes/mailer.php';
+    $report = row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [(int)$g('client_id'), $g('period')]);
+    $client = row("SELECT * FROM clients WHERE id=?", [(int)$g('client_id')]);
+    if (!$report || !$client) json_out(['ok' => false, 'error' => 'Önce raporu kaydedin.']);
+    $to = mb_strtolower(trim($g('to')));
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) json_out(['ok' => false, 'error' => 'Geçerli bir alıcı adresi girin.']);
+    // The sender must be one of the configured addresses (main or a Send-As alias)
+    $ana = setting('smtp_gonderen') ?: setting('smtp_kullanici');
+    $izinli = array_values(array_filter(array_unique(array_merge([$ana],
+        array_map('trim', explode(',', (string)setting('mail_takma_adlar')))))));
+    $from = trim($g('from')) ?: $ana;
+    if (!in_array($from, $izinli, true)) json_out(['ok' => false, 'error' => 'Bu gönderen adresi tanımlı değil (Ayarlar → SMTP → Ek gönderen adresleri).']);
+    $subject = trim($g('subject')) ?: ($client['name'] . ' Aylık Raporu');
+    if (!send_email_html($to, $subject, report_mail_html($report, $client, $g('period')), $from))
+        json_out(['ok' => false, 'error' => 'E-posta gönderilemedi — SMTP ayarlarını kontrol edin.']);
+    update_row('monthly_reports', ['sent_at' => $now, 'sent_to' => $to], 'id=?', [$report['id']]);
+    log_activity('Aylık rapor maili gönderildi: ' . $client['name'] . ' / ' . $g('period') . ' → ' . $to);
+    json_out(['ok' => true, 'mesaj' => 'Rapor maili gönderildi: ' . $to]);
+
 case 'drive_files':
     require_login();
     require_once __DIR__ . '/includes/google-drive.php';
@@ -1994,7 +2034,8 @@ case 'setting_save':
     $fieldToKey = ['site_name' => 'site_adi', 'default_theme' => 'varsayilan_tema', 'smtp_is_active' => 'smtp_aktif',
         'smtp_host' => 'smtp_host', 'smtp_port' => 'smtp_port', 'smtp_user' => 'smtp_kullanici',
         'smtp_sender' => 'smtp_gonderen', 'email_notification' => 'eposta_bildirim',
-        'ai_model' => 'ai_model', 'ai_provider' => 'ai_provider', 'gemini_model' => 'gemini_model'];
+        'ai_model' => 'ai_model', 'ai_provider' => 'ai_provider', 'gemini_model' => 'gemini_model',
+        'mail_aliases' => 'mail_takma_adlar'];
     // Google OAuth client: id is plain, the secret only overwrites on a fresh value
     if (isset($_POST['google_client_id'])) {
         q("INSERT INTO settings (setting_key,setting_value) VALUES ('google_client_id',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['google_client_id']), trim($_POST['google_client_id'])]);

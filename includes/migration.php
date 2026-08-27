@@ -109,6 +109,9 @@ function migration_commands(): array {
     "ALTER TABLE events ADD COLUMN drive_link VARCHAR(500) DEFAULT NULL",
     "ALTER TABLE events ADD COLUMN drive_status ENUM('bekliyor','aktarildi') NOT NULL DEFAULT 'bekliyor'",
         "ALTER TABLE events ADD COLUMN drive_files_seen TINYINT(1) NOT NULL DEFAULT 0",
+        // v6.6: the monthly report can be mailed to the client from the panel
+        "ALTER TABLE monthly_reports ADD COLUMN sent_at DATETIME DEFAULT NULL",
+        "ALTER TABLE monthly_reports ADD COLUMN sent_to VARCHAR(255) DEFAULT NULL",
     ];
 }
 
