@@ -79,7 +79,8 @@ page_start('Talepler', 'requests');
                 <div class="form-grup"><label class="form-etiket">Dosya</label><select name="client_id" class="secim"><option value="">—</option><?php foreach ($tumClients as $d): ?><option value="<?= $d['id'] ?>"><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
                 <?php endif; ?>
                 <div id="requestFields"></div>
-                <button type="submit" class="btn btn-marka btn-blok mt-2">Talebi Gönder</button>
+                <button type="button" class="btn btn-marka btn-blok mt-2" id="rtSonrakiBtn" style="display:none" onclick="rtSonraki()">Sonraki Bölüm →</button>
+                <button type="submit" class="btn btn-marka btn-blok mt-2" id="rtGonderBtn">Talebi Gönder</button>
             </form>
         </div>
     </div>
@@ -178,6 +179,7 @@ function requestFormOpen(id) {
         kap.addEventListener('change', rtIlerleme);
         rtIlerleme();
     }
+    rtButonGuncelle();
     if (window.ozelPickerRefresh) ozelPickerRefresh();
     document.getElementById('talepAdim1').style.display = 'none';
     document.getElementById('talepAdim2').style.display = 'block';
@@ -191,7 +193,39 @@ function rtSekmeSec(btn, no) {
         if (aktif) p.setAttribute('data-gezildi', '1');
     });
     rtIlerleme();
+    rtButonGuncelle();
 }
+// Sihirbaz akışı: Gönder yalnızca SON bölümde; öncekilerde "Sonraki Bölüm"
+function rtButonGuncelle() {
+    const kap = document.getElementById('requestFields');
+    const sonraki = document.getElementById('rtSonrakiBtn');
+    const gonder = document.getElementById('rtGonderBtn');
+    const paneller = kap.querySelectorAll('.rt-panel');
+    if (!paneller.length) { sonraki.style.display = 'none'; gonder.style.display = ''; return; }
+    const aktifNo = +(kap.querySelector('.rt-panel.aktif')?.dataset.rt ?? 0);
+    const sondaMi = aktifNo === paneller.length - 1;
+    sonraki.style.display = sondaMi ? 'none' : '';
+    gonder.style.display = sondaMi ? '' : 'none';
+}
+function rtSonraki() {
+    const kap = document.getElementById('requestFields');
+    const aktifNo = +(kap.querySelector('.rt-panel.aktif')?.dataset.rt ?? 0);
+    // Bu bölümün zorunlu alanları dolu mu? Değilse tarayıcı uyarısını tetikle
+    const panel = kap.querySelector(`.rt-panel[data-rt="${aktifNo}"]`);
+    const eksik = [...panel.querySelectorAll('input, textarea, select')].find(e => e.required && !e.checkValidity());
+    if (eksik) { eksik.reportValidity(); return; }
+    rtSekmeSec(null, aktifNo + 1);
+}
+// Klavye (Enter) ile erken gönderime karşı güvence: son bölümde değilsek
+// gönderim yerine sonraki bölüme geç (bu dinleyici app.js'inkinden önce kayıtlı)
+document.addEventListener('submit', e => {
+    if (e.target.id !== 'requestForm') return;
+    const kap = document.getElementById('requestFields');
+    const paneller = kap.querySelectorAll('.rt-panel');
+    if (!paneller.length) return;
+    const aktifNo = +(kap.querySelector('.rt-panel.aktif')?.dataset.rt ?? 0);
+    if (aktifNo < paneller.length - 1) { e.preventDefault(); e.stopImmediatePropagation(); rtSonraki(); }
+});
 // Alan doluluk kontrolü: gizli değer taşıyıcıları (osec/diğer/çoklu seçim) dahil
 function rtDoluMu(el) {
     if (el.type === 'file') return el.files.length > 0;

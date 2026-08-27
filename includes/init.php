@@ -370,7 +370,7 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.10.4';
+const APP_VERSION = '6.10.5';
 const VERSION_NOTES = [
     '6.10.4' => [
         'Form tiplerinin kaybolması KESİN olarak kapatıldı: veritabanı kolonu genişletme migration\'ı canlıda sessizce başarısız olabildiği için, form kaydetme artık kolonu kendisi denetleyip dar kalmışsa anında genişletiyor',

@@ -1433,7 +1433,9 @@ body { background-image: radial-gradient(ellipse 70% 45% at 85% -12%, var(--parl
 .secenek-oge .ikon-eylem { width: 28px; height: 28px; flex-shrink: 0; }
 
 /* ---- Request form: section tabs (stepper) ---- */
-.rt-sekmeler { display: flex; flex-wrap: wrap; border-bottom: 2px solid var(--border); margin-bottom: 0; }
+.rt-sekmeler { display: flex; flex-wrap: nowrap; overflow-x: auto; border-bottom: 2px solid var(--border); margin-bottom: 0; scrollbar-width: none; }
+.rt-sekmeler::-webkit-scrollbar { display: none; }
+.rt-sekme { white-space: nowrap; flex-shrink: 0; }
 .rt-sekme {
     display: inline-flex; align-items: center; gap: 8px;
     padding: 10px 16px 12px; margin-bottom: -2px;
