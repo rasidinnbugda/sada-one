@@ -75,27 +75,56 @@ function alanSatiri(field = {}) {
                     <input class="girdi alan-etiket" placeholder="Alan etiketi" value="${(field.tag||'').replace(/"/g,'&quot;')}">
                     <select class="secim alan-tip" onchange="optionShow(this)">${typeOps}</select>
                 </div>
-                <textarea class="metin-alani alan-secenekler" placeholder="Seçenekler (her satıra bir tane)" style="min-height:60px;display:${['secim','coklu_secim'].includes(field.type)?'block':(field.type==='bolum'?'block':'none')}">${field.options||''}</textarea>
+                <textarea class="metin-alani alan-secenekler" placeholder="Bölüm açıklaması (isteğe bağlı)" style="min-height:60px;display:${field.type==='bolum'?'block':'none'}">${field.type==='bolum'?(field.options||''):''}</textarea>
+                <div class="secenek-kutu" style="display:${['secim','coklu_secim'].includes(field.type)?'block':'none'}">
+                    <div class="secenek-liste"></div>
+                    <div class="satir-esnek sarma mt-1" style="gap:12px">
+                        <button type="button" class="mini-btn" onclick="secenekEkle(this.closest('.secenek-kutu').querySelector('.secenek-liste'), '')">+ Seçenek ekle</button>
+                        <label class="satir-esnek kucuk" style="gap:6px;cursor:pointer"><input type="checkbox" class="alan-diger"> "Diğer" seçeneği olsun</label>
+                    </div>
+                </div>
                 <label class="satir-esnek kucuk mt-2 alan-zorunlu-satir" style="gap:7px;cursor:pointer;display:${field.type==='bolum'?'none':'flex'}"><input type="checkbox" class="alan-zorunlu" ${field.is_required!=0?'checked':''}> Zorunlu alan</label>
             </div>
             <button type="button" class="ikon-eylem tehlike" onclick="this.closest('.alan-satir').remove()"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="16"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>`;
     document.getElementById('fieldList').appendChild(div);
+    // Kayıtlı seçenekleri satırlara aç; __diger__ işareti kutucuğa döner
+    if (['secim', 'coklu_secim'].includes(field.type)) {
+        const liste = div.querySelector('.secenek-liste');
+        const satirlar = (field.options || '').split('\n').map(s => s.trim()).filter(Boolean);
+        if (satirlar.includes('__diger__')) div.querySelector('.alan-diger').checked = true;
+        const gercek = satirlar.filter(s => s !== '__diger__');
+        (gercek.length ? gercek : ['', '']).forEach(s => secenekEkle(liste, s));
+    }
     if (window.ozelPickerRefresh) ozelPickerRefresh();
+}
+function secenekEkle(liste, deger) {
+    const oge = document.createElement('div');
+    oge.className = 'satir-esnek secenek-oge';
+    oge.innerHTML = `<span class="secenek-yuvarlak"></span>
+        <input class="girdi secenek-girdi" placeholder="Seçenek ${liste.children.length + 1}" value="${(deger||'').replace(/"/g,'&quot;')}"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();secenekEkle(this.closest('.secenek-liste'),'');this.closest('.secenek-liste').lastElementChild.querySelector('input').focus()}">
+        <button type="button" class="ikon-eylem" onclick="this.closest('.secenek-oge').remove()" title="Seçeneği kaldır"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="14"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
+    liste.appendChild(oge);
 }
 function optionShow(sel) {
     const satir = sel.closest('.alan-satir');
     const secenek = satir.querySelector('.alan-secenekler');
     const zorunlu = satir.querySelector('.alan-zorunlu-satir');
     const etiket = satir.querySelector('.alan-etiket');
+    const secKutu = satir.querySelector('.secenek-kutu');
     if (sel.value === 'bolum') {
         secenek.style.display = 'block';
-        secenek.placeholder = 'Bölüm açıklaması (isteğe bağlı — formda başlığın altında görünür)';
+        secKutu.style.display = 'none';
         etiket.placeholder = 'Bölüm başlığı';
         zorunlu.style.display = 'none';
     } else {
-        secenek.style.display = ['secim', 'coklu_secim'].includes(sel.value) ? 'block' : 'none';
-        secenek.placeholder = 'Seçenekler (her satıra bir tane)';
+        secenek.style.display = 'none';
+        secKutu.style.display = ['secim', 'coklu_secim'].includes(sel.value) ? 'block' : 'none';
+        if (secKutu.style.display === 'block' && !secKutu.querySelector('.secenek-oge')) {
+            secenekEkle(secKutu.querySelector('.secenek-liste'), '');
+            secenekEkle(secKutu.querySelector('.secenek-liste'), '');
+        }
         etiket.placeholder = 'Alan etiketi';
         zorunlu.style.display = 'flex';
     }
@@ -119,12 +148,18 @@ function formEdit(f) {
     modalOpen('modalForm');
 }
 document.getElementById('formForm').addEventListener('submit', () => {
-    const fields = Array.from(document.querySelectorAll('.alan-satir')).map(s => ({
-        tag: s.querySelector('.alan-etiket').value.trim(),
-        type: s.querySelector('.alan-tip').value,
-        options: s.querySelector('.alan-secenekler').value.trim(),
-        is_required: s.querySelector('.alan-zorunlu').checked ? 1 : 0
-    })).filter(a => a.tag);
+    const fields = Array.from(document.querySelectorAll('.alan-satir')).map(s => {
+        const type = s.querySelector('.alan-tip').value;
+        let options = '';
+        if (['secim', 'coklu_secim'].includes(type)) {
+            options = [...s.querySelectorAll('.secenek-girdi')].map(i => i.value.trim()).filter(Boolean).join('\n');
+            if (s.querySelector('.alan-diger').checked) options += (options ? '\n' : '') + '__diger__';
+        } else if (type === 'bolum') {
+            options = s.querySelector('.alan-secenekler').value.trim();
+        }
+        return { tag: s.querySelector('.alan-etiket').value.trim(), type, options,
+            is_required: s.querySelector('.alan-zorunlu').checked ? 1 : 0 };
+    }).filter(a => a.tag);
     document.getElementById('f_fields').value = JSON.stringify(fields);
 });
 </script>

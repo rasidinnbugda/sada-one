@@ -1424,3 +1424,10 @@ body { background-image: radial-gradient(ellipse 70% 45% at 85% -12%, var(--parl
 .talep-bolum { padding: 14px 2px 6px; border-bottom: 2px solid var(--marka); margin-bottom: 10px; }
 .talep-bolum-baslik { font-size: 15px; font-weight: 700; }
 @media (max-width: 640px) { .talep-izgara { grid-template-columns: 1fr; } }
+
+/* ---- Form builder: Google Forms-style option rows ---- */
+.secenek-liste { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.secenek-oge { gap: 9px; }
+.secenek-yuvarlak { width: 16px; height: 16px; border: 2px solid var(--border-2); border-radius: 50%; flex-shrink: 0; }
+.secenek-oge .girdi { padding: 7px 11px; font-size: 13px; }
+.secenek-oge .ikon-eylem { width: 28px; height: 28px; flex-shrink: 0; }

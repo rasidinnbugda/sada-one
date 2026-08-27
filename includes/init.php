@@ -368,7 +368,7 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.10';
+const APP_VERSION = '6.10.1';
 const VERSION_NOTES = [
     '6.10' => [
         'Form oluşturucu kökten onarıldı: tarih, seçim vb. tipler formda görünmüyordu (tip anahtarları uyuşmuyordu) ve gönderilen cevaplar hiç kaydedilmiyordu (alan adı uyuşmazlığı) — mevcut şablonlardaki bozuk tipler kendini onarır',

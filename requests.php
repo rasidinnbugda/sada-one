@@ -110,16 +110,33 @@ function requestFormOpen(id) {
         h += `<div class="form-grup${kisa.includes(a.type) ? '' : ' talep-genis'}"><label class="form-etiket">${esc(a.tag)}${star}</label>`;
         if (a.type === 'uzun_metin') h += `<textarea name="alan_${a.id}" class="metin-alani"${is_required}></textarea>`;
         else if (a.type === 'secim') {
-            h += `<select name="alan_${a.id}" class="secim"${is_required}><option value="">— Seçin</option>`;
-            (a.options || '').split('\n').forEach(s => { if (s.trim()) h += `<option value="${esc(s.trim())}">${esc(s.trim())}</option>`; });
-            h += `</select>`;
+            const satirlar = (a.options || '').split('\n').map(s => s.trim()).filter(Boolean);
+            const digerVar = satirlar.includes('__diger__');
+            const opsiyonlar = satirlar.filter(s => s !== '__diger__');
+            if (digerVar) {
+                // "Diğer" seçilince serbest metin açılır; gerçek değer gizli alanda taşınır
+                h += `<input type="hidden" name="alan_${a.id}" class="sd-deger">`;
+                h += `<select class="secim sd-secim" onchange="secimDiger(this)"${is_required}><option value="">— Seçin</option>`;
+                opsiyonlar.forEach(s => { h += `<option value="${esc(s)}">${esc(s)}</option>`; });
+                h += `<option value="__diger__">Diğer...</option></select>`;
+                h += `<input type="text" class="girdi mt-1 sd-metin" placeholder="Lütfen belirtin..." style="display:none" oninput="secimDiger(this.closest('.form-grup').querySelector('.sd-secim'))">`;
+            } else {
+                h += `<select name="alan_${a.id}" class="secim"${is_required}><option value="">— Seçin</option>`;
+                opsiyonlar.forEach(s => { h += `<option value="${esc(s)}">${esc(s)}</option>`; });
+                h += `</select>`;
+            }
         }
         else if (a.type === 'coklu_secim') {
+            const satirlar = (a.options || '').split('\n').map(s => s.trim()).filter(Boolean);
+            const digerVar = satirlar.includes('__diger__');
             h += `<input type="hidden" name="alan_${a.id}" class="cs-deger">`;
             h += `<div class="izgara izgara-2" style="gap:6px">`;
-            (a.options || '').split('\n').forEach(s => {
-                if (s.trim()) h += `<label class="satir-esnek kucuk" style="gap:8px;padding:8px 11px;background:var(--surface-2);border-radius:9px;cursor:pointer"><input type="checkbox" class="cs-kutu" value="${esc(s.trim())}" onchange="csGuncelle(this)"> <span>${esc(s.trim())}</span></label>`;
+            satirlar.filter(s => s !== '__diger__').forEach(s => {
+                h += `<label class="satir-esnek kucuk" style="gap:8px;padding:8px 11px;background:var(--surface-2);border-radius:9px;cursor:pointer"><input type="checkbox" class="cs-kutu" value="${esc(s)}" onchange="csGuncelle(this)"> <span>${esc(s)}</span></label>`;
             });
+            if (digerVar) {
+                h += `<label class="satir-esnek kucuk" style="gap:8px;padding:8px 11px;background:var(--surface-2);border-radius:9px;cursor:pointer"><input type="checkbox" class="cs-kutu cs-diger" value="" onchange="csGuncelle(this)"> <span style="flex-shrink:0">Diğer:</span><input type="text" class="girdi cs-diger-metin" style="padding:4px 8px;font-size:12.5px" oninput="csGuncelle(this)"></label>`;
+            }
             h += `</div>`;
         }
         else if (a.type === 'tarih') h += `<input type="date" name="alan_${a.id}" class="girdi"${is_required}>`;
@@ -137,7 +154,26 @@ function requestFormOpen(id) {
 }
 function csGuncelle(kutu) {
     const grup = kutu.closest('.form-grup');
-    grup.querySelector('.cs-deger').value = [...grup.querySelectorAll('.cs-kutu:checked')].map(k => k.value).join(', ');
+    const degerler = [...grup.querySelectorAll('.cs-kutu:checked')].filter(k => !k.classList.contains('cs-diger')).map(k => k.value);
+    const diger = grup.querySelector('.cs-diger');
+    if (diger && diger.checked) {
+        const metin = grup.querySelector('.cs-diger-metin').value.trim();
+        degerler.push(metin ? 'Diğer: ' + metin : 'Diğer');
+    }
+    grup.querySelector('.cs-deger').value = degerler.join(', ');
+}
+function secimDiger(sel) {
+    const grup = sel.closest('.form-grup');
+    const metin = grup.querySelector('.sd-metin');
+    const gizli = grup.querySelector('.sd-deger');
+    if (sel.value === '__diger__') {
+        metin.style.display = '';
+        const v = metin.value.trim();
+        gizli.value = v ? 'Diğer: ' + v : '';
+    } else {
+        metin.style.display = 'none';
+        gizli.value = sel.value;
+    }
 }
 function requestGeri() { document.getElementById('talepAdim2').style.display = 'none'; document.getElementById('talepAdim1').style.display = 'block'; }
 </script>
