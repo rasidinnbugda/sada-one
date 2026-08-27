@@ -65,7 +65,7 @@ page_start('Kullanıcılar', 'users');
                 </div>
             </div>
             <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Şifre <span id="passwordRequired" class="zorunlu">*</span></label><input type="password" name="password" id="k_password" class="girdi"><div class="form-ipucu" id="passwordIpucu">En az 8 karakter.</div></div>
+                <div class="form-grup"><label class="form-etiket">Şifre <span id="passwordRequired" class="zorunlu">*</span></label><input type="password" name="password" autocomplete="new-password" id="k_password" class="girdi"><div class="form-ipucu" id="passwordIpucu">En az 8 karakter.</div></div>
                 <div class="form-grup" id="capacityGrup"><label class="form-etiket">Haftalık Kapasite (saat)</label><input type="number" name="weekly_capacity" id="k_capacity" class="girdi" value="45" min="0" max="100"><div class="form-ipucu">Doluluk raporu bu hedefe göre hesaplanır.</div></div>
             </div>
             <div class="form-grup" id="salaryGrup"><label class="form-etiket">Aylık Maaş (₺)</label><input name="salary" id="k_salary" class="girdi" value="0" placeholder="0,00"><div class="form-ipucu">Girilirse her ay başında otomatik gider kaydı oluşur. Yalnızca yönetici ve finans rolü görür.</div></div>

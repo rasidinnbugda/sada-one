@@ -113,6 +113,15 @@
         });
     });
 
+    /* ---------- No autofill inside the panel ----------
+       The browser was pouring the PANEL's saved login into unrelated forms
+       (SMTP credentials, user editing...). The login page does not load this
+       file, so autofill keeps working there. new-password is the only value
+       Chrome reliably honours on password fields. */
+    $$('form').forEach(f => f.setAttribute('autocomplete', 'off'));
+    $$('input[type="password"]').forEach(i => { if (!i.getAttribute('autocomplete')) i.setAttribute('autocomplete', 'new-password'); });
+    $$('input[type="email"], input[name*="user"], input[name*="email"]').forEach(i => { if (!i.getAttribute('autocomplete')) i.setAttribute('autocomplete', 'off'); });
+
     /* ---------- Sidebar (mobile) ---------- */
     const sidebar = $('#sidebar'), karartma = $('[data-karartma]');
     $('[data-sidebar-open]')?.addEventListener('click', () => { sidebar.classList.add('acik'); karartma.classList.add('acik'); });

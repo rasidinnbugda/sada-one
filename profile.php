@@ -27,7 +27,7 @@ page_start('Profil', '');
                 <div class="form-grup"><label class="form-etiket">Ad Soyad</label><input name="name" class="girdi" value="<?= e($u['name']) ?>" required></div>
                 <div class="form-grup"><label class="form-etiket">E-posta</label><input class="girdi" value="<?= e($u['email']) ?>" disabled><div class="form-ipucu">E-posta değişikliği için yöneticinize başvurun.</div></div>
                 <div class="form-grup"><label class="form-etiket">Ünvan</label><input name="job_title" class="girdi" value="<?= e($u['job_title']) ?>"></div>
-                <div class="form-grup"><label class="form-etiket">Yeni Şifre</label><input type="password" name="password" class="girdi" placeholder="Değiştirmek için doldurun"></div>
+                <div class="form-grup"><label class="form-etiket">Yeni Şifre</label><input type="password" name="password" autocomplete="new-password" class="girdi" placeholder="Değiştirmek için doldurun"></div>
                 <button type="submit" class="btn btn-marka mt-1">Kaydet</button>
             </form>
         </div>

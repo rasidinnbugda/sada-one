@@ -82,8 +82,8 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
                 <div class="form-grup"><label class="form-etiket">SMTP Sunucu</label><input name="smtp_host" class="girdi" value="<?= e(setting('smtp_host')) ?>" placeholder="smtp.gmail.com"></div>
                 <div class="form-grup"><label class="form-etiket">Port</label><input name="smtp_port" class="girdi" value="<?= e(setting('smtp_port')) ?>" placeholder="465"></div>
             </div>
-            <div class="form-grup"><label class="form-etiket">Kullanıcı (E-posta)</label><input name="smtp_user" class="girdi" value="<?= e(setting('smtp_kullanici')) ?>" placeholder="panel@sizindomain.com"></div>
-            <div class="form-grup"><label class="form-etiket">Şifre</label><input type="password" name="smtp_password" class="girdi" placeholder="<?= setting('smtp_sifre') ? '••••••••' : 'E-posta şifresi' ?>"><div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın. Gmail için <b>uygulama şifresi</b> kullanın (normal şifre çalışmaz); boşluklarıyla yapıştırabilirsiniz, panel temizler.</div></div>
+            <div class="form-grup"><label class="form-etiket">Kullanıcı (E-posta)</label><input name="smtp_user" class="girdi" autocomplete="off" value="<?= e(setting('smtp_kullanici')) ?>" placeholder="panel@sizindomain.com"></div>
+            <div class="form-grup"><label class="form-etiket">Şifre</label><input type="password" name="smtp_password" autocomplete="new-password" class="girdi" placeholder="<?= setting('smtp_sifre') ? '••••••••' : 'E-posta şifresi' ?>"><div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın. Gmail için <b>uygulama şifresi</b> kullanın (normal şifre çalışmaz); boşluklarıyla yapıştırabilirsiniz, panel temizler.</div></div>
             <div class="form-grup"><label class="form-etiket">Gönderen Adresi</label><input name="smtp_sender" class="girdi" value="<?= e(setting('smtp_gonderen')) ?>" placeholder="panel@sizindomain.com"></div>
             <div class="form-grup"><label class="form-etiket">Ek Gönderen Adresleri <span class="metin-muted" style="font-weight:400">(virgülle ayırın — isteğe bağlı)</span></label>
                 <input name="mail_aliases" class="girdi" value="<?= e(setting('mail_takma_adlar')) ?>" placeholder="rapor@ajans.com, info@ajans.com">
@@ -118,7 +118,7 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
                 <div class="form-grup"><label class="form-etiket">Client ID</label>
                     <input name="google_client_id" class="girdi" value="<?= e(setting('google_client_id')) ?>" placeholder="....apps.googleusercontent.com"></div>
                 <div class="form-grup"><label class="form-etiket">Client Secret</label>
-                    <input type="password" name="google_client_secret" class="girdi" placeholder="<?= setting('google_client_secret') ? '••••••••••••' : 'GOCSPX-...' ?>"></div>
+                    <input type="password" name="google_client_secret" autocomplete="new-password" class="girdi" placeholder="<?= setting('google_client_secret') ? '••••••••••••' : 'GOCSPX-...' ?>"></div>
             </div>
             <div class="form-grup"><label class="form-etiket">Yönlendirme Adresi (Google Console'a eklenecek)</label>
                 <input class="girdi" readonly value="<?= e(full_url('oauth-google.php')) ?>" onclick="this.select()"></div>
@@ -167,7 +167,7 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
             </div>
             <div id="aiClaudeAlan" style="<?= setting('ai_provider') === 'gemini' ? 'display:none' : '' ?>">
             <div class="form-grup"><label class="form-etiket">Anthropic API Anahtarı</label>
-                <input type="password" name="anthropic_api_key" class="girdi" placeholder="<?= setting('anthropic_api_key') ? '••••••••••••' : 'sk-ant-...' ?>">
+                <input type="password" name="anthropic_api_key" autocomplete="new-password" class="girdi" placeholder="<?= setting('anthropic_api_key') ? '••••••••••••' : 'sk-ant-...' ?>">
                 <div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın.</div>
             </div>
             <div class="form-grup"><label class="form-etiket">Model</label>
@@ -180,7 +180,7 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
             </div>
             <div id="aiGeminiAlan" style="<?= setting('ai_provider') === 'gemini' ? '' : 'display:none' ?>">
             <div class="form-grup"><label class="form-etiket">Gemini API Anahtarı</label>
-                <input type="password" name="gemini_api_key" class="girdi" placeholder="<?= setting('gemini_api_key') ? '••••••••••••' : 'AIza...' ?>">
+                <input type="password" name="gemini_api_key" autocomplete="new-password" class="girdi" placeholder="<?= setting('gemini_api_key') ? '••••••••••••' : 'AIza...' ?>">
                 <div class="form-ipucu">Değiştirmek istemiyorsanız boş bırakın.</div>
             </div>
             <div class="form-grup"><label class="form-etiket">Model</label>
