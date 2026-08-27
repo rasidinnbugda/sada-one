@@ -370,8 +370,13 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.10.5';
+const APP_VERSION = '6.10.6';
 const VERSION_NOTES = [
+    '6.10.6' => [
+        'KÖK NEDEN BULUNDU ve kapatıldı: migration listesinde eski sürümden kalan bir komut, HER güncellemede form alan tipleri kolonunu önce eski dar hâline çevirip bölüm/çoklu seçim/çoklu dosya tiplerini siliyor, sonra yeniden genişletiyordu — veri her turda kayboluyordu. Komut kaldırıldı; tam güncelleme simülasyonuyla verilerin artık hayatta kaldığı kanıtlandı',
+        'Aynı desenden ikinci bomba: her güncellemede STAJYER kullanıcıların rolü de siliniyordu — o da kapatıldı',
+        'Form şablonundaki tipleri SON bir kez seçip kaydedin: bundan sonraki hiçbir güncelleme onlara dokunmayacak',
+    ],
     '6.10.4' => [
         'Form tiplerinin kaybolması KESİN olarak kapatıldı: veritabanı kolonu genişletme migration\'ı canlıda sessizce başarısız olabildiği için, form kaydetme artık kolonu kendisi denetleyip dar kalmışsa anında genişletiyor',
         'Kayıt sonrası doğrulama: yazılan tipler gönderilenle karşılaştırılıyor — veritabanı değeri kırparsa panel artık "kaydedildi" demiyor, açık hata veriyor',

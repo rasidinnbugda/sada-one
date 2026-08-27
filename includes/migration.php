@@ -9,7 +9,8 @@ function migration_commands(): array {
     return [
 
     // users
-    "ALTER TABLE users MODIFY role ENUM('yonetici','pm','ekip','finans','musteri') NOT NULL DEFAULT 'ekip'",
+    // (role'ün eski, 'stajyer'siz ENUM tanımı buradan kaldırıldı: aynı kolona iki MODIFY,
+    //  her migration turunda kolonu önce daraltıp stajyer rollerini siliyordu — v6 satırı yeterli)
     "ALTER TABLE users ADD COLUMN avatar VARCHAR(255) DEFAULT NULL",
     "ALTER TABLE users ADD COLUMN weekly_capacity SMALLINT NOT NULL DEFAULT 45",
     "ALTER TABLE users ADD COLUMN permissions TEXT",
@@ -79,7 +80,8 @@ function migration_commands(): array {
     // ---- v11 ----
     "ALTER TABLE archive ADD COLUMN url VARCHAR(500) DEFAULT NULL",
     "ALTER TABLE approvals ADD COLUMN drive_link VARCHAR(500) DEFAULT NULL",
-    "ALTER TABLE form_fields MODIFY type ENUM('metin','uzun_metin','secim','tarih','sayi','dosya') NOT NULL DEFAULT 'metin'",
+    // (form_fields.type'ın eski ENUM tanımı buradan kaldırıldı: her migration turunda kolonu
+    //  yeniden daraltıp bolum/coklu_secim/coklu_dosya tiplerini SİLİYORDU — v6.10 VARCHAR satırı yeterli)
     // ---- v10 ----
     "ALTER TABLE tasks ADD COLUMN content_id INT DEFAULT NULL",
     "CREATE TABLE IF NOT EXISTS project_templates (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(150) NOT NULL, description VARCHAR(255) DEFAULT NULL, tasks TEXT, created DATETIME NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
