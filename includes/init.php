@@ -80,7 +80,9 @@ function legacy_schema_check(): void {
         $st->execute();
         if ($st->fetchColumn() !== APP_VERSION) {
             require_once __DIR__ . '/migration.php';
-            run_migrations(db());
+            foreach (run_migrations(db()) as $mr) {
+                if (($mr[0] ?? '') === 'hata') error_log('[SADA] migration hatasi: ' . ($mr[1] ?? '?'));
+            }
             db()->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('schema_version', ?) ON DUPLICATE KEY UPDATE setting_value=?")
                 ->execute([APP_VERSION, APP_VERSION]);
         }
@@ -368,8 +370,13 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.10.3';
+const APP_VERSION = '6.10.4';
 const VERSION_NOTES = [
+    '6.10.4' => [
+        'Form tiplerinin kaybolması KESİN olarak kapatıldı: veritabanı kolonu genişletme migration\'ı canlıda sessizce başarısız olabildiği için, form kaydetme artık kolonu kendisi denetleyip dar kalmışsa anında genişletiyor',
+        'Kayıt sonrası doğrulama: yazılan tipler gönderilenle karşılaştırılıyor — veritabanı değeri kırparsa panel artık "kaydedildi" demiyor, açık hata veriyor',
+        'Migration hataları artık sessizce yutulmuyor, storage/error.log\'a yazılıyor',
+    ],
     '6.10.2' => [
         'Bölümlü formlar artık sekmeli: her bölüm başlığı bir sekme oluyor (bölümden önceki alanlar "Genel" sekmesinde); başka sekmedeki zorunlu alan boşsa gönderim o sekmeye otomatik atlıyor',
         'Not: 6.10 öncesinde oluşturulan şablonlarda tarih/seçim/dosya tipleri, eski sürümün veritabanı kolonu dar olduğu için kaydedilirken kaybolmuştu (güncelleme değil, kayıt anı sildi) — o şablonlarda tipleri bir kez yeniden seçmeniz gerekir; artık kalıcıdır',

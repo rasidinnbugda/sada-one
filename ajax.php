@@ -2087,6 +2087,14 @@ case 'form_save':
     $name = trim($g('name'));
     $fields = json_decode($g('fields', '[]'), true) ?: [];
     if ($name === '' || !$fields) json_out(['ok' => false, 'error' => 'Form adı ve en az bir alan gerekli.']);
+    // Self-repair at the exact failure point: if the type column is still the old
+    // six-value ENUM (a silently-failed migration leaves it that way), new type
+    // keys get truncated to '' on insert and every choice is lost. Widen it NOW.
+    $tipKolon = row("SHOW COLUMNS FROM form_fields LIKE 'type'");
+    if (str_starts_with(strtolower((string)($tipKolon['Type'] ?? '')), 'enum')) {
+        try { q("ALTER TABLE form_fields MODIFY type VARCHAR(20) NOT NULL DEFAULT 'metin'"); }
+        catch (Throwable $e) { json_out(['ok' => false, 'error' => 'Veritabanı kolonu genişletilemedi (tip seçimleri kaydedilemez): ' . mb_substr($e->getMessage(), 0, 150)]); }
+    }
     if ($g('id')) {
         $fid = (int)$g('id');
         update_row('form_templates', ['name' => $name, 'description' => $g('description'), 'is_active' => (int)$g('is_active', 1)], 'id=?', [$fid]);
@@ -2094,13 +2102,21 @@ case 'form_save':
     } else {
         $fid = insert('form_templates', ['name' => $name, 'description' => $g('description'), 'is_active' => 1, 'created' => $now]);
     }
+    $beklenen = [];
     foreach ($fields as $i => $field) {
         if (trim($field['tag'] ?? '') === '') continue;
+        $beklenen[] = $field['type'] ?? 'metin';
         insert('form_fields', [
             'template_id' => $fid, 'sort_order' => $i + 1, 'tag' => trim($field['tag']),
             'type' => $field['type'] ?? 'metin', 'options' => $field['options'] ?? null,
             'is_required' => !empty($field['is_required']) ? 1 : 0,
         ]);
+    }
+    // Verify what actually landed — a truncating column must never pass as success
+    $yazilan = array_column(rows("SELECT type FROM form_fields WHERE template_id=? ORDER BY sort_order", [$fid]), 'type');
+    if ($yazilan !== $beklenen) {
+        error_log('[SADA] form_save tip dogrulamasi basarisiz: beklenen=' . implode(',', $beklenen) . ' yazilan=' . implode(',', $yazilan));
+        json_out(['ok' => false, 'error' => 'Alan tipleri veritabanına eksik yazıldı — lütfen tekrar kaydedin; sorun sürerse yöneticinize storage/error.log kaydını iletin.']);
     }
     json_out(['ok' => true, 'mesaj' => 'Form şablonu kaydedildi.']);
 
