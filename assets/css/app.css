@@ -1432,14 +1432,27 @@ body { background-image: radial-gradient(ellipse 70% 45% at 85% -12%, var(--parl
 .secenek-oge .girdi { padding: 7px 11px; font-size: 13px; }
 .secenek-oge .ikon-eylem { width: 28px; height: 28px; flex-shrink: 0; }
 
-/* ---- Request form: section tabs ---- */
-.rt-sekmeler { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+/* ---- Request form: section tabs (stepper) ---- */
+.rt-sekmeler { display: flex; flex-wrap: wrap; border-bottom: 2px solid var(--border); margin-bottom: 0; }
 .rt-sekme {
-    padding: 8px 15px; border-radius: 99px; font-size: 13px; font-weight: 600;
-    color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border);
-    transition: all var(--gecis);
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 16px 12px; margin-bottom: -2px;
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    background: none; border: none; border-bottom: 3px solid transparent;
+    transition: color var(--gecis), border-color var(--gecis);
 }
-.rt-sekme:hover { border-color: var(--marka); color: var(--text); }
-.rt-sekme.aktif { background: var(--marka); color: var(--marka-ink); border-color: var(--marka); }
+.rt-sekme:hover { color: var(--text); }
+.rt-sekme.aktif { color: var(--text); border-bottom-color: var(--marka); }
+.rt-no {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 21px; height: 21px; border-radius: 50%; font-size: 11px; font-weight: 700;
+    background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border-2);
+    transition: all var(--gecis); flex-shrink: 0;
+}
+.rt-sekme.aktif .rt-no { background: var(--marka); color: var(--marka-ink); border-color: var(--marka); }
+.rt-sekme.tamam .rt-no { background: var(--basari); color: #fff; border-color: var(--basari); }
+.rt-ilerleme { height: 4px; background: var(--surface-2); border-radius: 0 0 3px 3px; overflow: hidden; }
+.rt-ilerleme-dolu { height: 100%; background: linear-gradient(90deg, var(--marka), var(--basari)); border-radius: 3px; transition: width .35s cubic-bezier(.4, 0, .2, 1); }
+.rt-ilerleme-metin { padding: 7px 2px 0; }
 .rt-panel { display: none; }
 .rt-panel.aktif { display: block; animation: sayfaGiris .3s ease; }

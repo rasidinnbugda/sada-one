@@ -104,7 +104,8 @@ function requestFormOpen(id) {
         const adlar = f.fields[0].type === 'bolum' ? [] : ['Genel'];
         bolumler.forEach(b => adlar.push(b.tag));
         h += `<div class="rt-sekmeler">` + adlar.map((ad, i) =>
-            `<button type="button" class="rt-sekme${i === 0 ? ' aktif' : ''}" onclick="rtSekmeSec(this, ${i})">${esc(ad)}</button>`).join('') + `</div>`;
+            `<button type="button" class="rt-sekme${i === 0 ? ' aktif' : ''}" onclick="rtSekmeSec(this, ${i})"><span class="rt-no">${i + 1}</span><span>${esc(ad)}</span></button>`).join('') + `</div>`;
+        h += `<div class="rt-ilerleme"><div class="rt-ilerleme-dolu" style="width:0%"></div></div><div class="rt-ilerleme-metin hucre-alt mb-2"></div>`;
         h += `<div class="rt-panel${panelNo === 0 ? ' aktif' : ''}" data-rt="${panelNo}"><div class="talep-izgara">`;
     }
     // Kısa alanlar iki sütuna oturur; uzun/bölüm alanları tam genişlik kaplar
@@ -170,6 +171,13 @@ function requestFormOpen(id) {
     if (sekmeli) h += `</div></div>`;
     document.getElementById('requestFields').innerHTML = h;
     document.getElementById('requestFields').className = sekmeli ? '' : 'talep-izgara';
+    if (sekmeli) {
+        const kap = document.getElementById('requestFields');
+        kap.querySelector('.rt-panel')?.setAttribute('data-gezildi', '1');
+        kap.addEventListener('input', rtIlerleme);
+        kap.addEventListener('change', rtIlerleme);
+        rtIlerleme();
+    }
     if (window.ozelPickerRefresh) ozelPickerRefresh();
     document.getElementById('talepAdim1').style.display = 'none';
     document.getElementById('talepAdim2').style.display = 'block';
@@ -177,7 +185,48 @@ function requestFormOpen(id) {
 function rtSekmeSec(btn, no) {
     const kap = document.getElementById('requestFields');
     kap.querySelectorAll('.rt-sekme').forEach((s, i) => s.classList.toggle('aktif', i === no));
-    kap.querySelectorAll('.rt-panel').forEach(p => p.classList.toggle('aktif', +p.dataset.rt === no));
+    kap.querySelectorAll('.rt-panel').forEach(p => {
+        const aktif = +p.dataset.rt === no;
+        p.classList.toggle('aktif', aktif);
+        if (aktif) p.setAttribute('data-gezildi', '1');
+    });
+    rtIlerleme();
+}
+// Alan doluluk kontrolü: gizli değer taşıyıcıları (osec/diğer/çoklu seçim) dahil
+function rtDoluMu(el) {
+    if (el.type === 'file') return el.files.length > 0;
+    return (el.value || '').trim() !== '';
+}
+function rtIlerleme() {
+    const kap = document.getElementById('requestFields');
+    if (!kap.querySelector('.rt-sekmeler')) return;
+    let zorunluToplam = 0, zorunluDolu = 0;
+    kap.querySelectorAll('.rt-panel').forEach(p => {
+        // Değer taşıyıcı, form grubundaki alan_* adlı eleman: özel seçiciler (tarih)
+        // gerçek inputu type=hidden yapıp zorunluluğu adsız tetiğe taşıdığı için
+        // hem gizli taşıyıcıyı saymalı hem zorunluluğu yıldızdan okumalıyız
+        const gruplar = [...p.querySelectorAll('.form-grup')];
+        const alanlar = gruplar.map(g => g.querySelector('[name^="alan_"]')).filter(Boolean);
+        const zorunlular = gruplar.filter(g => g.querySelector('.zorunlu')).map(g => g.querySelector('[name^="alan_"]')).filter(Boolean);
+        zorunluToplam += zorunlular.length;
+        const doluZorunlu = zorunlular.filter(rtDoluMu).length;
+        zorunluDolu += doluZorunlu;
+        const tamam = zorunlular.length
+            ? doluZorunlu === zorunlular.length
+            : (p.getAttribute('data-gezildi') === '1' || alanlar.some(rtDoluMu));
+        const sekme = kap.querySelectorAll('.rt-sekme')[+p.dataset.rt];
+        if (sekme) {
+            sekme.classList.toggle('tamam', tamam);
+            sekme.querySelector('.rt-no').textContent = tamam ? '✓' : (+p.dataset.rt + 1);
+        }
+    });
+    const paneller = [...kap.querySelectorAll('.rt-panel')];
+    const tamamPanel = kap.querySelectorAll('.rt-sekme.tamam').length;
+    const yuzde = zorunluToplam ? Math.round(zorunluDolu / zorunluToplam * 100) : Math.round(tamamPanel / paneller.length * 100);
+    kap.querySelector('.rt-ilerleme-dolu').style.width = yuzde + '%';
+    kap.querySelector('.rt-ilerleme-metin').textContent = zorunluToplam
+        ? `${zorunluDolu}/${zorunluToplam} zorunlu alan tamamlandı (%${yuzde})`
+        : `${tamamPanel}/${paneller.length} bölüm tamamlandı`;
 }
 // Gizli sekmedeki zorunlu alan doldurulmadıysa tarayıcı sessizce engeller;
 // invalid olayını yakalayıp o alanın sekmesine geçiyoruz ki kullanıcı görsün

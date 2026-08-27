@@ -368,7 +368,7 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.10.2';
+const APP_VERSION = '6.10.3';
 const VERSION_NOTES = [
     '6.10.2' => [
         'Bölümlü formlar artık sekmeli: her bölüm başlığı bir sekme oluyor (bölümden önceki alanlar "Genel" sekmesinde); başka sekmedeki zorunlu alan boşsa gönderim o sekmeye otomatik atlıyor',
