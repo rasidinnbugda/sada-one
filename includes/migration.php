@@ -117,6 +117,9 @@ function migration_commands(): array {
         "CREATE TABLE IF NOT EXISTS client_contacts (id INT AUTO_INCREMENT PRIMARY KEY, client_id INT NOT NULL, name VARCHAR(120) NOT NULL, title VARCHAR(120) DEFAULT NULL, email VARCHAR(190) DEFAULT NULL, phone VARCHAR(40) DEFAULT NULL, created DATETIME NOT NULL, INDEX(client_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
         "ALTER TABLE client_notes ADD COLUMN category VARCHAR(30) NOT NULL DEFAULT 'genel'",
         "ALTER TABLE client_notes ADD COLUMN pinned TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE form_fields MODIFY type VARCHAR(20) NOT NULL DEFAULT 'metin'",
+        // v6.10: the form builder briefly saved English type keys; heal them to the stored contract
+        "UPDATE form_fields SET type = CASE type WHEN 'text' THEN 'metin' WHEN 'long_text' THEN 'uzun_metin' WHEN 'select' THEN 'secim' WHEN 'date' THEN 'tarih' WHEN 'count' THEN 'sayi' WHEN 'client' THEN 'dosya' ELSE type END WHERE type IN ('text','long_text','select','date','count','client')",
     ];
 }
 

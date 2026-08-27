@@ -1737,15 +1737,32 @@ case 'request_send':
         'sender_id' => $u['id'], 'title' => $title, 'status' => 'yeni', 'created' => $now,
     ]);
     foreach ($fields as $field) {
-        $setting_value = $g('field_' . $field['id']);
+        if ($field['type'] === 'bolum') continue; // görsel başlık, cevap taşımaz
+        // The renderer posts alan_{id} (a field_{id} mismatch used to drop every value)
+        $setting_value = $g('alan_' . $field['id']);
         if ($field['type'] === 'dosya') {
-            $tYuk = file_upload('field_' . $field['id']);
+            $tYuk = file_upload('alan_' . $field['id']);
             if ($tYuk) {
                 insert('archive', ['client_id' => $clientId ?: null, 'name' => $tYuk['name'], 'file_path' => $tYuk['path'], 'size' => $tYuk['size'], 'extension' => $tYuk['extension'], 'uploader_id' => $u['id'], 'created' => $now]);
                 $setting_value = $tYuk['path'];
             }
             if ($field['is_required'] && !$tYuk) { q("DELETE FROM requests WHERE id=?", [$requestId]); json_out(['ok' => false, 'error' => '"' . $field['tag'] . '" için dosya yükleyin.']); }
             insert('request_replies', ['request_id' => $requestId, 'field_id' => $field['id'], 'setting_value' => $setting_value]);
+            continue;
+        }
+        if ($field['type'] === 'coklu_dosya') {
+            // The form handler posts multiple files as alan_{id}__0, alan_{id}__1, ...
+            $paths = [];
+            foreach (array_keys($_FILES) as $fk) {
+                if (!str_starts_with($fk, 'alan_' . $field['id'] . '__')) continue;
+                $tYuk = file_upload($fk);
+                if ($tYuk) {
+                    insert('archive', ['client_id' => $clientId ?: null, 'name' => $tYuk['name'], 'file_path' => $tYuk['path'], 'size' => $tYuk['size'], 'extension' => $tYuk['extension'], 'uploader_id' => $u['id'], 'created' => $now]);
+                    $paths[] = $tYuk['path'];
+                }
+            }
+            if ($field['is_required'] && !$paths) { q("DELETE FROM requests WHERE id=?", [$requestId]); json_out(['ok' => false, 'error' => '"' . $field['tag'] . '" için en az bir dosya yükleyin.']); }
+            insert('request_replies', ['request_id' => $requestId, 'field_id' => $field['id'], 'setting_value' => implode(',', $paths)]);
             continue;
         }
         if ($field['is_required'] && trim((string)$setting_value) === '') {

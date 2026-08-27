@@ -56,7 +56,7 @@ page_start('Talepler', 'requests');
 
 <!-- New request modal: pick form type → fill in the fields -->
 <div class="modal-katman" id="modalNewRequest">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Talep</div><button class="modal-kapat" data-modal-close>✕</button></div>
+    <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">Yeni Talep</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde">
         <div id="talepAdim1">
             <div class="hucre-alt mb-3">Ne tür bir talep oluşturmak istiyorsunuz?</div>
@@ -96,22 +96,48 @@ function requestFormOpen(id) {
     const f = formFields[id]; if (!f) return;
     document.getElementById('requestTemplateId').value = id;
     let h = '';
+    // Kısa alanlar iki sütuna oturur; uzun/bölüm alanları tam genişlik kaplar
+    const kisa = ['metin', 'tarih', 'sayi', 'secim'];
     f.fields.forEach(a => {
         const is_required = a.is_required == 1 ? ' required' : '';
         const star = a.is_required == 1 ? ' <span class="zorunlu">*</span>' : '';
-        h += `<div class="form-grup"><label class="form-etiket">${esc(a.tag)}${star}</label>`;
+        if (a.type === 'bolum') {
+            h += `<div class="talep-bolum"><div class="talep-bolum-baslik">${esc(a.tag)}</div>`;
+            if ((a.options || '').trim()) h += `<div class="hucre-alt mt-1" style="white-space:pre-wrap">${esc(a.options.trim())}</div>`;
+            h += `</div>`;
+            return;
+        }
+        h += `<div class="form-grup${kisa.includes(a.type) ? '' : ' talep-genis'}"><label class="form-etiket">${esc(a.tag)}${star}</label>`;
         if (a.type === 'uzun_metin') h += `<textarea name="alan_${a.id}" class="metin-alani"${is_required}></textarea>`;
-        else if (a.type === 'secim') { h += `<select name="alan_${a.id}" class="secim"${is_required}>`; (a.options||'').split('\n').forEach(s => { if(s.trim()) h += `<option>${s.trim()}</option>`; }); h += `</select>`; }
+        else if (a.type === 'secim') {
+            h += `<select name="alan_${a.id}" class="secim"${is_required}><option value="">— Seçin</option>`;
+            (a.options || '').split('\n').forEach(s => { if (s.trim()) h += `<option value="${esc(s.trim())}">${esc(s.trim())}</option>`; });
+            h += `</select>`;
+        }
+        else if (a.type === 'coklu_secim') {
+            h += `<input type="hidden" name="alan_${a.id}" class="cs-deger">`;
+            h += `<div class="izgara izgara-2" style="gap:6px">`;
+            (a.options || '').split('\n').forEach(s => {
+                if (s.trim()) h += `<label class="satir-esnek kucuk" style="gap:8px;padding:8px 11px;background:var(--surface-2);border-radius:9px;cursor:pointer"><input type="checkbox" class="cs-kutu" value="${esc(s.trim())}" onchange="csGuncelle(this)"> <span>${esc(s.trim())}</span></label>`;
+            });
+            h += `</div>`;
+        }
         else if (a.type === 'tarih') h += `<input type="date" name="alan_${a.id}" class="girdi"${is_required}>`;
         else if (a.type === 'sayi') h += `<input type="number" name="alan_${a.id}" class="girdi"${is_required}>`;
         else if (a.type === 'dosya') h += `<input type="file" name="alan_${a.id}" class="girdi"${is_required}>`;
+        else if (a.type === 'coklu_dosya') h += `<input type="file" name="alan_${a.id}" class="girdi" multiple${is_required}><div class="form-ipucu">Birden fazla dosyayı Ctrl ile seçebilirsiniz.</div>`;
         else h += `<input type="text" name="alan_${a.id}" class="girdi"${is_required}>`;
         h += `</div>`;
     });
     document.getElementById('requestFields').innerHTML = h;
+    document.getElementById('requestFields').className = 'talep-izgara';
     if (window.ozelPickerRefresh) ozelPickerRefresh();
     document.getElementById('talepAdim1').style.display = 'none';
     document.getElementById('talepAdim2').style.display = 'block';
+}
+function csGuncelle(kutu) {
+    const grup = kutu.closest('.form-grup');
+    grup.querySelector('.cs-deger').value = [...grup.querySelectorAll('.cs-kutu:checked')].map(k => k.value).join(', ');
 }
 function requestGeri() { document.getElementById('talepAdim2').style.display = 'none'; document.getElementById('talepAdim1').style.display = 'block'; }
 </script>

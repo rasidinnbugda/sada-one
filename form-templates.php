@@ -6,7 +6,8 @@ $u = require_admin();
 $forms = rows("SELECT * FROM form_templates ORDER BY name");
 foreach ($forms as &$f) $f['fields'] = rows("SELECT * FROM form_fields WHERE template_id=? ORDER BY sort_order", [$f['id']]);
 unset($f);
-$fieldTipleri = ['text' => 'Kısa Metin', 'long_text' => 'Uzun Metin', 'select' => 'Seçim Listesi', 'date' => 'Tarih', 'count' => 'Sayı', 'client' => 'Dosya Yükleme'];
+// Type keys are the STORED values (Turkish, like every other stored enum in the panel)
+$fieldTipleri = ['metin' => 'Kısa Metin', 'uzun_metin' => 'Uzun Metin', 'secim' => 'Seçim Listesi', 'coklu_secim' => 'Çoklu Seçim (kutucuklar)', 'tarih' => 'Tarih', 'sayi' => 'Sayı', 'dosya' => 'Dosya Yükleme', 'coklu_dosya' => 'Çoklu Dosya Yükleme', 'bolum' => '— Bölüm Başlığı —'];
 
 page_start('Form Şablonları', 'forms');
 ?>
@@ -74,15 +75,31 @@ function alanSatiri(field = {}) {
                     <input class="girdi alan-etiket" placeholder="Alan etiketi" value="${(field.tag||'').replace(/"/g,'&quot;')}">
                     <select class="secim alan-tip" onchange="optionShow(this)">${typeOps}</select>
                 </div>
-                <textarea class="metin-alani alan-secenekler" placeholder="Seçenekler (her satıra bir tane)" style="min-height:60px;display:${field.type==='secim'?'block':'none'}">${field.options||''}</textarea>
-                <label class="satir-esnek kucuk mt-2" style="gap:7px;cursor:pointer"><input type="checkbox" class="alan-zorunlu" ${field.is_required!=0?'checked':''}> Zorunlu alan</label>
+                <textarea class="metin-alani alan-secenekler" placeholder="Seçenekler (her satıra bir tane)" style="min-height:60px;display:${['secim','coklu_secim'].includes(field.type)?'block':(field.type==='bolum'?'block':'none')}">${field.options||''}</textarea>
+                <label class="satir-esnek kucuk mt-2 alan-zorunlu-satir" style="gap:7px;cursor:pointer;display:${field.type==='bolum'?'none':'flex'}"><input type="checkbox" class="alan-zorunlu" ${field.is_required!=0?'checked':''}> Zorunlu alan</label>
             </div>
             <button type="button" class="ikon-eylem tehlike" onclick="this.closest('.alan-satir').remove()"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="16"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>`;
     document.getElementById('fieldList').appendChild(div);
     if (window.ozelPickerRefresh) ozelPickerRefresh();
 }
-function optionShow(sel) { sel.closest('.alan-satir').querySelector('.alan-secenekler').style.display = sel.value === 'secim' ? 'block' : 'none'; }
+function optionShow(sel) {
+    const satir = sel.closest('.alan-satir');
+    const secenek = satir.querySelector('.alan-secenekler');
+    const zorunlu = satir.querySelector('.alan-zorunlu-satir');
+    const etiket = satir.querySelector('.alan-etiket');
+    if (sel.value === 'bolum') {
+        secenek.style.display = 'block';
+        secenek.placeholder = 'Bölüm açıklaması (isteğe bağlı — formda başlığın altında görünür)';
+        etiket.placeholder = 'Bölüm başlığı';
+        zorunlu.style.display = 'none';
+    } else {
+        secenek.style.display = ['secim', 'coklu_secim'].includes(sel.value) ? 'block' : 'none';
+        secenek.placeholder = 'Seçenekler (her satıra bir tane)';
+        etiket.placeholder = 'Alan etiketi';
+        zorunlu.style.display = 'flex';
+    }
+}
 function fieldAdd() { alanSatiri(); }
 function formSifirla() {
     document.getElementById('formForm').reset();

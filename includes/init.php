@@ -368,8 +368,14 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.9';
+const APP_VERSION = '6.10';
 const VERSION_NOTES = [
+    '6.10' => [
+        'Form oluşturucu kökten onarıldı: tarih, seçim vb. tipler formda görünmüyordu (tip anahtarları uyuşmuyordu) ve gönderilen cevaplar hiç kaydedilmiyordu (alan adı uyuşmazlığı) — mevcut şablonlardaki bozuk tipler kendini onarır',
+        'Yeni alan tipleri: Çoklu Seçim (kutucuklar), Çoklu Dosya Yükleme (tek alanda birden fazla dosya) ve Bölüm Başlığı (açıklamalı) — formlar bölümlere ayrılabiliyor',
+        'Talep oluşturma penceresi genişledi: iki sütunlu ferah yerleşim, bölüm başlıkları, uzun alanlar tam satır',
+        'Talep detayında çoklu dosyalar ayrı düğmeler olarak listeleniyor; tüm yüklemeler arşive de düşüyor',
+    ],
     '6.9' => [
         'Rapor mailinde alıcılar artık çip (kutucuk) olarak: adres yazıp Enter — her alıcı ayrı kutucuk, ✕ ile çıkarılır, hatalı adres kırmızı görünür',
         'Dosyalara birden fazla iletişim kişisi eklenebiliyor (ad, ünvan, e-posta, telefon) — dosya sayfasında yeni "İletişim Kişileri" kartı; kayıtlı tek kişi otomatik taşındı',

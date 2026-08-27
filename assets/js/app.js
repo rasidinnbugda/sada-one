@@ -228,7 +228,9 @@
         new FormData(form).forEach((v, k) => { data[k] = v; });
         // Add ALL file inputs in the form (e.g. logo + favicon in the same form)
         $$('input[type="file"]', form).forEach(field => {
-            if (field.files.length && field.name) data[field.name] = field.files[0];
+            if (!field.files.length || !field.name) return;
+            if (field.multiple) [...field.files].forEach((d, i) => { data[field.name + '__' + i] = d; });
+            else data[field.name] = field.files[0];
         });
 
         const j = await api(form.dataset.ajax, data);

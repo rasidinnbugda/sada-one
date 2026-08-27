@@ -34,7 +34,7 @@ page_start('Talep Detayı', 'requests');
         <div class="kart-baslik mb-3">Talep Bilgileri</div>
         <div class="dikey" style="gap:16px">
             <?php foreach ($replies as $c): ?>
-            <div><div class="hucre-alt mb-2"><?= e($c['tag']) ?></div><div class="metin-2" style="white-space:pre-wrap"><?php if ($c['type'] === 'dosya' && $c['setting_value']): ?><a href="uploads/<?= e($c['setting_value']) ?>" target="_blank" class="btn btn-sm"><?= icon('atac', 13) ?> Yüklenen Dosya</a><?php else: ?><?= $c['setting_value'] ? e($c['setting_value']) : '<span class="metin-muted">—</span>' ?><?php endif; ?></div></div>
+            <div><div class="hucre-alt mb-2"><?= e($c['tag']) ?></div><div class="metin-2" style="white-space:pre-wrap"><?php if (in_array($c['type'], ['dosya', 'coklu_dosya']) && $c['setting_value']): ?><span class="satir-esnek sarma" style="gap:6px"><?php foreach (array_filter(explode(',', $c['setting_value'])) as $di => $dp): ?><a href="uploads/<?= e($dp) ?>" target="_blank" class="btn btn-sm"><?= icon('atac', 13) ?> Dosya <?= $di + 1 ?></a><?php endforeach; ?></span><?php else: ?><?= $c['setting_value'] ? e($c['setting_value']) : '<span class="metin-muted">—</span>' ?><?php endif; ?></div></div>
             <?php endforeach; ?>
         </div>
     </div>
