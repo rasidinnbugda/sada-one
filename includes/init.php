@@ -368,7 +368,7 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.5';
+const APP_VERSION = '6.5.1';
 const VERSION_NOTES = [
     '6.5' => [
         'Çekim klasöründeki dosyalar artık tür özetiyle görünüyor (🎬 3 video · 🖼️ 12 fotoğraf) ve tek tık Drive\'da açılıyor',

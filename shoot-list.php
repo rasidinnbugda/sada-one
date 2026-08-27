@@ -10,7 +10,12 @@ $driveReady = drive_configured();
 $u = require_staff();
 
 $historyShow = isset($_GET['history']);
-$where_sql = $historyShow ? "1=1" : "(e.end IS NULL AND e.start >= CURDATE() - INTERVAL 1 DAY) OR e.end >= NOW() - INTERVAL 1 DAY";
+// Default view: upcoming shoots PLUS recent past ones still awaiting the
+// "everything uploaded" confirmation — that is exactly where the folder files
+// and the confirm button live, so hiding them behind "history" buried the flow
+$where_sql = $historyShow ? "1=1"
+    : "(e.end IS NULL AND e.start >= CURDATE() - INTERVAL 1 DAY) OR e.end >= NOW() - INTERVAL 1 DAY
+       OR (e.drive_status='bekliyor' AND e.start >= NOW() - INTERVAL 30 DAY)";
 $shoots = rows("SELECT e.*, p.name project_name, d.name client_name,
     (SELECT GROUP_CONCAT(u2.name SEPARATOR ', ') FROM event_participants ek JOIN users u2 ON u2.id=ek.user_id WHERE ek.event_id=e.id) people,
     (SELECT GROUP_CONCAT(eq.name SEPARATOR ', ') FROM event_equipment ee JOIN equipment eq ON eq.id=ee.equipment_id WHERE ee.event_id=e.id) equipment_names
@@ -19,6 +24,9 @@ $shoots = rows("SELECT e.*, p.name project_name, d.name client_name,
 
 page_start('Çekim Listesi', 'shoots');
 ?>
+<?php if (!$driveReady && is_admin()): ?>
+<div class="kart mb-3" style="border-color:var(--uyari)"><div class="kucuk">📁 Google Drive bağlı değil — çekim klasörleri, dosya listesi ve otomatik denetim için <a href="settings.php" style="color:var(--marka)">Ayarlar → Drive Entegrasyonu</a>'ndan bağlantı kurun.</div></div>
+<?php endif; ?>
 <div class="sayfa-ust">
     <div><div class="sayfa-baslik">Çekim Listesi</div><div class="sayfa-alt"><?= $historyShow ? 'Tüm çekimler' : 'Yaklaşan çekimler' ?> — kim gidiyor, hangi ekipman, ne alınacak</div></div>
     <div class="sayfa-ust-aksiyon">
@@ -113,7 +121,9 @@ function ckEdit(c) {
 }
 </script>
 <script>
-// Drive folder contents, loaded async so the page itself stays fast
+// Drive folder contents, loaded async so the page itself stays fast.
+// app.js (which defines api/esc) loads at the end of the body, so wait for it.
+addEventListener('DOMContentLoaded', () => {
 document.querySelectorAll('.drive-dosyalar').forEach(async kutu => {
     const j = await api('drive_files', { id: kutu.dataset.driveEvent }).catch(() => null);
     if (!j || !j.ok || !j.files.length) return;
@@ -132,6 +142,7 @@ document.querySelectorAll('.drive-dosyalar').forEach(async kutu => {
         h += ` <button class="mini-btn" style="border-color:var(--basari);color:var(--basari)" data-action="drive_mark" data-id="${kutu.dataset.driveEvent}" data-approval="Yüklenmesi gereken HER ŞEY klasörde mi? Çekim 'yüklendi' olarak işaretlenecek.">✔ Tümü yüklendi</button>`;
     }
     kutu.innerHTML = h;
+});
 });
 </script>
 <?php page_end(); ?>
