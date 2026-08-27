@@ -368,8 +368,12 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.10.1';
+const APP_VERSION = '6.10.2';
 const VERSION_NOTES = [
+    '6.10.2' => [
+        'Bölümlü formlar artık sekmeli: her bölüm başlığı bir sekme oluyor (bölümden önceki alanlar "Genel" sekmesinde); başka sekmedeki zorunlu alan boşsa gönderim o sekmeye otomatik atlıyor',
+        'Not: 6.10 öncesinde oluşturulan şablonlarda tarih/seçim/dosya tipleri, eski sürümün veritabanı kolonu dar olduğu için kaydedilirken kaybolmuştu (güncelleme değil, kayıt anı sildi) — o şablonlarda tipleri bir kez yeniden seçmeniz gerekir; artık kalıcıdır',
+    ],
     '6.10' => [
         'Form oluşturucu kökten onarıldı: tarih, seçim vb. tipler formda görünmüyordu (tip anahtarları uyuşmuyordu) ve gönderilen cevaplar hiç kaydedilmiyordu (alan adı uyuşmazlığı) — mevcut şablonlardaki bozuk tipler kendini onarır',
         'Yeni alan tipleri: Çoklu Seçim (kutucuklar), Çoklu Dosya Yükleme (tek alanda birden fazla dosya) ve Bölüm Başlığı (açıklamalı) — formlar bölümlere ayrılabiliyor',

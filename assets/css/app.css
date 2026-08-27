@@ -1431,3 +1431,15 @@ body { background-image: radial-gradient(ellipse 70% 45% at 85% -12%, var(--parl
 .secenek-yuvarlak { width: 16px; height: 16px; border: 2px solid var(--border-2); border-radius: 50%; flex-shrink: 0; }
 .secenek-oge .girdi { padding: 7px 11px; font-size: 13px; }
 .secenek-oge .ikon-eylem { width: 28px; height: 28px; flex-shrink: 0; }
+
+/* ---- Request form: section tabs ---- */
+.rt-sekmeler { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.rt-sekme {
+    padding: 8px 15px; border-radius: 99px; font-size: 13px; font-weight: 600;
+    color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border);
+    transition: all var(--gecis);
+}
+.rt-sekme:hover { border-color: var(--marka); color: var(--text); }
+.rt-sekme.aktif { background: var(--marka); color: var(--marka-ink); border-color: var(--marka); }
+.rt-panel { display: none; }
+.rt-panel.aktif { display: block; animation: sayfaGiris .3s ease; }

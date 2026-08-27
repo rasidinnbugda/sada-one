@@ -95,16 +95,37 @@ const formFields = <?= json_encode(array_reduce($forms, function ($acc, $f) {
 function requestFormOpen(id) {
     const f = formFields[id]; if (!f) return;
     document.getElementById('requestTemplateId').value = id;
+    // Bölümler sekmeye dönüşür: her bölüm bir sekme, öncesindeki alanlar "Genel"
+    const bolumler = f.fields.filter(a => a.type === 'bolum');
+    const sekmeli = bolumler.length > 0;
     let h = '';
+    let panelNo = 0;
+    if (sekmeli) {
+        const adlar = f.fields[0].type === 'bolum' ? [] : ['Genel'];
+        bolumler.forEach(b => adlar.push(b.tag));
+        h += `<div class="rt-sekmeler">` + adlar.map((ad, i) =>
+            `<button type="button" class="rt-sekme${i === 0 ? ' aktif' : ''}" onclick="rtSekmeSec(this, ${i})">${esc(ad)}</button>`).join('') + `</div>`;
+        h += `<div class="rt-panel${panelNo === 0 ? ' aktif' : ''}" data-rt="${panelNo}"><div class="talep-izgara">`;
+    }
     // Kısa alanlar iki sütuna oturur; uzun/bölüm alanları tam genişlik kaplar
     const kisa = ['metin', 'tarih', 'sayi', 'secim'];
-    f.fields.forEach(a => {
+    f.fields.forEach((a, fi) => {
         const is_required = a.is_required == 1 ? ' required' : '';
         const star = a.is_required == 1 ? ' <span class="zorunlu">*</span>' : '';
         if (a.type === 'bolum') {
-            h += `<div class="talep-bolum"><div class="talep-bolum-baslik">${esc(a.tag)}</div>`;
-            if ((a.options || '').trim()) h += `<div class="hucre-alt mt-1" style="white-space:pre-wrap">${esc(a.options.trim())}</div>`;
-            h += `</div>`;
+            if (sekmeli) {
+                // önceki paneli kapat, bu bölümün panelini aç
+                if (!(fi === 0)) h += `</div></div>`;
+                else if (panelNo === 0 && fi === 0) h = h.replace(`<div class="rt-panel aktif" data-rt="0"><div class="talep-izgara">`, '');
+                panelNo = (fi === 0) ? 0 : panelNo + 1;
+                h += `<div class="rt-panel${(fi === 0 && panelNo === 0) ? ' aktif' : ''}" data-rt="${panelNo}">`;
+                if ((a.options || '').trim()) h += `<div class="hucre-alt mb-2" style="white-space:pre-wrap">${esc(a.options.trim())}</div>`;
+                h += `<div class="talep-izgara">`;
+            } else {
+                h += `<div class="talep-bolum"><div class="talep-bolum-baslik">${esc(a.tag)}</div>`;
+                if ((a.options || '').trim()) h += `<div class="hucre-alt mt-1" style="white-space:pre-wrap">${esc(a.options.trim())}</div>`;
+                h += `</div>`;
+            }
             return;
         }
         h += `<div class="form-grup${kisa.includes(a.type) ? '' : ' talep-genis'}"><label class="form-etiket">${esc(a.tag)}${star}</label>`;
@@ -146,12 +167,24 @@ function requestFormOpen(id) {
         else h += `<input type="text" name="alan_${a.id}" class="girdi"${is_required}>`;
         h += `</div>`;
     });
+    if (sekmeli) h += `</div></div>`;
     document.getElementById('requestFields').innerHTML = h;
-    document.getElementById('requestFields').className = 'talep-izgara';
+    document.getElementById('requestFields').className = sekmeli ? '' : 'talep-izgara';
     if (window.ozelPickerRefresh) ozelPickerRefresh();
     document.getElementById('talepAdim1').style.display = 'none';
     document.getElementById('talepAdim2').style.display = 'block';
 }
+function rtSekmeSec(btn, no) {
+    const kap = document.getElementById('requestFields');
+    kap.querySelectorAll('.rt-sekme').forEach((s, i) => s.classList.toggle('aktif', i === no));
+    kap.querySelectorAll('.rt-panel').forEach(p => p.classList.toggle('aktif', +p.dataset.rt === no));
+}
+// Gizli sekmedeki zorunlu alan doldurulmadıysa tarayıcı sessizce engeller;
+// invalid olayını yakalayıp o alanın sekmesine geçiyoruz ki kullanıcı görsün
+document.addEventListener('invalid', e => {
+    const panel = e.target.closest('.rt-panel');
+    if (panel && !panel.classList.contains('aktif')) rtSekmeSec(null, +panel.dataset.rt);
+}, true);
 function csGuncelle(kutu) {
     const grup = kutu.closest('.form-grup');
     const degerler = [...grup.querySelectorAll('.cs-kutu:checked')].filter(k => !k.classList.contains('cs-diger')).map(k => k.value);
