@@ -84,6 +84,11 @@ case 'report_mail_data_save':
     $veri['fav']['title'] = mb_substr(trim($g('fav_title')), 0, 120);
     $veri['fav']['text'] = mb_substr(trim($g('fav_text')), 0, 600);
     $veri['fav']['stat'] = mb_substr(trim($g('fav_stat')), 0, 60);
+    // Düzenlenebilir başlık/selamlama/kapanış metinleri (boş = varsayılan)
+    $veri['metin'] = [];
+    foreach (['baslik', 'selam', 'uretim_baslik', 'stat_baslik', 'stat_giris', 'plan_baslik', 'kapanis', 'tesekkur'] as $mk) {
+        $veri['metin'][$mk] = mb_substr(trim($g('metin_' . $mk)), 0, 200);
+    }
     $statlar = json_decode($g('stats', '[]'), true) ?: [];
     $veri['stats'] = [];
     foreach (array_slice($statlar, 0, 4) as $s) {
@@ -101,8 +106,12 @@ case 'report_mail_send':
     $report = row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [(int)$g('client_id'), $g('period')]);
     $client = row("SELECT * FROM clients WHERE id=?", [(int)$g('client_id')]);
     if (!$report || !$client) json_out(['ok' => false, 'error' => 'Önce raporu kaydedin.']);
-    $to = mb_strtolower(trim($g('to')));
-    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) json_out(['ok' => false, 'error' => 'Geçerli bir alıcı adresi girin.']);
+    // Birden fazla alıcı: virgül veya noktalı virgülle ayrılır
+    $alicilar = array_values(array_unique(array_filter(array_map(
+        fn($a) => mb_strtolower(trim($a)), preg_split('/[;,]+/', (string)$g('to'))))));
+    if (!$alicilar) json_out(['ok' => false, 'error' => 'En az bir alıcı adresi girin.']);
+    foreach ($alicilar as $a) if (!filter_var($a, FILTER_VALIDATE_EMAIL))
+        json_out(['ok' => false, 'error' => 'Geçersiz adres: ' . $a]);
     // The sender must be one of the configured addresses (main or a Send-As alias)
     $ana = setting('smtp_gonderen') ?: setting('smtp_kullanici');
     $izinli = array_values(array_filter(array_unique(array_merge([$ana],
@@ -110,11 +119,18 @@ case 'report_mail_send':
     $from = trim($g('from')) ?: $ana;
     if (!in_array($from, $izinli, true)) json_out(['ok' => false, 'error' => 'Bu gönderen adresi tanımlı değil (Ayarlar → SMTP → Ek gönderen adresleri).']);
     $subject = trim($g('subject')) ?: ($client['name'] . ' Aylık Raporu');
-    if (!send_email_html($to, $subject, report_mail_html($report, $client, $g('period')), $from))
+    $govde = report_mail_html($report, $client, $g('period'));
+    $basarili = []; $basarisiz = [];
+    foreach ($alicilar as $a) {
+        if (send_email_html($a, $subject, $govde, $from)) $basarili[] = $a;
+        else $basarisiz[] = $a;
+    }
+    if (!$basarili)
         json_out(['ok' => false, 'error' => 'E-posta gönderilemedi' . (!empty($GLOBALS['smtp_last_error']) ? ' — sunucu yanıtı: ' . $GLOBALS['smtp_last_error'] : ' — SMTP ayarlarını kontrol edin.')]);
-    update_row('monthly_reports', ['sent_at' => $now, 'sent_to' => $to], 'id=?', [$report['id']]);
-    log_activity('Aylık rapor maili gönderildi: ' . $client['name'] . ' / ' . $g('period') . ' → ' . $to);
-    json_out(['ok' => true, 'mesaj' => 'Rapor maili gönderildi: ' . $to]);
+    update_row('monthly_reports', ['sent_at' => $now, 'sent_to' => mb_substr(implode(', ', $basarili), 0, 255)], 'id=?', [$report['id']]);
+    log_activity('Aylık rapor maili gönderildi: ' . $client['name'] . ' / ' . $g('period') . ' → ' . implode(', ', $basarili));
+    json_out(['ok' => true, 'mesaj' => 'Rapor maili gönderildi: ' . implode(', ', $basarili)
+        . ($basarisiz ? ' — GÖNDERİLEMEYEN: ' . implode(', ', $basarisiz) : '')]);
 
 case 'drive_files':
     require_login();

@@ -147,7 +147,7 @@ async function aiDraft(clientId, period) {
     <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">📧 Müşteri Rapor Maili</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde">
         <div class="form-satir">
-            <div class="form-grup"><label class="form-etiket">Alıcı</label><input class="girdi" id="rm_to" placeholder="musteri@firma.com"></div>
+            <div class="form-grup"><label class="form-etiket">Alıcılar <span class="metin-muted" style="font-weight:400">(virgülle birden fazla)</span></label><input class="girdi" id="rm_to" placeholder="musteri@firma.com, yonetici@firma.com"></div>
             <div class="form-grup"><label class="form-etiket">Gönderen</label><select class="secim native-kal" id="rm_from"></select></div>
         </div>
         <div class="form-grup"><label class="form-etiket">Konu</label><input class="girdi" id="rm_subject"></div>
@@ -167,6 +167,17 @@ async function aiDraft(clientId, period) {
                     <div class="form-grup"><label class="form-etiket">Öne Çıkan Sayı</label><input class="girdi" id="rm_fav_stat" placeholder="113B izlenme"></div>
                 </div>
                 <div class="form-grup"><label class="form-etiket">Favori Açıklaması</label><textarea class="metin-alani" id="rm_fav_text" rows="2" placeholder="Ürettiğimiz bu içerik markanızı çok daha ileriye taşıdı!"></textarea></div>
+                <label class="form-etiket">Metinler <span class="metin-muted" style="font-weight:400">(boş bırakılan varsayılanı kullanır)</span></label>
+                <div class="izgara izgara-2 mb-2" style="gap:6px">
+                    <input class="girdi rm-metin" data-metin="baslik" placeholder="Başlık: Aylık Durum Raporu">
+                    <input class="girdi rm-metin" data-metin="selam" placeholder="Selamlama: Selam ... ekibi 👋">
+                    <input class="girdi rm-metin" data-metin="uretim_baslik" placeholder="Bölüm: Markanız İçin Ürettik">
+                    <input class="girdi rm-metin" data-metin="stat_baslik" placeholder="Bölüm: Biz Susalım, Sayılar Konuşsun">
+                    <input class="girdi rm-metin" data-metin="stat_giris" placeholder="İstatistik giriş cümlesi (isteğe bağlı)">
+                    <input class="girdi rm-metin" data-metin="plan_baslik" placeholder="Bölüm: Önümüzdeki Ay">
+                    <input class="girdi rm-metin" data-metin="kapanis" placeholder="Kapanış: Önümüzdeki ay görüşmek üzere...">
+                    <input class="girdi rm-metin" data-metin="tesekkur" placeholder="Alt başlık: Teşekkür Ederiz!">
+                </div>
                 <label class="form-etiket">İstatistik Kartları <span class="metin-muted" style="font-weight:400">(etiket · değer · değişim — boş bırakılan satır atlanır)</span></label>
                 <div class="dikey" style="gap:6px" id="rm_stats">
                     <?php for ($si = 0; $si < 4; $si++): ?>
@@ -216,6 +227,7 @@ async function reportMailAc(clientId, period) {
         s.querySelector('.rm-stat-deger').value = st.deger || '';
         s.querySelector('.rm-stat-degisim').value = st.degisim || '';
     });
+    document.querySelectorAll('.rm-metin').forEach(i => i.value = (v.metin && v.metin[i.dataset.metin]) || '');
     ['rm_hero', 'rm_fav_img'].forEach(id => document.getElementById(id).value = '');
     ['rm_hero_kaldir', 'rm_fav_img_kaldir'].forEach(id => document.getElementById(id).checked = false);
     modalOpen('modalReportMail');
@@ -232,6 +244,7 @@ async function reportMailTasarimKaydet() {
         fav_stat: document.getElementById('rm_fav_stat').value,
         fav_text: document.getElementById('rm_fav_text').value,
         stats: stats,
+        ...Object.fromEntries([...document.querySelectorAll('.rm-metin')].map(i => ['metin_' + i.dataset.metin, i.value])),
         hero_kaldir: document.getElementById('rm_hero_kaldir').checked ? '1' : '0',
         fav_img_kaldir: document.getElementById('rm_fav_img_kaldir').checked ? '1' : '0'
     };
