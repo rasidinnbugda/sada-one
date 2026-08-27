@@ -113,6 +113,10 @@ function migration_commands(): array {
         "ALTER TABLE monthly_reports ADD COLUMN sent_at DATETIME DEFAULT NULL",
         "ALTER TABLE monthly_reports ADD COLUMN sent_to VARCHAR(255) DEFAULT NULL",
         "ALTER TABLE monthly_reports ADD COLUMN mail_data TEXT",
+        // v6.9: birden çok iletişim kişisi + bilgi bankası kategorileri
+        "CREATE TABLE IF NOT EXISTS client_contacts (id INT AUTO_INCREMENT PRIMARY KEY, client_id INT NOT NULL, name VARCHAR(120) NOT NULL, title VARCHAR(120) DEFAULT NULL, email VARCHAR(190) DEFAULT NULL, phone VARCHAR(40) DEFAULT NULL, created DATETIME NOT NULL, INDEX(client_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
+        "ALTER TABLE client_notes ADD COLUMN category VARCHAR(30) NOT NULL DEFAULT 'genel'",
+        "ALTER TABLE client_notes ADD COLUMN pinned TINYINT(1) NOT NULL DEFAULT 0",
     ];
 }
 
@@ -136,6 +140,16 @@ function run_migrations(PDO $pdo): array {
             if ($hasOld && !$hasNew) { $pdo->exec("RENAME TABLE `$oldT` TO `$newT`"); $results[] = ['ok', "rename: $oldT → $newT"]; }
         } catch (PDOException $e) { $results[] = ['hata', "rename $oldT — " . $e->getMessage()]; }
     }
+    // One-time: seed client_contacts from the clients table's single contact fields
+    try {
+        if ($pdo->query("SHOW TABLES LIKE 'client_contacts'")->fetchColumn()
+            && !(int)$pdo->query('SELECT COUNT(*) FROM client_contacts')->fetchColumn()) {
+            $pdo->exec("INSERT INTO client_contacts (client_id, name, email, phone, created)
+                SELECT id, COALESCE(NULLIF(contact_name,''), 'İletişim'), NULLIF(contact_email,''), NULLIF(contact_phone,''), NOW()
+                FROM clients WHERE COALESCE(contact_name,'') != '' OR COALESCE(contact_email,'') != ''");
+            $results[] = ['ok', 'seed: client_contacts'];
+        }
+    } catch (PDOException $e) { /* tablo bu turda oluşuyorsa sonraki çalıştırmada dolar */ }
     foreach (migration_commands() as $sql) {
         try {
             $pdo->exec($sql);

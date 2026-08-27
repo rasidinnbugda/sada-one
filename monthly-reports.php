@@ -147,7 +147,12 @@ async function aiDraft(clientId, period) {
     <div class="modal modal-genis"><div class="modal-ust"><div class="modal-baslik">📧 Müşteri Rapor Maili</div><button class="modal-kapat" data-modal-close>✕</button></div>
     <div class="modal-govde">
         <div class="form-satir">
-            <div class="form-grup"><label class="form-etiket">Alıcılar <span class="metin-muted" style="font-weight:400">(virgülle birden fazla)</span></label><input class="girdi" id="rm_to" placeholder="musteri@firma.com, yonetici@firma.com"></div>
+            <div class="form-grup"><label class="form-etiket">Alıcılar</label>
+                <div class="cip-alan" id="rm_to_alan" onclick="document.getElementById('rm_to_girdi').focus()">
+                    <input id="rm_to_girdi" placeholder="adres yazıp Enter'a basın..." autocomplete="off">
+                </div>
+                <div class="satir-esnek sarma mt-1" style="gap:6px" id="rm_kisiler"></div>
+            </div>
             <div class="form-grup"><label class="form-etiket">Gönderen</label><select class="secim native-kal" id="rm_from"></select></div>
         </div>
         <div class="form-grup"><label class="form-etiket">Konu</label><input class="girdi" id="rm_subject"></div>
@@ -204,11 +209,50 @@ async function aiDraft(clientId, period) {
 </div>
 <script>
 let rmClient = 0, rmPeriod = '';
+let rmAlicilar = [];
+const rmEpostaMi = a => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a);
+function rmCipCiz() {
+    const alan = document.getElementById('rm_to_alan');
+    alan.querySelectorAll('.cip').forEach(cp => cp.remove());
+    const girdi = document.getElementById('rm_to_girdi');
+    rmAlicilar.forEach(a => {
+        const cp = document.createElement('span');
+        cp.className = 'cip' + (rmEpostaMi(a) ? '' : ' cip-hatali');
+        cp.innerHTML = esc(a) + ' <button type="button" class="cip-sil" aria-label="Kaldır">✕</button>';
+        cp.querySelector('.cip-sil').onclick = () => { rmAlicilar = rmAlicilar.filter(x => x !== a); rmCipCiz(); rmKisiCiz(); };
+        alan.insertBefore(cp, girdi);
+    });
+}
+function rmCipEkle(ham) {
+    ham.split(/[;,\s]+/).map(a => a.trim().toLowerCase()).filter(Boolean).forEach(a => {
+        if (!rmAlicilar.includes(a)) rmAlicilar.push(a);
+    });
+    rmCipCiz(); rmKisiCiz();
+}
+let rmKisiListe = [];
+function rmKisiCiz() {
+    const kap = document.getElementById('rm_kisiler');
+    const kalan = rmKisiListe.filter(k => !rmAlicilar.includes(k.email.toLowerCase()));
+    kap.innerHTML = kalan.map((k, i) =>
+        `<button type="button" class="mini-btn" onclick="rmCipEkle(rmKisiListe.find(x => x.email === '${esc(k.email)}').email)" title="${esc(k.email)}">+ ${esc(k.name)}${k.title ? ' · ' + esc(k.title) : ''}</button>`
+    ).join('') + (kalan.length > 1 ? ` <button type="button" class="mini-btn" style="border-color:var(--marka);color:var(--marka)" onclick="rmCipEkle(rmKisiListe.map(k => k.email).join(','))">Hepsini ekle</button>` : '');
+}
+document.addEventListener('DOMContentLoaded', () => {
+    const girdi = document.getElementById('rm_to_girdi');
+    if (!girdi) return;
+    girdi.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); rmCipEkle(girdi.value); girdi.value = ''; }
+        else if (e.key === 'Backspace' && girdi.value === '' && rmAlicilar.length) { rmAlicilar.pop(); rmCipCiz(); rmKisiCiz(); }
+    });
+    girdi.addEventListener('blur', () => { if (girdi.value.trim()) { rmCipEkle(girdi.value); girdi.value = ''; } });
+});
 async function reportMailAc(clientId, period) {
     rmClient = clientId; rmPeriod = period;
     const j = await api('report_mail_preview', { client_id: clientId, period });
     if (!j.ok) return;
-    document.getElementById('rm_to').value = j.to || '';
+    rmAlicilar = (j.to || '').split(/[;,]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
+    rmKisiListe = j.contacts || [];
+    rmCipCiz(); rmKisiCiz();
     document.getElementById('rm_subject').value = j.subject;
     document.getElementById('rm_from').innerHTML = j.senders.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
     document.getElementById('rm_preview').srcdoc = j.html;
@@ -261,11 +305,14 @@ async function reportMailTasarimKaydet() {
 }
 async function reportMailGonder() {
     const btn = document.getElementById('rm_send');
-    if (!confirm('Rapor maili "' + document.getElementById('rm_to').value + '" adresine gönderilsin mi?')) return;
+    const girdiKalan = document.getElementById('rm_to_girdi').value.trim();
+    if (girdiKalan) { rmCipEkle(girdiKalan); document.getElementById('rm_to_girdi').value = ''; }
+    if (!rmAlicilar.length) { toast('En az bir alıcı ekleyin.', 'hata'); return; }
+    if (!confirm('Rapor maili şu adreslere gönderilsin mi?\n\n' + rmAlicilar.join('\n'))) return;
     btn.disabled = true; btn.textContent = 'Gönderiliyor...';
     const j = await api('report_mail_send', {
         client_id: rmClient, period: rmPeriod,
-        to: document.getElementById('rm_to').value,
+        to: rmAlicilar.join(', '),
         from: document.getElementById('rm_from').value,
         subject: document.getElementById('rm_subject').value
     });

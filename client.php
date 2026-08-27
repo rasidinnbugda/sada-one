@@ -134,18 +134,80 @@ page_start($client['name'], 'clients');
         <?php endif; ?>
 
         <?php if (!$customerView):
-            $infoNotes = rows("SELECT bn.*, us.name updater_name FROM client_notes bn LEFT JOIN users us ON us.id=bn.updated_by WHERE bn.client_id=? ORDER BY bn.sort_order", [$id]); ?>
+            $kisiler = rows("SELECT * FROM client_contacts WHERE client_id=? ORDER BY name", [$id]); ?>
+        <!-- Contact people (team only) -->
+        <div class="satir-esnek arasi mb-2 mt-3">
+            <div class="kart-baslik"><?= icon('team', 16) ?> İletişim Kişileri (<?= count($kisiler) ?>)</div>
+            <?php if (permission('dosya_yonet')): ?><button class="btn btn-sm btn-marka" onclick="kisiNew()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><path d="M12 5v14M5 12h14"/></svg> Kişi Ekle</button><?php endif; ?>
+        </div>
+        <?php if (!$kisiler): ?>
+        <div class="kart orta metin-muted kucuk" style="padding:18px">Bu dosyada iletişim kurulacak kişileri ekleyin — rapor maili gönderirken buradan seçilirler.</div>
+        <?php else: ?>
+        <div class="izgara mb-3" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+            <?php foreach ($kisiler as $ki): ?>
+            <div class="kart" style="padding:13px 15px">
+                <div class="satir-esnek arasi">
+                    <div class="kalin kucuk"><?= e($ki['name']) ?></div>
+                    <?php if (permission('dosya_yonet')): ?>
+                    <div class="satir-esnek" style="gap:2px">
+                        <button class="ikon-eylem" style="width:24px;height:24px" onclick='kisiEdit(<?= json_encode($ki, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 12) ?></button>
+                        <button class="ikon-eylem tehlike" style="width:24px;height:24px" data-action="client_contact_delete" data-id="<?= $ki['id'] ?>" data-approval="Kişi silinsin mi?"><?= icon('cop', 12) ?></button>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <?php if ($ki['title']): ?><div class="hucre-alt mt-1"><?= e($ki['title']) ?></div><?php endif; ?>
+                <?php if ($ki['email']): ?><div class="kucuk mt-1"><a href="mailto:<?= e($ki['email']) ?>" style="color:var(--marka)"><?= e($ki['email']) ?></a></div><?php endif; ?>
+                <?php if ($ki['phone']): ?><div class="kucuk metin-muted mt-1"><?= e($ki['phone']) ?></div><?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        <div class="modal-katman" id="modalKisi">
+            <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="kisiTitle">İletişim Kişisi</div><button class="modal-kapat" data-modal-close>✕</button></div>
+            <form data-ajax="client_contact_save">
+                <input type="hidden" name="id" id="ki_id"><input type="hidden" name="client_id" value="<?= $id ?>">
+                <div class="modal-govde">
+                    <div class="form-satir">
+                        <div class="form-grup"><label class="form-etiket">Ad Soyad <span class="zorunlu">*</span></label><input name="name" id="ki_name" class="girdi" required></div>
+                        <div class="form-grup"><label class="form-etiket">Ünvan / Rol</label><input name="title" id="ki_title" class="girdi" placeholder="Örn. Pazarlama Müdürü"></div>
+                    </div>
+                    <div class="form-satir">
+                        <div class="form-grup"><label class="form-etiket">E-posta</label><input type="email" name="email" id="ki_email" class="girdi" autocomplete="off"></div>
+                        <div class="form-grup"><label class="form-etiket">Telefon</label><input name="phone" id="ki_phone" class="girdi"></div>
+                    </div>
+                </div>
+                <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+            </form></div>
+        </div>
+        <script>
+        function kisiNew() { ['ki_id','ki_name','ki_title','ki_email','ki_phone'].forEach(i => document.getElementById(i).value = ''); document.getElementById('kisiTitle').textContent = 'Yeni İletişim Kişisi'; modalOpen('modalKisi'); }
+        function kisiEdit(k) { document.getElementById('ki_id').value = k.id; document.getElementById('ki_name').value = k.name; document.getElementById('ki_title').value = k.title || ''; document.getElementById('ki_email').value = k.email || ''; document.getElementById('ki_phone').value = k.phone || ''; document.getElementById('kisiTitle').textContent = 'Kişiyi Düzenle'; modalOpen('modalKisi'); }
+        </script>
+        <?php
+            $infoNotes = rows("SELECT bn.*, us.name updater_name FROM client_notes bn LEFT JOIN users us ON us.id=bn.updated_by WHERE bn.client_id=? ORDER BY bn.pinned DESC, bn.sort_order", [$id]);
+            $BB_KATEGORI = ['genel' => 'Genel', 'marka' => 'Marka Rehberi', 'erisim' => 'Erişim Bilgileri', 'kitle' => 'Hedef Kitle', 'surec' => 'Süreç']; ?>
         <!-- Knowledge base (team only) -->
         <div class="satir-esnek arasi mb-2 mt-3">
             <div class="kart-baslik"><?= icon('document', 16) ?> Bilgi Bankası (<?= count($infoNotes) ?>)</div>
             <button class="btn btn-sm btn-marka" onclick="notNew()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><path d="M12 5v14M5 12h14"/></svg> Bölüm Ekle</button>
         </div>
+        <?php if ($infoNotes): ?>
+        <div class="filtre-bar mb-2">
+            <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Bilgi bankasında ara..." data-search="#bbListe .kart"></div>
+            <div class="pill-filtre" data-pill-grup="#bbListe .kart">
+                <button class="pill aktif" data-setting_value="">Tümü</button>
+                <?php foreach ($BB_KATEGORI as $bk => $bv): ?><button class="pill" data-setting_value="<?= $bk ?>"><?= $bv ?></button><?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+        <div id="bbListe">
         <?php if (!$infoNotes): ?>
         <div class="kart orta metin-muted kucuk" style="padding:22px">Marka rehberi, hedef kitle, yazım dili gibi süreç notlarını buraya ekleyin — müşteri görmez, ekip her zaman ulaşır.</div>
         <?php else: foreach ($infoNotes as $bn): ?>
-        <div class="kart mb-2" style="padding:14px 16px">
+        <div class="kart mb-2" style="padding:14px 16px" data-filter="<?= e($bn['category'] ?? 'genel') ?>" data-search="<?= e($bn['title'] . ' ' . $bn['text']) ?>">
             <div class="satir-esnek arasi">
-                <div class="kalin kucuk"><?= e($bn['title']) ?></div>
+                <div class="satir-esnek" style="gap:8px"><?= !empty($bn['pinned']) ? '📌 ' : '' ?><span class="kalin kucuk"><?= e($bn['title']) ?></span>
+                    <span class="rozet rozet-tur" style="font-size:10.5px"><?= $BB_KATEGORI[$bn['category'] ?? 'genel'] ?? 'Genel' ?></span></div>
                 <div class="satir-esnek" style="gap:2px">
                     <button class="ikon-eylem" style="width:26px;height:26px" onclick='notDuzenleBB(<?= json_encode($bn, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 13) ?></button>
                     <button class="ikon-eylem tehlike" style="width:26px;height:26px" data-action="clientnote_delete" data-id="<?= $bn['id'] ?>" data-approval="Bölüm silinsin mi?"><?= icon('cop', 13) ?></button>
@@ -155,21 +217,28 @@ page_start($client['name'], 'clients');
             <?php if ($bn['update']): ?><div class="hucre-alt mt-2"><?= e($bn['updater_name']) ?> güncelledi · <?= time_ago($bn['update']) ?></div><?php endif; ?>
         </div>
         <?php endforeach; endif; ?>
+        </div>
 
         <div class="modal-katman" id="modalInfoNot">
             <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="bnTitleTop">Bilgi Bölümü</div><button class="modal-kapat" data-modal-close>✕</button></div>
             <form data-ajax="clientnote_save">
                 <input type="hidden" name="id" id="bn_id"><input type="hidden" name="client_id" value="<?= $id ?>">
                 <div class="modal-govde">
-                    <div class="form-grup"><label class="form-etiket">Bölüm Başlığı <span class="zorunlu">*</span></label><input name="title" id="bn_title" class="girdi" required placeholder="Örn. Marka Sesi & Yazım Dili"></div>
+                    <div class="form-satir">
+                        <div class="form-grup"><label class="form-etiket">Bölüm Başlığı <span class="zorunlu">*</span></label><input name="title" id="bn_title" class="girdi" required placeholder="Örn. Marka Sesi & Yazım Dili"></div>
+                        <div class="form-grup"><label class="form-etiket">Kategori</label><select name="category" id="bn_category" class="secim">
+                            <?php foreach ($BB_KATEGORI as $bk => $bv): ?><option value="<?= $bk ?>"><?= $bv ?></option><?php endforeach; ?>
+                        </select></div>
+                    </div>
+                    <label class="satir-esnek kucuk mb-2" style="gap:8px;cursor:pointer"><input type="checkbox" name="pinned" id="bn_pinned" value="1"> 📌 Üste sabitle</label>
                     <div class="form-grup"><label class="form-etiket">İçerik</label><textarea name="text" id="bn_text" class="metin-alani" style="min-height:150px"></textarea></div>
                 </div>
                 <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
             </form></div>
         </div>
         <script>
-        function notNew() { document.getElementById('bn_id').value = ''; document.getElementById('bn_title').value = ''; document.getElementById('bn_text').value = ''; document.getElementById('bnTitleTop').textContent = 'Yeni Bilgi Bölümü'; modalOpen('modalInfoNot'); }
-        function notDuzenleBB(n) { document.getElementById('bn_id').value = n.id; document.getElementById('bn_title').value = n.title; document.getElementById('bn_text').value = n.text || ''; document.getElementById('bnTitleTop').textContent = 'Bölümü Düzenle'; modalOpen('modalInfoNot'); }
+        function notNew() { document.getElementById('bn_id').value = ''; document.getElementById('bn_title').value = ''; document.getElementById('bn_text').value = ''; document.getElementById('bn_category').value = 'genel'; document.getElementById('bn_pinned').checked = false; document.getElementById('bnTitleTop').textContent = 'Yeni Bilgi Bölümü'; modalOpen('modalInfoNot'); }
+        function notDuzenleBB(n) { document.getElementById('bn_id').value = n.id; document.getElementById('bn_title').value = n.title; document.getElementById('bn_text').value = n.text || ''; document.getElementById('bn_category').value = n.category || 'genel'; document.getElementById('bn_pinned').checked = !!+n.pinned; document.getElementById('bnTitleTop').textContent = 'Bölümü Düzenle'; modalOpen('modalInfoNot'); }
         </script>
         <?php endif; ?>
     </div>

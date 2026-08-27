@@ -44,6 +44,22 @@ case 'drive_folder_test':
     if (!$r['ok']) json_out(['ok' => false, 'error' => 'Klasör okunamadı: ' . $r['error'] . ' (Klasörü servis hesabı e-postasıyla paylaştınız mı?)']);
     json_out(['ok' => true, 'mesaj' => 'Klasör erişilebilir ✓' . ($r['sample'] ? ' (örnek dosya: ' . $r['sample'] . ')' : ' (klasör şu an boş)')]);
 
+case 'client_contact_save':
+    require_permission('dosya_yonet');
+    $data = ['client_id' => (int)$g('client_id'), 'name' => mb_substr(trim($g('name')), 0, 120),
+        'title' => mb_substr(trim($g('title')), 0, 120) ?: null,
+        'email' => mb_strtolower(trim($g('email'))) ?: null, 'phone' => mb_substr(trim($g('phone')), 0, 40) ?: null];
+    if ($data['name'] === '') json_out(['ok' => false, 'error' => 'İsim gerekli.']);
+    if ($data['email'] && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) json_out(['ok' => false, 'error' => 'Geçersiz e-posta adresi.']);
+    if ($g('id')) { update_row('client_contacts', $data, 'id=?', [(int)$g('id')]); json_out(['ok' => true, 'mesaj' => 'Kişi güncellendi.']); }
+    insert('client_contacts', $data + ['created' => $now]);
+    json_out(['ok' => true, 'mesaj' => 'Kişi eklendi.']);
+
+case 'client_contact_delete':
+    require_permission('dosya_yonet');
+    q("DELETE FROM client_contacts WHERE id=?", [(int)$g('id')]);
+    json_out(['ok' => true, 'mesaj' => 'Kişi silindi.']);
+
 case 'report_mail_preview':
     require_permission('rapor');
     require_once __DIR__ . '/includes/report-mail.php';
@@ -61,6 +77,7 @@ case 'report_mail_preview':
         'senders' => $senders,
         'sent_at' => $report['sent_at'] ? format_date($report['sent_at'], true) : null,
         'mail_data' => json_decode((string)($report['mail_data'] ?? ''), true) ?: new stdClass(),
+        'contacts' => rows("SELECT name, title, email FROM client_contacts WHERE client_id=? AND email IS NOT NULL ORDER BY name", [(int)$g('client_id')]),
     ]);
 
 case 'report_mail_data_save':
@@ -766,10 +783,10 @@ case 'clientnote_save':
     $title = mb_substr(trim($g('title')), 0, 150);
     if ($title === '') json_out(['ok' => false, 'error' => 'Bölüm başlığı gerekli.']);
     if ($g('id')) {
-        update_row('client_notes', ['title' => $title, 'text' => $g('text'), 'updated_by' => $u['id'], 'update' => $now], 'id=?', [(int)$g('id')]);
+        update_row('client_notes', ['title' => $title, 'text' => $g('text'), 'category' => $g('category', 'genel'), 'pinned' => (int)(bool)$g('pinned'), 'updated_by' => $u['id'], 'update' => $now], 'id=?', [(int)$g('id')]);
         json_out(['ok' => true, 'mesaj' => 'Not güncellendi.']);
     }
-    insert('client_notes', ['client_id' => (int)$g('client_id'), 'title' => $title, 'text' => $g('text'), 'sort_order' => (int)val("SELECT COALESCE(MAX(sort_order),0)+1 FROM client_notes WHERE client_id=?", [(int)$g('client_id')]), 'updated_by' => $u['id'], 'created' => $now]);
+    insert('client_notes', ['client_id' => (int)$g('client_id'), 'title' => $title, 'text' => $g('text'), 'category' => $g('category', 'genel'), 'pinned' => (int)(bool)$g('pinned'), 'sort_order' => (int)val("SELECT COALESCE(MAX(sort_order),0)+1 FROM client_notes WHERE client_id=?", [(int)$g('client_id')]), 'updated_by' => $u['id'], 'created' => $now]);
     json_out(['ok' => true, 'mesaj' => 'Bilgi notu eklendi.']);
 
 case 'clientnote_delete':

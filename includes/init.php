@@ -368,8 +368,14 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.8';
+const APP_VERSION = '6.9';
 const VERSION_NOTES = [
+    '6.9' => [
+        'Rapor mailinde alıcılar artık çip (kutucuk) olarak: adres yazıp Enter — her alıcı ayrı kutucuk, ✕ ile çıkarılır, hatalı adres kırmızı görünür',
+        'Dosyalara birden fazla iletişim kişisi eklenebiliyor (ad, ünvan, e-posta, telefon) — dosya sayfasında yeni "İletişim Kişileri" kartı; kayıtlı tek kişi otomatik taşındı',
+        'Mail gönderirken dosyanın kişileri tek tıkla alıcılara ekleniyor (+Ayşe, +Mehmet, Hepsini ekle)',
+        'Bilgi Bankası geliştirildi: kategoriler (Marka Rehberi, Erişim Bilgileri, Hedef Kitle, Süreç), 📌 üste sabitleme, arama ve kategori filtresi',
+    ],
     '6.8' => [
         'Rapor maili birden fazla alıcıya gidebiliyor — adresleri virgülle yazın; kısmi başarı durumunda kimlere gittiği/gitmediği açıkça bildirilir',
         'Mailin tüm metinleri düzenlenebilir: ana başlık, selamlama, bölüm başlıkları, istatistik giriş cümlesi, kapanış ve teşekkür — boş bırakılan varsayılanı kullanır',
