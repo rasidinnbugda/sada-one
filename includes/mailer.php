@@ -55,7 +55,7 @@ function smtp_send(string $alici, string $topic, string $html, string $sender, s
 
     $adres = ($port === 465 ? 'ssl://' : '') . $host;
     $sock = @fsockopen($adres, $port, $errno, $errstr, 10);
-    if (!$sock) return false;
+    if (!$sock) { $GLOBALS['smtp_last_error'] = "Sunucuya bağlanılamadı ($host:$port): $errstr"; return false; }
 
     $read = function () use ($sock) {
         $data = '';
@@ -81,19 +81,29 @@ function smtp_send(string $alici, string $topic, string $html, string $sender, s
         $send('AUTH LOGIN');
         $send(base64_encode($user));
         $reply = $send(base64_encode($password));
-        if (strpos($reply, '235') !== 0) { fclose($sock); return false; }
+        if (strpos($reply, '235') !== 0) { $GLOBALS['smtp_last_error'] = 'Kimlik doğrulama reddedildi: ' . trim(mb_substr((string)$reply, 0, 160)); fclose($sock); return false; }
         $send("MAIL FROM:<$sender>");
         $send("RCPT TO:<$alici>");
         $send('DATA');
+        // SMTP caps lines at ~1000 octets (RFC 5321) and Gmail enforces it: a
+        // several-KB single-line HTML body gets "500 Line too long". Wrap at
+        // spaces (whitespace inside HTML/CSS is safe) and dot-stuff leading dots.
+        $govde = wordwrap($html, 900, "\r\n", false);
+        $govde = preg_replace('/^\./m', '..', $govde);
         $message = "From: =?UTF-8?B?" . base64_encode($sendName) . "?= <$sender>\r\n"
             . "To: <$alici>\r\n"
             . "Subject: =?UTF-8?B?" . base64_encode($topic) . "?=\r\n"
             . "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n"
-            . $html . "\r\n.";
+            . $govde . "\r\n.";
         $reply = $send($message);
         $send('QUIT');
         fclose($sock);
-        return strpos($reply, '250') === 0;
+        if (strpos($reply, '250') !== 0) {
+            // surface the server's actual answer so failures are diagnosable
+            $GLOBALS['smtp_last_error'] = trim(mb_substr((string)$reply, 0, 200));
+            return false;
+        }
+        return true;
     } catch (Throwable $e) {
         @fclose($sock);
         return false;

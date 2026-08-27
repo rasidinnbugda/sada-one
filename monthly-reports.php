@@ -151,6 +151,35 @@ async function aiDraft(clientId, period) {
             <div class="form-grup"><label class="form-etiket">Gönderen</label><select class="secim native-kal" id="rm_from"></select></div>
         </div>
         <div class="form-grup"><label class="form-etiket">Konu</label><input class="girdi" id="rm_subject"></div>
+        <details class="mb-2" id="rm_tasarim">
+            <summary class="kucuk kalin" style="cursor:pointer;padding:6px 0">🎨 Tasarımı Düzenle — kapak görseli, favori içerik, istatistikler</summary>
+            <div class="mt-2" style="padding:14px;background:var(--surface-2);border-radius:12px">
+                <div class="form-satir">
+                    <div class="form-grup"><label class="form-etiket">Kapak Görseli <span class="metin-muted" style="font-weight:400" id="rm_hero_durum"></span></label>
+                        <input type="file" class="girdi" id="rm_hero" accept="image/*">
+                        <label class="kucuk satir-esnek mt-1" style="gap:6px"><input type="checkbox" id="rm_hero_kaldir"> Mevcut görseli kaldır</label></div>
+                    <div class="form-grup"><label class="form-etiket">Favori Görseli <span class="metin-muted" style="font-weight:400" id="rm_fav_img_durum"></span></label>
+                        <input type="file" class="girdi" id="rm_fav_img" accept="image/*">
+                        <label class="kucuk satir-esnek mt-1" style="gap:6px"><input type="checkbox" id="rm_fav_img_kaldir"> Mevcut görseli kaldır</label></div>
+                </div>
+                <div class="form-satir">
+                    <div class="form-grup"><label class="form-etiket">Favori Başlığı</label><input class="girdi" id="rm_fav_title" placeholder="Bu Ayın Favorisi"></div>
+                    <div class="form-grup"><label class="form-etiket">Öne Çıkan Sayı</label><input class="girdi" id="rm_fav_stat" placeholder="113B izlenme"></div>
+                </div>
+                <div class="form-grup"><label class="form-etiket">Favori Açıklaması</label><textarea class="metin-alani" id="rm_fav_text" rows="2" placeholder="Ürettiğimiz bu içerik markanızı çok daha ileriye taşıdı!"></textarea></div>
+                <label class="form-etiket">İstatistik Kartları <span class="metin-muted" style="font-weight:400">(etiket · değer · değişim — boş bırakılan satır atlanır)</span></label>
+                <div class="dikey" style="gap:6px" id="rm_stats">
+                    <?php for ($si = 0; $si < 4; $si++): ?>
+                    <div class="satir-esnek" style="gap:6px">
+                        <input class="girdi rm-stat-tag" placeholder="<?= ['Erişilen Hesaplar','Görüntüleme','Takipçi Sayısı','Etkileşim'][$si] ?>" style="flex:2">
+                        <input class="girdi rm-stat-deger" placeholder="<?= ['340,8K','1.3M','43,3K','86K'][$si] ?>" style="flex:1">
+                        <input class="girdi rm-stat-degisim" placeholder="+%12" style="flex:1">
+                    </div>
+                    <?php endfor; ?>
+                </div>
+                <button type="button" class="btn btn-sm mt-2" onclick="reportMailTasarimKaydet()">Kaydet & Önizlemeyi Yenile</button>
+            </div>
+        </details>
         <div class="form-grup"><label class="form-etiket">Önizleme</label>
             <iframe id="rm_preview" style="width:100%;height:420px;border:1px solid var(--border);border-radius:12px;background:#eef1f6"></iframe>
         </div>
@@ -173,7 +202,49 @@ async function reportMailAc(clientId, period) {
     document.getElementById('rm_from').innerHTML = j.senders.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
     document.getElementById('rm_preview').srcdoc = j.html;
     document.getElementById('rm_sent_info').textContent = j.sent_at ? 'Daha önce gönderildi: ' + j.sent_at : '';
+    // tasarım düzenleyicisini mevcut verilerle doldur
+    const v = j.mail_data || {};
+    document.getElementById('rm_hero_durum').textContent = v.hero ? '(yüklü ✓)' : '';
+    document.getElementById('rm_fav_img_durum').textContent = (v.fav && v.fav.img) ? '(yüklü ✓)' : '';
+    document.getElementById('rm_fav_title').value = (v.fav && v.fav.title) || '';
+    document.getElementById('rm_fav_stat').value = (v.fav && v.fav.stat) || '';
+    document.getElementById('rm_fav_text').value = (v.fav && v.fav.text) || '';
+    const satirlar = document.querySelectorAll('#rm_stats .satir-esnek');
+    satirlar.forEach((s, i) => {
+        const st = (v.stats || [])[i] || {};
+        s.querySelector('.rm-stat-tag').value = st.tag || '';
+        s.querySelector('.rm-stat-deger').value = st.deger || '';
+        s.querySelector('.rm-stat-degisim').value = st.degisim || '';
+    });
+    ['rm_hero', 'rm_fav_img'].forEach(id => document.getElementById(id).value = '');
+    ['rm_hero_kaldir', 'rm_fav_img_kaldir'].forEach(id => document.getElementById(id).checked = false);
     modalOpen('modalReportMail');
+}
+async function reportMailTasarimKaydet() {
+    const stats = [...document.querySelectorAll('#rm_stats .satir-esnek')].map(s => ({
+        tag: s.querySelector('.rm-stat-tag').value.trim(),
+        deger: s.querySelector('.rm-stat-deger').value.trim(),
+        degisim: s.querySelector('.rm-stat-degisim').value.trim()
+    })).filter(s => s.tag || s.deger);
+    const data = {
+        client_id: rmClient, period: rmPeriod,
+        fav_title: document.getElementById('rm_fav_title').value,
+        fav_stat: document.getElementById('rm_fav_stat').value,
+        fav_text: document.getElementById('rm_fav_text').value,
+        stats: stats,
+        hero_kaldir: document.getElementById('rm_hero_kaldir').checked ? '1' : '0',
+        fav_img_kaldir: document.getElementById('rm_fav_img_kaldir').checked ? '1' : '0'
+    };
+    const hero = document.getElementById('rm_hero').files[0];
+    const favImg = document.getElementById('rm_fav_img').files[0];
+    if (hero) data.hero_img = hero;
+    if (favImg) data.fav_img = favImg;
+    const j = await api('report_mail_data_save', data);
+    if (!j.ok) return;
+    toast('Tasarım kaydedildi', 'basari', 1600);
+    // önizlemeyi tazele (alanları yeniden doldurur)
+    reportMailAc(rmClient, rmPeriod);
+    document.getElementById('rm_tasarim').open = true;
 }
 async function reportMailGonder() {
     const btn = document.getElementById('rm_send');

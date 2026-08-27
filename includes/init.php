@@ -368,8 +368,13 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.6';
+const APP_VERSION = '6.7';
 const VERSION_NOTES = [
+    '6.7' => [
+        'Rapor maili tasarımı baştan: kapak görseli, dönem etiketi, "Markanız İçin Ürettik" kartları, kırmızı "Bu Ayın Favorisi" bloğu (görsel + öne çıkan sayı), 2x2 istatistik kartları (artış/azalış oklu) ve dosya sorumlusunun iletişimiyle kapanış',
+        'Mail modalına 🎨 Tasarımı Düzenle bölümü: kapak/favori görseli yükleme, istatistik kartlarını doldurma — kaydet deyince önizleme anında yenileniyor',
+        'SMTP gönderim hatası düzeltildi: uzun HTML satırları Gmail\'in satır sınırına takılıyordu; ayrıca hata artık sunucunun gerçek yanıtını gösteriyor',
+    ],
     '6.6' => [
         'Aylık rapor artık tek tıkla şık bir HTML müşteri mailine dönüşüyor: Aylık Raporlar → 📧 Müşteri Maili — önizleme, alıcı/konu düzenleme ve panelden gönderim',
         'Mail, markalı tasarımla raporun özet/çalışmalar/metrik/plan bölümlerini içeriyor; iç finans verileri müşteriye gitmiyor',

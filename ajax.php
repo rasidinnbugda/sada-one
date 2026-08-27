@@ -60,7 +60,39 @@ case 'report_mail_preview':
         'to' => $client['contact_email'] ?: '',
         'senders' => $senders,
         'sent_at' => $report['sent_at'] ? format_date($report['sent_at'], true) : null,
+        'mail_data' => json_decode((string)($report['mail_data'] ?? ''), true) ?: new stdClass(),
     ]);
+
+case 'report_mail_data_save':
+    // The mail modal's design editor: cover image, favourite block, stat tiles
+    require_permission('rapor');
+    $report = row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [(int)$g('client_id'), $g('period')]);
+    if (!$report) json_out(['ok' => false, 'error' => 'Önce raporu kaydedin.']);
+    $veri = json_decode((string)($report['mail_data'] ?? ''), true) ?: [];
+    // Görseller: yalnızca resim dosyaları
+    foreach (['hero_img' => 'hero', 'fav_img' => 'fav_img'] as $alanAdi => $anahtar) {
+        if (!empty($_FILES[$alanAdi]['tmp_name'])) {
+            $yuklenen = file_upload($alanAdi);
+            if (!$yuklenen || !in_array($yuklenen['extension'], ['jpg', 'jpeg', 'png', 'gif', 'webp']))
+                json_out(['ok' => false, 'error' => 'Görsel yüklenemedi (JPG/PNG/WebP kullanın).']);
+            if ($anahtar === 'hero') $veri['hero'] = 'uploads/' . $yuklenen['path'];
+            else { $veri['fav']['img'] = 'uploads/' . $yuklenen['path']; }
+        }
+    }
+    if ($g('hero_kaldir') === '1') unset($veri['hero']);
+    if ($g('fav_img_kaldir') === '1') unset($veri['fav']['img']);
+    $veri['fav']['title'] = mb_substr(trim($g('fav_title')), 0, 120);
+    $veri['fav']['text'] = mb_substr(trim($g('fav_text')), 0, 600);
+    $veri['fav']['stat'] = mb_substr(trim($g('fav_stat')), 0, 60);
+    $statlar = json_decode($g('stats', '[]'), true) ?: [];
+    $veri['stats'] = [];
+    foreach (array_slice($statlar, 0, 4) as $s) {
+        $veri['stats'][] = ['tag' => mb_substr(trim((string)($s['tag'] ?? '')), 0, 60),
+            'deger' => mb_substr(trim((string)($s['deger'] ?? '')), 0, 30),
+            'degisim' => mb_substr(trim((string)($s['degisim'] ?? '')), 0, 20)];
+    }
+    update_row('monthly_reports', ['mail_data' => json_encode($veri, JSON_UNESCAPED_UNICODE)], 'id=?', [$report['id']]);
+    json_out(['ok' => true, 'mesaj' => 'Tasarım kaydedildi.']);
 
 case 'report_mail_send':
     require_permission('rapor');
@@ -79,7 +111,7 @@ case 'report_mail_send':
     if (!in_array($from, $izinli, true)) json_out(['ok' => false, 'error' => 'Bu gönderen adresi tanımlı değil (Ayarlar → SMTP → Ek gönderen adresleri).']);
     $subject = trim($g('subject')) ?: ($client['name'] . ' Aylık Raporu');
     if (!send_email_html($to, $subject, report_mail_html($report, $client, $g('period')), $from))
-        json_out(['ok' => false, 'error' => 'E-posta gönderilemedi — SMTP ayarlarını kontrol edin.']);
+        json_out(['ok' => false, 'error' => 'E-posta gönderilemedi' . (!empty($GLOBALS['smtp_last_error']) ? ' — sunucu yanıtı: ' . $GLOBALS['smtp_last_error'] : ' — SMTP ayarlarını kontrol edin.')]);
     update_row('monthly_reports', ['sent_at' => $now, 'sent_to' => $to], 'id=?', [$report['id']]);
     log_activity('Aylık rapor maili gönderildi: ' . $client['name'] . ' / ' . $g('period') . ' → ' . $to);
     json_out(['ok' => true, 'mesaj' => 'Rapor maili gönderildi: ' . $to]);

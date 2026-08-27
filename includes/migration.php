@@ -112,6 +112,7 @@ function migration_commands(): array {
         // v6.6: the monthly report can be mailed to the client from the panel
         "ALTER TABLE monthly_reports ADD COLUMN sent_at DATETIME DEFAULT NULL",
         "ALTER TABLE monthly_reports ADD COLUMN sent_to VARCHAR(255) DEFAULT NULL",
+        "ALTER TABLE monthly_reports ADD COLUMN mail_data TEXT",
     ];
 }
 
