@@ -56,10 +56,10 @@ page_start('Çekim Listesi', 'shoots');
                 <?php if ($c['drive_status'] === 'aktarildi'): ?>
                 <span class="rozet r-tamamlandi" title="Görüntüler Drive'da">📁 Aktarıldı</span>
                 <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn">Drive ↗</a><?php endif; ?>
-                <?php if ($c['drive_folder_id'] && $driveReady): ?><span class="drive-dosyalar" data-drive-event="<?= $c['id'] ?>" data-drive-status="<?= $c['drive_status'] ?>"></span><?php endif; ?>
+                
                 <?php elseif (strtotime($c['start']) < time()): ?>
                 <span class="rozet r-gecikti" title="Görüntüler henüz Drive'da görünmüyor">📁 Aktarılmadı</span>
-                <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn">Klasöre yükle ↗</a><?php if ($c['drive_folder_id'] && $driveReady): ?><span class="drive-dosyalar" data-drive-event="<?= $c['id'] ?>" data-drive-status="<?= $c['drive_status'] ?>"></span><?php endif; ?>
+                <?php if ($c['drive_link']): ?><a href="<?= e($c['drive_link']) ?>" target="_blank" class="mini-btn">Klasöre yükle ↗</a>
                 <?php elseif ($driveReady): ?><button class="mini-btn" data-action="drive_folder_create" data-id="<?= $c['id'] ?>" data-refresh="evet">Klasör oluştur</button><?php endif; ?>
                 <button class="mini-btn" onclick="driveMark(<?= $c['id'] ?>)">Aktarıldı işaretle</button>
                 <?php else: ?>
@@ -89,6 +89,9 @@ page_start('Çekim Listesi', 'shoots');
                 <div class="kucuk" style="white-space:pre-wrap"><?= $c['needs_list'] ? e($c['needs_list']) : '<span class="metin-muted">—</span>' ?></div>
             </div>
         </div>
+        <?php if ($c['drive_folder_id'] && $driveReady): ?>
+        <div class="drive-bolum" data-drive-event="<?= $c['id'] ?>" data-drive-status="<?= $c['drive_status'] ?>" data-drive-folder="<?= e($c['drive_link'] ?: 'https://drive.google.com/drive/folders/' . $c['drive_folder_id']) ?>" style="display:none"></div>
+        <?php endif; ?>
     </div>
     <?php endforeach; ?>
 </div>
@@ -121,28 +124,35 @@ function ckEdit(c) {
 }
 </script>
 <script>
-// Drive folder contents, loaded async so the page itself stays fast.
+// Drive folder contents render as their own section at the bottom of each card.
 // app.js (which defines api/esc) loads at the end of the body, so wait for it.
 addEventListener('DOMContentLoaded', () => {
-document.querySelectorAll('.drive-dosyalar').forEach(async kutu => {
-    const j = await api('drive_files', { id: kutu.dataset.driveEvent }).catch(() => null);
+document.querySelectorAll('.drive-bolum').forEach(async bolum => {
+    const j = await api('drive_files', { id: bolum.dataset.driveEvent }).catch(() => null);
     if (!j || !j.ok || !j.files.length) return;
-    // Tür özeti: 🎬 3 video · 🖼️ 12 fotoğraf
     const ozet = [];
     if (j.counts.video) ozet.push('🎬 ' + j.counts.video + ' video');
     if (j.counts.image) ozet.push('🖼️ ' + j.counts.image + ' fotoğraf');
     if (j.counts.other) ozet.push('📄 ' + j.counts.other + ' dosya');
-    let h = `<span class="rozet rozet-tur" title="Klasördeki dosyalar">${ozet.join(' · ')}</span> `;
-    h += j.files.slice(0, 5).map(d =>
-        `<a href="${esc(d.link)}" target="_blank" class="mini-btn" title="${esc(d.name)}">${d.mime.includes('video') ? '🎬' : d.mime.includes('image') ? '🖼️' : '📄'} ${esc(d.name.length > 20 ? d.name.slice(0, 18) + '…' : d.name)}</a>`
-    ).join(' ');
-    if (j.files.length > 5) h += ` <a href="${esc(j.folder)}" target="_blank" class="mini-btn">tümü ↗</a>`;
-    // Dosyalar var ama çekim hâlâ bekliyor → tamamlanma onayını sor
-    if (kutu.dataset.driveStatus === 'bekliyor') {
-        h += ` <button class="mini-btn" style="border-color:var(--basari);color:var(--basari)" data-action="drive_mark" data-id="${kutu.dataset.driveEvent}" data-approval="Yüklenmesi gereken HER ŞEY klasörde mi? Çekim 'yüklendi' olarak işaretlenecek.">✔ Tümü yüklendi</button>`;
+    let h = `<div class="satir-esnek arasi sarma mb-2" style="gap:8px">
+        <div class="hucre-alt">📁 Drive Dosyaları — ${ozet.join(' · ')}</div>
+        <div class="satir-esnek" style="gap:8px">
+            <a href="${esc(bolum.dataset.driveFolder)}" target="_blank" class="mini-btn">Klasörü aç ↗</a>`;
+    if (bolum.dataset.driveStatus === 'bekliyor') {
+        h += `<button class="mini-btn" style="border-color:var(--basari);color:var(--basari)" data-action="drive_mark" data-id="${bolum.dataset.driveEvent}" data-approval="Yüklenmesi gereken HER ŞEY klasörde mi? Çekim 'yüklendi' olarak işaretlenecek.">✔ Tümü yüklendi</button>`;
     }
-    kutu.innerHTML = h;
+    h += `</div></div><div class="drive-dosya-izgara">`;
+    h += j.files.slice(0, 12).map(d => {
+        const ikon = d.mime.includes('video') ? '🎬' : d.mime.includes('image') ? '🖼️' : d.mime.includes('folder') ? '📁' : '📄';
+        const tarih = d.created ? new Date(d.created).toLocaleDateString('tr-TR') : '';
+        return `<a href="${esc(d.link)}" target="_blank" class="drive-dosya-oge" title="${esc(d.name)}">
+            <span class="drive-dosya-ikon">${ikon}</span>
+            <span class="drive-dosya-meta"><span class="drive-dosya-ad">${esc(d.name)}</span><span class="hucre-alt">${tarih}</span></span></a>`;
+    }).join('');
+    h += `</div>`;
+    if (j.files.length > 12) h += `<div class="kucuk metin-muted mt-1">+${j.files.length - 12} dosya daha — klasörü açın</div>`;
+    bolum.innerHTML = h;
+    bolum.style.display = '';
 });
-});
-</script>
+});</script>
 <?php page_end(); ?>

@@ -1387,3 +1387,16 @@ body { background-image: radial-gradient(ellipse 70% 45% at 85% -12%, var(--parl
 .giris-logo span { color: var(--marka); }
 .giris-alt { text-align: center; color: var(--text-2); font-size: 14px; margin-bottom: 32px; }
 .giris-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 34px; }
+
+/* ---- Shoot card: Drive files section ---- */
+.drive-bolum { margin-top: 14px; padding-top: 13px; border-top: 1px dashed var(--border); }
+.drive-dosya-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.drive-dosya-oge {
+    display: flex; align-items: center; gap: 9px; padding: 8px 11px; min-width: 0;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    transition: border-color var(--gecis), background var(--gecis);
+}
+.drive-dosya-oge:hover { border-color: var(--marka); background: var(--parlak); }
+.drive-dosya-ikon { font-size: 17px; flex-shrink: 0; }
+.drive-dosya-meta { display: flex; flex-direction: column; min-width: 0; }
+.drive-dosya-ad { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
