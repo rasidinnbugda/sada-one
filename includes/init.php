@@ -23,6 +23,47 @@ function session_write(callable $fn): void {
     $fn();
     session_write_close();
 }
+
+/**
+ * Run work AFTER the response has been delivered to the browser.
+ * Reminder mails, Drive checks and similar housekeeping used to run inside the
+ * page request: whoever happened to load a page first waited for every SMTP
+ * handshake and API call — a stalled mail server meant a page that never opened.
+ */
+function after_response(callable $fn): void {
+    $GLOBALS['sada_after_response'][] = $fn;
+}
+register_shutdown_function(function () {
+    // Slow-request evidence: anything the visitor waited on for 5+ seconds is
+    // logged with its URL, so a "the panel hung" report can be traced to a cause.
+    $spent = microtime(true) - (float)($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true));
+    if ($spent > 5) {
+        error_log(sprintf('[SADA] yavas istek: %.1fs %s %s', $spent, $_SERVER['REQUEST_METHOD'] ?? '?',
+            ($_SERVER['REQUEST_URI'] ?? '?') . (isset($_POST['action']) ? ' action=' . $_POST['action'] : '')));
+    }
+    if (empty($GLOBALS['sada_after_response'])) return;
+    ignore_user_abort(true);
+    // Hand the finished page to the web server first; the browser is done at this point.
+    $detached = true;
+    if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+    elseif (function_exists('litespeed_finish_request')) litespeed_finish_request();
+    else { $detached = false; while (ob_get_level() > 0) @ob_end_flush(); @flush(); }
+    // Without a real early finish the browser is still waiting on this connection,
+    // so the work gets a short budget; loops check sada_deadline_passed() and stop.
+    $GLOBALS['sada_deadline'] = max((float)($GLOBALS['sada_deadline'] ?? 0), microtime(true) + ($detached ? 100 : 12)); // cron.php sets its own, longer one
+    @set_time_limit(120);
+    $t = microtime(true);
+    // Drained as a queue: a job may enqueue more (notify() defers its e-mail here)
+    while ($fn = array_shift($GLOBALS['sada_after_response'])) {
+        try { $fn(); } catch (Throwable $e) { error_log('[SADA] arka plan isi: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine()); }
+    }
+    $spent = microtime(true) - $t;
+    if ($spent > 10) error_log(sprintf('[SADA] arka plan isleri %.1fs surdu%s', $spent, $detached ? ' (sayfa bundan etkilenmedi)' : ' — sunucuda erken teslim yok, sayfa bekledi'));
+});
+/** True once the background-work budget of this request is spent (always false during the page itself). */
+function sada_deadline_passed(): bool {
+    return isset($GLOBALS['sada_deadline']) && microtime(true) > $GLOBALS['sada_deadline'];
+}
 mb_internal_encoding('UTF-8');
 date_default_timezone_set('Europe/Istanbul');
 
@@ -69,22 +110,37 @@ $GLOBALS['config'] = include ROOT . '/config.php';
  */
 function legacy_schema_check(): void {
     try {
-        if (db()->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='dosyalar'")->fetchColumn()) {
-            require_once __DIR__ . '/legacy-migration.php';
-            legacy_localization(db());
-        }
-        // Self-healing schema: whenever the code version moves ahead of the DB,
-        // run the (idempotent) migrations once. Prevents "files updated but the
-        // schema wasn't" 500s after manual file uploads.
+        // Hot path: one indexed lookup per request, nothing else.
         $st = db()->prepare("SELECT setting_value FROM settings WHERE setting_key='schema_version'");
         $st->execute();
-        if ($st->fetchColumn() !== APP_VERSION) {
+        if ($st->fetchColumn() === APP_VERSION) return;
+
+        // Self-healing schema: whenever the code version moves ahead of the DB, run
+        // the migrations once. Exactly ONE request may do it: right after an update
+        // every open tab (polls, prerenders, other users) used to start the same
+        // ALTER TABLE list at once and queue on each other's metadata locks — and
+        // every request touching those tables hung with them for minutes.
+        $lockName = 'sada_migrate_' . substr(md5((string)($GLOBALS['config']['db_name'] ?? '')), 0, 20);
+        $got = (int)db()->query("SELECT GET_LOCK(" . db()->quote($lockName) . ", 15)")->fetchColumn();
+        if ($got !== 1) return; // another request is migrating; this one proceeds as-is
+        try {
+            $st->execute();
+            if ($st->fetchColumn() === APP_VERSION) return; // finished while we waited
+            if (db()->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='dosyalar'")->fetchColumn()) {
+                require_once __DIR__ . '/legacy-migration.php';
+                legacy_localization(db());
+            }
             require_once __DIR__ . '/migration.php';
+            $t0 = microtime(true); $yeni = 0;
             foreach (run_migrations(db()) as $mr) {
                 if (($mr[0] ?? '') === 'hata') error_log('[SADA] migration hatasi: ' . ($mr[1] ?? '?'));
+                if (($mr[0] ?? '') === 'ok') $yeni++;
             }
             db()->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('schema_version', ?) ON DUPLICATE KEY UPDATE setting_value=?")
                 ->execute([APP_VERSION, APP_VERSION]);
+            error_log(sprintf('[SADA] sema guncellendi: v%s (%d yeni komut, %.1fs)', APP_VERSION, $yeni, microtime(true) - $t0));
+        } finally {
+            db()->query("SELECT RELEASE_LOCK(" . db()->quote($lockName) . ")");
         }
     } catch (Throwable $e) { /* connection problems surface later with a clearer error */ }
 }
@@ -98,7 +154,8 @@ function db(): PDO {
         $pdo = new PDO(
             "mysql:host={$c['db_host']};dbname={$c['db_name']};charset=utf8mb4",
             $c['db_user'], $c['db_pass'],
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+             PDO::ATTR_TIMEOUT => 5] // an unreachable DB fails fast instead of hanging the request
         );
     }
     return $pdo;
@@ -370,8 +427,21 @@ const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'ayli
 const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.10.6';
+const APP_VERSION = '6.11';
 const VERSION_NOTES = [
+    '6.11' => [
+        'KİLİTLENME AVI: saatlik/günlük otomatik işler (hatırlatma mailleri, Drive kontrolleri) artık sayfa yüklemesinin İÇİNDE değil, sayfa tarayıcıya teslim edildikten SONRA çalışıyor — takılan bir mail sunucusu paneli bekletemez',
+        'Güncelleme sonrası şema migration\'ı artık tek bir istek tarafından kilitle çalıştırılıyor; aynı anda açık sekmeler/anketler aynı ALTER TABLE listesini paralel koşturup tüm siteyi dakikalarca kilitlemiyordu artık',
+        'Migration komutları bir kez başarılı olduktan sonra hash ile hatırlanıyor: her sürümde tabloları yeniden inşa eden komutlar bir daha çalışmıyor',
+        'SMTP: tek bağlantı tüm mailler için tekrar kullanılıyor, her okumada 20 sn zaman aşımı var; günlük hatırlatmalar iki kez (bildirim + ayrı mail) gönderilmiyor',
+        'Otomatik işlerin "bugün çalıştı mı" kontrolü atomik yapıldı: iki eşzamanlı istek aynı hatırlatmaları iki kez göndermiyor',
+        'Çekim listesi Drive dosyalarını kart başına ayrı istek yerine tek toplu istekle ve 3 dk önbellekle alıyor',
+        'Bağlantı önyükleme (prerender) sadece tıklama anında: her üzerine gelinen menü linki gizli bir tam sayfa isteği üretmiyor',
+        'Canlı senkron özeti GROUP_CONCAT kesilmesinden kurtarıldı; DB bağlantısına 5 sn zaman aşımı; giriş deneme kaydı 30 günde temizleniyor',
+        'Bildirim e-postaları (duyuru, atama, yorum…) artık tıklayan kullanıcıyı bekletmeden yanıt sonrasında gönderiliyor',
+        'Tarayıcı: her istek için zaman aşımı (takılan istek düğmeyi "İşleniyor…" bırakmıyor), anketler önceki yanıt gelmeden yenisini atmıyor, görev listesi canlı senkronu yeniden yükleme fırtınasına karşı frenlendi (45 sn / 10 dk\'da 4), servis çalışanı boş yanıt üretmiyor',
+        'AI ve Drive çağrılarına bağlantı zaman aşımı; cron.php eşzamanlı çalışmaya karşı kilitli; mesaj geçmişi son 300 mesajla açılıyor; yavaş istekler (5 sn+) storage/error.log\'a yazılıyor',
+    ],
     '6.10.6' => [
         'KÖK NEDEN BULUNDU ve kapatıldı: migration listesinde eski sürümden kalan bir komut, HER güncellemede form alan tipleri kolonunu önce eski dar hâline çevirip bölüm/çoklu seçim/çoklu dosya tiplerini siliyor, sonra yeniden genişletiyordu — veri her turda kayboluyordu. Komut kaldırıldı; tam güncelleme simülasyonuyla verilerin artık hayatta kaldığı kanıtlandı',
         'Aynı desenden ikinci bomba: her güncellemede STAJYER kullanıcıların rolü de siliniyordu — o da kapatıldı',
@@ -709,7 +779,9 @@ function badge(string $setting_value, array $sozluk, string $sinifOn = ''): stri
 /* ---------------- Notifications & Activity ---------------- */
 
 function notify(int $userId, string $title, string $message = '', string $link = '', string $category = 'gorev', bool $email = true): void {
-    if ($userId === (int)(user()['id'] ?? 0)) return; // no self-notifications
+    // No self-notifications for a user's own actions — but the scheduled jobs are
+    // the system acting, so the user whose page load triggered them still gets theirs
+    if (empty($GLOBALS['sada_system_actor']) && $userId === (int)(user()['id'] ?? 0)) return;
     $alici = row("SELECT * FROM users WHERE id=? AND is_active=1", [$userId]);
     if (!$alici) return;
     [$panelOpen, $emailOpen] = notification_pref($alici, $category);
@@ -719,8 +791,14 @@ function notify(int $userId, string $title, string $message = '', string $link =
         'link' => $link, 'is_read' => 0, 'created' => date('Y-m-d H:i:s'),
     ]);
     if ($email && $emailOpen && setting('eposta_bildirim') === '1' && setting('smtp_aktif') === '1') {
-        require_once __DIR__ . '/mailer.php';
-        send_email($alici['email'], $title, $message . ($link ? "\n\nGörüntüle: " . full_url($link) : ''));
+        // The mail leaves after the response: an announcement to 15 people used to be
+        // 15 SMTP transactions the clicking user waited on (minutes when the MX is slow)
+        $to = $alici['email']; $text = $message . ($link ? "\n\nGörüntüle: " . full_url($link) : '');
+        after_response(function () use ($to, $title, $text) {
+            if (sada_deadline_passed()) return;
+            require_once __DIR__ . '/mailer.php';
+            send_email($to, $title, $text);
+        });
     }
 }
 
@@ -831,12 +909,36 @@ function notify_mentions(string $tagsJson, string $title, string $message, strin
  * Requires no cron setup on the server: triggered hourly during page loads.
  * Optionally, /cron.php can also be wired to a real cron job.
  */
+/**
+ * Atomic once-per-value claim (e.g. once per day): exactly one caller gets true.
+ * The old "read, compare, then write" pairs let two simultaneous requests both
+ * pass the check and send every reminder twice.
+ */
+function claim_once(string $key, string $value): bool {
+    if (val("SELECT setting_value FROM settings WHERE setting_key=?", [$key]) === $value) return false; // cheap read first
+    $st = q("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE setting_value = IF(setting_value = VALUES(setting_value), setting_value, VALUES(setting_value))", [$key, $value]);
+    return $st->rowCount() > 0; // 1 = inserted, 2 = changed, 0 = already claimed
+}
+
+/** Atomic interval claim: true for the single caller that moves the timestamp forward. */
+function claim_interval(string $key, int $seconds): bool {
+    $now = time();
+    $last = val("SELECT setting_value FROM settings WHERE setting_key=?", [$key]);
+    if ($last !== false && (int)$last > $now - $seconds) return false; // cheap read first: no writes on ordinary page loads
+    if ($last === false) q("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, '0')", [$key]);
+    $st = q("UPDATE settings SET setting_value=? WHERE setting_key=? AND CAST(setting_value AS UNSIGNED) <= ?", [(string)$now, $key, $now - $seconds]);
+    return $st->rowCount() > 0;
+}
+
 function run_recurring_jobs(bool $force = false): int {
-    $last = (int)val("SELECT setting_value FROM settings WHERE setting_key='son_tekrar_kontrol'");
-    if (!$force && time() - $last < 3600) return 0;
-    q("INSERT INTO settings (setting_key, setting_value) VALUES ('son_tekrar_kontrol', ?) ON DUPLICATE KEY UPDATE setting_value=?", [time(), time()]);
+    if ($force) q("INSERT INTO settings (setting_key, setting_value) VALUES ('son_tekrar_kontrol', ?) ON DUPLICATE KEY UPDATE setting_value=?", [time(), time()]);
+    elseif (!claim_interval('son_tekrar_kontrol', 3600)) return 0;
+    $GLOBALS['sada_system_actor'] = true;
 
     $count = 0;
+    // Housekeeping: the login log only matters for the 15-minute lockout window
+    q("DELETE FROM login_attempts WHERE created < DATE_SUB(NOW(), INTERVAL 30 DAY)");
     foreach (rows("SELECT * FROM tasks WHERE `repeat`!='yok'") as $g) {
         $periodKey = $g['repeat'] === 'haftalik' ? date('o-W') : date('Y-m');
         if ($g['last_repeat'] === $periodKey) continue;
@@ -916,9 +1018,7 @@ function run_recurring_jobs(bool $force = false): int {
     }
 
     /* --- Daily digest: once a day per user — "what awaits you today" --- */
-    $lastSummary = val("SELECT setting_value FROM settings WHERE setting_key='son_gunluk_ozet'");
-    if ($lastSummary !== date('Y-m-d')) {
-        q("INSERT INTO settings (setting_key, setting_value) VALUES ('son_gunluk_ozet', ?) ON DUPLICATE KEY UPDATE setting_value=?", [date('Y-m-d'), date('Y-m-d')]);
+    if (claim_once('son_gunluk_ozet', date('Y-m-d'))) {
         $today = date('Y-m-d');
         foreach (rows("SELECT id FROM users WHERE is_active=1 AND role!='musteri'") as $person) {
             $kid = (int)$person['id'];
@@ -941,8 +1041,7 @@ function run_recurring_jobs(bool $force = false): int {
 
     /* --- Weekly manager digest: once every Monday --- */
     $buWeek = date('o-W');
-    if (date('N') == 1 && val("SELECT setting_value FROM settings WHERE setting_key='son_haftalik_ozet'") !== $buWeek) {
-        q("INSERT INTO settings (setting_key, setting_value) VALUES ('son_haftalik_ozet', ?) ON DUPLICATE KEY UPDATE setting_value=?", [$buWeek, $buWeek]);
+    if (date('N') == 1 && claim_once('son_haftalik_ozet', $buWeek)) {
         $hb = date('Y-m-d', strtotime('-7 days'));
         $summary = [];
         $t1 = (int)val("SELECT COUNT(*) FROM tasks WHERE status='tamamlandi' AND completion>=?", [$hb]);
@@ -973,14 +1072,14 @@ function run_recurring_jobs(bool $force = false): int {
 
     require_once __DIR__ . '/mailer.php'; // due/digest/drive mails below need it
 
-    /* --- Task due-date chain: notification + e-mail (max once per day) --- */
-    if (val("SELECT setting_value FROM settings WHERE setting_key='last_due_check'") !== date('Y-m-d')) {
-        q("INSERT INTO settings (setting_key, setting_value) VALUES ('last_due_check', ?) ON DUPLICATE KEY UPDATE setting_value=?", [date('Y-m-d'), date('Y-m-d')]);
+    /* --- Task due-date chain: notification (+ e-mail via notify's preferences), max once per day --- */
+    if (claim_once('last_due_check', date('Y-m-d'))) {
         $dueTasks = rows("SELECT g.id, g.title, g.due_date, g.assignee_id,
             (SELECT GROUP_CONCAT(ga.user_id) FROM task_assignees ga WHERE ga.task_id=g.id) assignee_ids
             FROM tasks g WHERE g.is_archived=0 AND g.status!='tamamlandi' AND g.due_date IS NOT NULL
             AND g.due_date <= DATE_ADD(CURDATE(), INTERVAL 1 DAY)");
         foreach ($dueTasks as $dt) {
+            if (sada_deadline_passed()) break;
             $who = array_filter(array_unique(array_merge([(int)$dt['assignee_id']], array_map('intval', explode(',', (string)$dt['assignee_ids'])))));
             $overdue = $dt['due_date'] < date('Y-m-d');
             foreach ($who as $uid) {
@@ -988,16 +1087,15 @@ function run_recurring_jobs(bool $force = false): int {
                 $body = $overdue
                     ? 'Son tarihi ' . format_date($dt['due_date']) . ' olan görev hâlâ tamamlanmadı.'
                     : 'Görevin son tarihi yarın (' . format_date($dt['due_date']) . ').';
+                // notify() mails too (when e-mail notifications are on) — a second explicit
+                // send here used to double every reminder and double the SMTP time
                 notify($uid, $title, $body, 'task.php?id=' . $dt['id'], 'gorev');
-                $mail = val("SELECT email FROM users WHERE id=? AND is_active=1", [$uid]);
-                if ($mail) send_email($mail, $title, $body . "\n\nGörev: " . full_url('task.php?id=' . $dt['id']));
             }
         }
     }
 
     /* --- Daily manager digest e-mail (first run of the day after 07:00) --- */
-    if ((int)date('G') >= 7 && val("SELECT setting_value FROM settings WHERE setting_key='last_daily_digest'") !== date('Y-m-d')) {
-        q("INSERT INTO settings (setting_key, setting_value) VALUES ('last_daily_digest', ?) ON DUPLICATE KEY UPDATE setting_value=?", [date('Y-m-d'), date('Y-m-d')]);
+    if ((int)date('G') >= 7 && claim_once('last_daily_digest', date('Y-m-d'))) {
         $overdueList = rows("SELECT g.title, g.due_date, u.name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id WHERE g.is_archived=0 AND g.status!='tamamlandi' AND g.due_date < CURDATE() ORDER BY g.due_date LIMIT 15");
         $todayShoots = rows("SELECT title, start FROM events WHERE type='cekim' AND DATE(start)=CURDATE()");
         $pendingApprovals = (int)val("SELECT COUNT(*) FROM approvals WHERE status='bekliyor'");
@@ -1010,6 +1108,7 @@ function run_recurring_jobs(bool $force = false): int {
             if ($missingDrive) $ozet .= "Drive'a aktarılmamış çekim: $missingDrive\n";
             $ozet .= "\nPanel: " . full_url('index.php');
             foreach (rows("SELECT email FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $yd) {
+                if (sada_deadline_passed()) break;
                 if ($yd['email']) send_email($yd['email'], '📋 SADA One günlük özet — ' . date('d.m.Y'), $ozet);
             }
         }
@@ -1019,8 +1118,7 @@ function run_recurring_jobs(bool $force = false): int {
      * Semi-automatic: a finished shoot without a Drive link/mark → warn the crew.
      * Fully automatic (if the service account is configured): look into the shoot's
      * (or client's) Drive folder; files created after the shoot start → auto-mark. */
-    if (val("SELECT setting_value FROM settings WHERE setting_key='last_drive_check'") !== date('Y-m-d')) {
-        q("INSERT INTO settings (setting_key, setting_value) VALUES ('last_drive_check', ?) ON DUPLICATE KEY UPDATE setting_value=?", [date('Y-m-d'), date('Y-m-d')]);
+    if (claim_once('last_drive_check', date('Y-m-d'))) {
         require_once __DIR__ . '/google-drive.php';
         $driveOn = drive_configured();
         $driveToken = $driveOn ? drive_token() : null;
@@ -1032,16 +1130,13 @@ function run_recurring_jobs(bool $force = false): int {
             AND COALESCE(e.`end`, e.start) < DATE_SUB(NOW(), INTERVAL 24 HOUR)
             AND e.start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
         foreach ($pendingShoots as $sh) {
+            if (sada_deadline_passed()) break; // the rest is picked up tomorrow
             $folder = $sh['drive_folder_id'] ?: $sh['client_folder'];
             $who = array_filter(array_unique(array_merge(
                 array_map('intval', explode(',', (string)$sh['participant_ids'])),
                 [(int)$sh['created_by'], (int)$sh['manager_id']])));
             $uyar = function (string $title, string $text) use ($who) {
-                foreach ($who as $uid) {
-                    notify($uid, $title, $text, 'shoot-list.php', 'gorev');
-                    $mail = val("SELECT email FROM users WHERE id=? AND is_active=1", [$uid]);
-                    if ($mail) send_email($mail, $title, $text . "\n\nÇekim listesi: " . full_url('shoot-list.php'));
-                }
+                foreach ($who as $uid) notify($uid, $title, $text, 'shoot-list.php', 'gorev'); // mails per preference
             };
             // A link counts as human confirmation only when someone actually ADDED it —
             // auto-created folders store their own URL in drive_link, that must not count
@@ -1078,8 +1173,7 @@ function run_recurring_jobs(bool $force = false): int {
      * Window 2: first 3 days of the month → remind about the PREVIOUS month
      * Day 4:    still empty               → escalate to admins/PMs as overdue */
     $today = date('Y-m-d');
-    if (val("SELECT setting_value FROM settings WHERE setting_key='last_report_reminder'") !== $today) {
-        q("INSERT INTO settings (setting_key, setting_value) VALUES ('last_report_reminder', ?) ON DUPLICATE KEY UPDATE setting_value=?", [$today, $today]);
+    if (claim_once('last_report_reminder', $today)) {
         $day = (int)date('j');
         $lastDay = (int)date('t');
         $missing = function (string $period): array {
@@ -1140,7 +1234,10 @@ function live_hash_task(int $id): string {
 }
 
 function live_hash_list(): string {
-    return md5((string)val("SELECT GROUP_CONCAT(CONCAT_WS(':',id,status,sort_order,is_archived,COALESCE(assignee_id,0)) ORDER BY id) FROM tasks"));
+    // Aggregates instead of GROUP_CONCAT: that one silently truncates at
+    // group_concat_max_len (1 KB ≈ 60 tasks), after which the hash stopped changing
+    return md5(json_encode(row("SELECT COUNT(*) c, COALESCE(MAX(id),0) m,
+        COALESCE(SUM(CRC32(CONCAT_WS(':',id,status,sort_order,is_archived,COALESCE(assignee_id,0)))),0) s FROM tasks")));
 }
 
 /** Has the user enabled the 'only steps I am responsible for' preference? */

@@ -278,7 +278,7 @@ async function reaction(commentId, emoji) {
     const j = await api('reaction_toggle', { comment_box_id: commentId, emoji });
     if (!j.ok) return;
     // Without refresh: update / create / remove the existing chip
-    let chip = document.querySelector(`.tepki-cip[data-yorum="${commentId}"][data-emoji="${CSS.escape(emoji)}"]`);
+    let chip = document.querySelector(`.tepki-cip[data-comment_box="${commentId}"][data-emoji="${CSS.escape(emoji)}"]`);
     if (j.adet === 0) { if (chip) chip.remove(); }
     else if (chip) {
         chip.querySelector('.tepki-adet').textContent = j.adet;

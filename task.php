@@ -312,7 +312,7 @@ const CHECK_SVG = '<svg width="20" fill="none" stroke="currentColor" stroke-widt
 async function statusChange(status) {
     const j = await api('task_status', { id: <?= $id ?>, status });
     if (j.ok) { toast('Durum güncellendi', 'basari'); liveRefresh(); setTimeout(() => location.reload(), 450); }
-    else setTimeout(() => location.reload(), 1600); // if the lock rejected it, revert to the old value
+    else if (!['network', 'timeout'].includes(j.error)) setTimeout(() => location.reload(), 1600); // the lock rejected it → revert to the stored value (a network failure must not add a reload to a struggling server)
 }
 function stepOwner(id) { document.getElementById('stepOwnerId').value = id; modalOpen('modalStepOwner'); }
 

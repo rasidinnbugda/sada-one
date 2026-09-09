@@ -30,7 +30,7 @@ function ai_http(string $url, array $headers, array $body, ?string &$transportEr
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 180,
+        CURLOPT_TIMEOUT => 90, CURLOPT_CONNECTTIMEOUT => 8, // a dead endpoint fails in seconds, not minutes
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE),
         CURLOPT_HTTPHEADER => array_merge(['Content-Type: application/json'], $headers),

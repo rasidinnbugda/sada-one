@@ -52,7 +52,8 @@ $backups = is_dir(ROOT . '/backups') ? array_reverse(glob(ROOT . '/backups/backu
 
 page_start('Güncelleme', 'update');
 ?>
-<div class="sayfa-ust"><div><div class="sayfa-baslik">Sistem Güncelleme</div><div class="sayfa-alt">Mevcut sürüm: <b>v<?= APP_VERSION ?></b> — paketle veya GitHub üzerinden güncelleyin</div></div></div>
+<div class="sayfa-ust"><div><div class="sayfa-baslik">Sistem Güncelleme</div><div class="sayfa-alt">Mevcut sürüm: <b>v<?= APP_VERSION ?></b> — paketle veya GitHub üzerinden güncelleyin
+    · PHP <?= PHP_VERSION ?> (<?= e(php_sapi_name()) ?>) · arka plan işleri: <b><?= function_exists('litespeed_finish_request') || function_exists('fastcgi_finish_request') ? 'sayfa teslim edildikten sonra ✓' : 'sayfa sonunda (erken teslim desteği yok)' ?></b></div></div></div>
 
 <?php if ($result): [$ok, $message, $d] = $result; ?>
 <div class="kart mb-3" style="border-color:<?= $ok ? 'var(--basari)' : 'var(--tehlike)' ?>">

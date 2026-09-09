@@ -126,10 +126,16 @@ function ckEdit(c) {
 <script>
 // Drive folder contents render as their own section at the bottom of each card.
 // app.js (which defines api/esc) loads at the end of the body, so wait for it.
-addEventListener('DOMContentLoaded', () => {
-document.querySelectorAll('.drive-bolum').forEach(async bolum => {
-    const j = await api('drive_files', { id: bolum.dataset.driveEvent }).catch(() => null);
-    if (!j || !j.ok || !j.files.length) return;
+addEventListener('DOMContentLoaded', async () => {
+// One batched request for every card: N parallel calls used to occupy N PHP
+// processes on the server and a Google API round trip each, on every visit.
+const bolumler = Array.from(document.querySelectorAll('.drive-bolum'));
+if (!bolumler.length) return;
+const toplu = await api('drive_files_batch', { ids: bolumler.map(b => b.dataset.driveEvent) }).catch(() => null);
+if (!toplu || !toplu.ok) return;
+bolumler.forEach(bolum => {
+    const j = toplu.events[bolum.dataset.driveEvent];
+    if (!j || !j.files.length) return;
     const ozet = [];
     if (j.counts.video) ozet.push('🎬 ' + j.counts.video + ' video');
     if (j.counts.image) ozet.push('🖼️ ' + j.counts.image + ' fotoğraf');

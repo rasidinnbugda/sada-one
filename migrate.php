@@ -10,7 +10,12 @@ require __DIR__ . '/includes/init.php';
 $u = require_admin();
 
 require_once __DIR__ . '/includes/migration.php';
+// Same lock as the automatic self-heal: never two migration runs at once
+$kilit = 'sada_migrate_' . substr(md5((string)($GLOBALS['config']['db_name'] ?? '')), 0, 20);
+if ((int)val("SELECT GET_LOCK(?, 20)", [$kilit]) !== 1) die('Başka bir şema güncellemesi sürüyor, biraz sonra tekrar deneyin.');
 $results = run_migrations(db());
+q("INSERT INTO settings (setting_key, setting_value) VALUES ('schema_version', ?) ON DUPLICATE KEY UPDATE setting_value=?", [APP_VERSION, APP_VERSION]);
+val("SELECT RELEASE_LOCK(?)", [$kilit]);
 ?>
 <!DOCTYPE html>
 <html lang="tr" data-theme="lime">
@@ -20,7 +25,7 @@ $results = run_migrations(db());
 <p class="metin-2" style="margin-bottom:24px">v2 şema değişiklikleri uygulandı. "Atlandı" satırları zaten güncel olan kısımlardır.</p>
 <?php foreach ($results as [$status, $sql]): ?>
 <div style="padding:9px 14px;margin-bottom:6px;border-radius:10px;font-size:12.5px;font-family:monospace;background:var(--surface);border:1px solid var(--border)">
-    <?= ['ok' => '✅', 'skip' => '⏭️', 'error' => '❌'][$status] ?> <?= e(mb_substr($sql, 0, 110)) ?>
+    <?= ['ok' => '✅', 'skip' => '⏭️', 'hata' => '❌', 'error' => '❌'][$status] ?? '❔' ?> <?= e(mb_substr($sql, 0, 110)) ?>
 </div>
 <?php endforeach; ?>
 <div style="margin-top:24px;padding:14px 18px;border-radius:12px;background:var(--parlak);border:1px solid var(--border-2)">

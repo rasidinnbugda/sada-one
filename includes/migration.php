@@ -128,9 +128,19 @@ function migration_commands(): array {
 /** Runs all migration commands; returns [status, sql] pairs. status: ok|atla|hata */
 function run_migrations(PDO $pdo): array {
     $results = [];
-    // Legacy Turkish schemas are renamed to English first (no-op on fresh installs)
-    require_once __DIR__ . '/legacy-migration.php';
-    foreach (legacy_localization($pdo) as $l) $results[] = [str_starts_with($l, 'ERR') ? 'error' : 'ok', 'legacy: ' . $l];
+    // Legacy Turkish schemas are renamed to English first (no-op on fresh installs).
+    // Once a full pass finds nothing left to rename it is remembered and skipped:
+    // its ~700 information_schema lookups cost seconds on shared MySQL servers.
+    $legacyDone = false;
+    try { $legacyDone = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='legacy_localized'")->fetchColumn() === '1'; } catch (PDOException $e) {}
+    if (!$legacyDone) {
+        require_once __DIR__ . '/legacy-migration.php';
+        $legacy = legacy_localization($pdo);
+        foreach ($legacy as $l) $results[] = [str_starts_with($l, 'ERR') ? 'hata' : 'ok', 'legacy: ' . $l];
+        if (!$legacy) {
+            try { $pdo->exec("INSERT INTO settings (setting_key, setting_value) VALUES ('legacy_localized', '1') ON DUPLICATE KEY UPDATE setting_value='1'"); } catch (PDOException $e) {}
+        }
+    }
     // Table renames must run BEFORE the CREATE IF NOT EXISTS list: otherwise an empty
     // new-named table gets created first, the rename then collides, and the old data
     // is stranded in the old table. If both exist, keep the one that holds the data.
@@ -149,20 +159,37 @@ function run_migrations(PDO $pdo): array {
     try {
         if ($pdo->query("SHOW TABLES LIKE 'client_contacts'")->fetchColumn()
             && !(int)$pdo->query('SELECT COUNT(*) FROM client_contacts')->fetchColumn()) {
-            $pdo->exec("INSERT INTO client_contacts (client_id, name, email, phone, created)
+            $n = $pdo->exec("INSERT INTO client_contacts (client_id, name, email, phone, created)
                 SELECT id, COALESCE(NULLIF(contact_name,''), 'İletişim'), NULLIF(contact_email,''), NULLIF(contact_phone,''), NOW()
                 FROM clients WHERE COALESCE(contact_name,'') != '' OR COALESCE(contact_email,'') != ''");
-            $results[] = ['ok', 'seed: client_contacts'];
+            if ($n) $results[] = ['ok', 'seed: client_contacts'];
         }
     } catch (PDOException $e) { /* tablo bu turda oluşuyorsa sonraki çalıştırmada dolar */ }
+    // Commands that already succeeded (or were confirmed as "already there") are
+    // remembered by hash and never re-executed: a MODIFY/UPDATE without a guard
+    // used to rebuild its table on EVERY run, holding metadata locks the whole
+    // site waits on. Only genuinely failed commands are retried next time.
+    $done = [];
+    try {
+        $raw = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='migration_done'")->fetchColumn();
+        $done = array_fill_keys(json_decode((string)$raw, true) ?: [], true);
+    } catch (PDOException $e) { /* fresh install without settings yet */ }
     foreach (migration_commands() as $sql) {
+        $h = substr(md5($sql), 0, 16);
+        if (isset($done[$h])) { $results[] = ['skip', $sql]; continue; }
         try {
             $pdo->exec($sql);
             $results[] = ['ok', $sql];
+            $done[$h] = true;
         } catch (PDOException $e) {
             $zaten = (strpos($e->getMessage(), 'Duplicate') !== false || strpos($e->getMessage(), 'exists') !== false || strpos($e->getMessage(), "doesn't exist") !== false);
+            if ($zaten) $done[$h] = true;
             $results[] = [$zaten ? 'skip' : 'hata', $sql . ($zaten ? '' : ' — ' . $e->getMessage())];
         }
     }
+    try {
+        $st = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('migration_done', ?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)");
+        $st->execute([json_encode(array_keys($done))]);
+    } catch (PDOException $e) { /* not fatal: the next run simply re-checks */ }
     return $results;
 }

@@ -175,8 +175,12 @@ function requestFormOpen(id) {
     if (sekmeli) {
         const kap = document.getElementById('requestFields');
         kap.querySelector('.rt-panel')?.setAttribute('data-gezildi', '1');
-        kap.addEventListener('input', rtIlerleme);
-        kap.addEventListener('change', rtIlerleme);
+        // the container persists across template picks — bind once, not once per render
+        if (!kap.dataset.ilerlemeBagli) {
+            kap.dataset.ilerlemeBagli = '1';
+            kap.addEventListener('input', rtIlerleme);
+            kap.addEventListener('change', rtIlerleme);
+        }
         rtIlerleme();
     }
     rtButonGuncelle();

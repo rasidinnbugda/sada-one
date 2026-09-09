@@ -5,7 +5,8 @@
 
 function page_start(string $title, string $activePage = ''): void {
     $u = user();
-    if ($u && is_staff()) { try { run_recurring_jobs(); } catch (Throwable $e) { /* silent */ } }
+    // Scheduled housekeeping runs after the page has been sent — never inside the page wait
+    if ($u && is_staff()) after_response(fn() => run_recurring_jobs());
     $theme = isset(THEMES[$u['theme'] ?? '']) ? $u['theme'] : setting('varsayilan_tema', 'lime');
     $siteName = setting('site_adi', 'SADA One');
     $notificationCount = $u ? (int)val("SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0", [$u['id']]) : 0;
@@ -99,6 +100,9 @@ function page_start(string $title, string $activePage = ''): void {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="assets/img/icon-192.png">
+<?php /* conservative = prerender on pointer-down only. "moderate" prerendered every
+         hovered link: each one a full hidden page render (queries + live-sync timers)
+         multiplying the PHP processes a single user occupied on shared hosting. */ ?>
 <script type="speculationrules">
 {"prerender": [{"where": {"and": [
     {"href_matches": "/*"},
@@ -106,7 +110,7 @@ function page_start(string $title, string $activePage = ''): void {
     {"not": {"href_matches": "/*export*"}},
     {"not": {"href_matches": "/*update_row*"}},
     {"not": {"href_matches": "/*install*"}}
-]}, "eagerness": "moderate"}]}
+]}, "eagerness": "conservative"}]}
 </script>
 <?php if (theme_favicon()): ?><link rel="icon" href="uploads/<?= e(theme_favicon()) ?>"><?php endif; ?>
 </head>

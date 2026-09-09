@@ -3,7 +3,14 @@
  * SADA One — Email sending
  * Sends via SMTP (SSL); falls back to PHP mail() when SMTP is disabled.
  * For Hostinger: smtp.hostinger.com, port 465 (SSL).
+ *
+ * One SMTP connection is opened per request and reused for every message
+ * (batches such as the daily reminders used to open/handshake/authenticate a
+ * fresh TLS session per mail). Every socket read has a hard timeout, so a
+ * silent server can no longer hold a request open for minutes.
  */
+
+const SMTP_IO_TIMEOUT = 20; // seconds a single SMTP response may take
 
 function send_email(string $alici, string $topic, string $text): bool {
     // Security: reject malformed addresses (also blocks CRLF header injection)
@@ -47,44 +54,104 @@ function send_email_html(string $to, string $subject, string $html, ?string $fro
     return smtp_send($to, $subject, $html, $sender, $siteName);
 }
 
-function smtp_send(string $alici, string $topic, string $html, string $sender, string $sendName): bool {
+/**
+ * The request's shared SMTP session. Returns a `send(command): reply` closure,
+ * or null when connecting/authenticating failed ($GLOBALS['smtp_last_error']).
+ * Pass $close=true to QUIT and drop the connection (done automatically at shutdown).
+ */
+function smtp_connection(bool $close = false): ?callable {
+    static $sock = null, $send = null, $failed = false, $shutdownHooked = false;
+
+    if ($close) {
+        if ($sock) { @fwrite($sock, "QUIT\r\n"); @fclose($sock); }
+        $sock = null; $send = null;
+        return null;
+    }
+    if ($sock) {
+        $meta = stream_get_meta_data($sock);
+        if (!$meta['eof'] && !$meta['timed_out']) return $send;
+        @fclose($sock); $sock = null; $send = null;
+    }
+    // A rejected login is not retried within the request: every message in a
+    // batch would otherwise hammer the server with the same bad credentials.
+    if ($failed) return null;
+
     $host = setting('smtp_host');
     $port = (int)setting('smtp_port', '465');
     $user = setting('smtp_kullanici');
     $password = setting('smtp_sifre');
 
     $adres = ($port === 465 ? 'ssl://' : '') . $host;
-    $sock = @fsockopen($adres, $port, $errno, $errstr, 10);
-    if (!$sock) { $GLOBALS['smtp_last_error'] = "Sunucuya bağlanılamadı ($host:$port): $errstr"; return false; }
+    // Inside a background-work budget (see init.php) the per-read timeout shrinks to what is left
+    $ioTimeout = SMTP_IO_TIMEOUT;
+    if (isset($GLOBALS['sada_deadline'])) $ioTimeout = (int)max(3, min(SMTP_IO_TIMEOUT, $GLOBALS['sada_deadline'] - microtime(true)));
+    $s = @fsockopen($adres, $port, $errno, $errstr, min(10, $ioTimeout));
+    if (!$s) { $GLOBALS['smtp_last_error'] = "Sunucuya bağlanılamadı ($host:$port): $errstr"; $failed = true; return null; }
+    stream_set_timeout($s, $ioTimeout);
 
-    $read = function () use ($sock) {
+    $read = function () use ($s, $ioTimeout) {
         $data = '';
-        while ($row_item = fgets($sock, 515)) {
+        $deadline = microtime(true) + $ioTimeout + 5; // absolute cap: a trickling server can't stretch the per-read timeout
+        while (microtime(true) < $deadline && ($row_item = fgets($s, 515))) {
             $data .= $row_item;
             if (isset($row_item[3]) && $row_item[3] === ' ') break;
         }
+        if ($data === '' && (stream_get_meta_data($s)['timed_out'] ?? false)) {
+            $GLOBALS['smtp_last_error'] = 'SMTP sunucusu ' . $ioTimeout . ' sn içinde yanıt vermedi.';
+        }
         return $data;
     };
-    $send = function ($komut) use ($sock, $read) {
-        fwrite($sock, $komut . "\r\n");
+    $sendFn = function (string $komut) use ($s, $read) {
+        fwrite($s, $komut . "\r\n");
         return $read();
     };
 
     try {
         $read();
-        $send('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+        $sendFn('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
         if ($port === 587) { // STARTTLS
-            $send('STARTTLS');
-            stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
-            $send('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+            $sendFn('STARTTLS');
+            stream_socket_enable_crypto($s, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+            $sendFn('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
         }
-        $send('AUTH LOGIN');
-        $send(base64_encode($user));
-        $reply = $send(base64_encode($password));
-        if (strpos($reply, '235') !== 0) { $GLOBALS['smtp_last_error'] = 'Kimlik doğrulama reddedildi: ' . trim(mb_substr((string)$reply, 0, 160)); fclose($sock); return false; }
-        $send("MAIL FROM:<$sender>");
-        $send("RCPT TO:<$alici>");
-        $send('DATA');
+        $sendFn('AUTH LOGIN');
+        $sendFn(base64_encode($user));
+        $reply = $sendFn(base64_encode($password));
+        if (strpos($reply, '235') !== 0) {
+            $GLOBALS['smtp_last_error'] = $reply === '' ? ($GLOBALS['smtp_last_error'] ?? 'SMTP yanıt vermedi')
+                : 'Kimlik doğrulama reddedildi: ' . trim(mb_substr((string)$reply, 0, 160));
+            @fclose($s); $failed = true; return null;
+        }
+    } catch (Throwable $e) {
+        @fclose($s); $failed = true;
+        $GLOBALS['smtp_last_error'] = 'SMTP bağlantı hatası: ' . $e->getMessage();
+        return null;
+    }
+
+    $sock = $s; $send = $sendFn;
+    if (!$shutdownHooked) { $shutdownHooked = true; register_shutdown_function(fn() => smtp_connection(true)); }
+    return $send;
+}
+
+function smtp_send(string $alici, string $topic, string $html, string $sender, string $sendName): bool {
+    $send = smtp_connection();
+    if (!$send) return false;
+
+    $fail = function (string $reply) {
+        $GLOBALS['smtp_last_error'] = trim(mb_substr((string)$reply, 0, 200)) ?: ($GLOBALS['smtp_last_error'] ?? 'SMTP yanıt vermedi');
+        // an empty reply means the socket is dead — drop it so the next mail reconnects
+        if ($reply === '') smtp_connection(true);
+        return false;
+    };
+
+    try {
+        $send('RSET'); // clear any half-finished transaction of a previous message
+        $reply = $send("MAIL FROM:<$sender>");
+        if (strpos($reply, '250') !== 0) return $fail($reply);
+        $reply = $send("RCPT TO:<$alici>");
+        if (strpos($reply, '250') !== 0 && strpos($reply, '251') !== 0) return $fail($reply);
+        $reply = $send('DATA');
+        if (strpos($reply, '354') !== 0) return $fail($reply);
         // SMTP caps lines at ~1000 octets (RFC 5321) and Gmail enforces it: a
         // several-KB single-line HTML body gets "500 Line too long". Wrap at
         // spaces (whitespace inside HTML/CSS is safe) and dot-stuff leading dots.
@@ -96,16 +163,11 @@ function smtp_send(string $alici, string $topic, string $html, string $sender, s
             . "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n"
             . $govde . "\r\n.";
         $reply = $send($message);
-        $send('QUIT');
-        fclose($sock);
-        if (strpos($reply, '250') !== 0) {
-            // surface the server's actual answer so failures are diagnosable
-            $GLOBALS['smtp_last_error'] = trim(mb_substr((string)$reply, 0, 200));
-            return false;
-        }
+        if (strpos($reply, '250') !== 0) return $fail($reply);
         return true;
     } catch (Throwable $e) {
-        @fclose($sock);
+        $GLOBALS['smtp_last_error'] = 'SMTP hatası: ' . $e->getMessage();
+        smtp_connection(true);
         return false;
     }
 }

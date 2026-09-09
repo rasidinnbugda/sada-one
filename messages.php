@@ -27,7 +27,9 @@ $activeChannel = null;
 foreach ($channels as $k) if ($k['id'] == $activeChannelId) $activeChannel = $k;
 if (!$activeChannel && $channels) { $activeChannel = $channels[0]; $activeChannelId = $activeChannel['id']; }
 
-$messages = $activeChannel ? rows("SELECT m.*, us.name, us.color FROM messages m JOIN users us ON us.id=m.user_id WHERE m.channel_id=? ORDER BY m.id", [$activeChannelId]) : [];
+// Last 300 messages only — a long-lived channel's full history is not rendered on every open
+$messages = $activeChannel ? rows("SELECT * FROM (SELECT m.*, us.name, us.color FROM messages m JOIN users us ON us.id=m.user_id
+    WHERE m.channel_id=? ORDER BY m.id DESC LIMIT 300) son ORDER BY id", [$activeChannelId]) : [];
 if ($activeChannel) update_row('channel_members', ['last_read' => date('Y-m-d H:i:s')], 'channel_id=? AND user_id=?', [$activeChannelId, $u['id']]);
 $lastMessageId = $messages ? end($messages)['id'] : 0;
 
@@ -237,13 +239,15 @@ if (form) {
     });
 }
 
-// Fetch new messages (polling)
-if (channelId) setInterval(async () => {
+// Fetch new messages (polling — next round only after the previous answer, see sadaPoll).
+// app.js defines sadaPoll and loads at the end of the body, so wait for it.
+if (channelId) addEventListener('DOMContentLoaded', () => sadaPoll(4000, async () => {
     const j = await api('message_fetch', { channel_id: channelId, last_id: lastId });
-    if (j.ok && j.messages.length) {
+    if (!j.ok) throw new Error('poll');
+    if (j.messages.length) {
         j.messages.forEach(m => { if (!m.mine) balonAdd(m); lastId = Math.max(lastId, m.id); });
     }
-}, 4000);
+}));
 
 // Channel member selection
 const channelForm = document.getElementById('channelForm');

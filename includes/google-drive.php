@@ -123,7 +123,7 @@ function drive_token(?string &$error = null): ?string {
 function drive_http(string $url, ?string $body = null, array $headers = []): ?string {
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_HTTPHEADER => $headers]);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_HTTPHEADER => $headers]);
         if ($body !== null) { curl_setopt($ch, CURLOPT_POST, true); curl_setopt($ch, CURLOPT_POSTFIELDS, $body); }
         $out = curl_exec($ch);
         curl_close($ch);
@@ -182,6 +182,24 @@ function drive_create_folder(string $name, ?string $parentId = null, ?string $to
  * ['ok' => bool, 'files' => [['name','link','mime','created'],...], 'error' => ?string].
  */
 function drive_list_files(string $folderId, int $limit = 12): array {
+    // Short file cache: the shoot list asks for every card on each visit, and each
+    // answer is a 1–2 s Google round trip on the server — 3 minutes of staleness
+    // is invisible to the crew, the saved API quota and PHP time are not.
+    $cacheDir = ROOT . '/storage/cache';
+    $cacheFile = $cacheDir . '/drive-' . md5($folderId . '|' . $limit) . '.json';
+    if (is_file($cacheFile) && filemtime($cacheFile) > time() - 180) {
+        $c = json_decode((string)file_get_contents($cacheFile), true);
+        if (is_array($c) && !empty($c['ok'])) return $c;
+    }
+    $r = drive_list_files_live($folderId, $limit);
+    if ($r['ok']) {
+        if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+        @file_put_contents($cacheFile, json_encode($r, JSON_UNESCAPED_UNICODE), LOCK_EX);
+    }
+    return $r;
+}
+
+function drive_list_files_live(string $folderId, int $limit = 12): array {
     $token = drive_token($error);
     if (!$token) return ['ok' => false, 'files' => [], 'error' => $error];
     $url = 'https://www.googleapis.com/drive/v3/files?' . http_build_query([
@@ -200,6 +218,18 @@ function drive_list_files(string $folderId, int $limit = 12): array {
             'mime' => $d['mimeType'] ?? '', 'created' => $d['createdTime'] ?? ''];
     }
     return ['ok' => true, 'files' => $files, 'error' => null];
+}
+
+/** Shoot-card payload: files + type counts + folder link (shared by the single and batch endpoints). */
+function drive_files_summary(array $ev, array $files): array {
+    $counts = ['video' => 0, 'image' => 0, 'other' => 0];
+    foreach ($files as $d) {
+        if (str_starts_with($d['mime'], 'video/')) $counts['video']++;
+        elseif (str_starts_with($d['mime'], 'image/')) $counts['image']++;
+        else $counts['other']++;
+    }
+    return ['files' => $files, 'counts' => $counts, 'total' => count($files),
+        'folder' => $ev['drive_link'] ?: ('https://drive.google.com/drive/folders/' . $ev['drive_folder_id'])];
 }
 
 /** The panel's root shoots folder — created once, its id kept in settings. */

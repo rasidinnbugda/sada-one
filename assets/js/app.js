@@ -14,20 +14,26 @@
         const fd = new FormData();
         fd.append('action', action);
         fd.append('csrf', CSRF);
+        let hasFile = false;
         for (const k in data) {
-            if (data[k] instanceof File || data[k] instanceof Blob) fd.append(k, data[k]);
+            if (data[k] instanceof File || data[k] instanceof Blob) { fd.append(k, data[k]); hasFile = true; }
             else if (Array.isArray(data[k])) fd.append(k, JSON.stringify(data[k]));
             else fd.append(k, data[k] ?? '');
         }
+        // Every call has a deadline: a request that never answers used to leave the
+        // button on "İşleniyor..." forever and silently stop the polling chain.
+        const ms = hasFile ? 180000 : (action.startsWith('ai_') || action.startsWith('report_mail') || action === 'drive_files_batch' ? 120000 : 25000);
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), ms);
         try {
-            const r = await fetch('ajax.php', { method: 'POST', body: fd });
+            const r = await fetch('ajax.php', { method: 'POST', body: fd, signal: ctrl.signal });
             const j = await r.json();
             if (!j.ok && j.error) toast(j.error, 'hata');
             return j;
         } catch (e) {
-            toast('Bağlantı hatası. Tekrar deneyin.', 'hata');
-            return { ok: false, error: 'network' };
-        }
+            toast(e.name === 'AbortError' ? 'Sunucu yanıt vermedi (zaman aşımı). Tekrar deneyin.' : 'Bağlantı hatası. Tekrar deneyin.', 'hata');
+            return { ok: false, error: e.name === 'AbortError' ? 'timeout' : 'network' };
+        } finally { clearTimeout(timer); }
     };
 
     /* ---------- Toast ---------- */
@@ -107,7 +113,7 @@
             const entry = localStorage.getItem(setting_key);
             if (entry === 'acik') grup.classList.add('acik');
         }
-        grup.querySelector('[data-grup-btn]').addEventListener('click', () => {
+        grup.querySelector('[data-grup-btn]')?.addEventListener('click', () => {
             grup.classList.toggle('acik');
             localStorage.setItem(setting_key, grup.classList.contains('acik') ? 'acik' : 'kapali');
         });
@@ -184,18 +190,31 @@
         if (cubuk) { cubuk.style.width = '0'; cubuk.classList.remove('aktif'); }
     });
 
+    /* ---------- Polling helper ----------
+       The next round is scheduled only after the previous answer arrived: with a
+       plain setInterval a slow server made every open tab stack requests on top of
+       each other (10 s interval, 30 s answers → 3 in flight), which slowed the
+       server further — a self-feeding pile-up. Failures back off up to 2 min. */
+    window.sadaPoll = function (ms, fn) {
+        let wait = ms;
+        const tick = async () => {
+            if (!document.hidden) {
+                try { await fn(); wait = ms; } catch (e) { wait = Math.min(wait * 2, 120000); }
+            }
+            setTimeout(tick, wait);
+        };
+        setTimeout(tick, ms);
+    };
+
     /* ---------- Live notification counter: refresh every 45 s ---------- */
-    setInterval(async () => {
-        if (document.hidden) return;
-        try {
-            const j = await api('notification_count', {});
-            if (!j.ok) return;
-            const badge = document.querySelector('[data-notification-badge]');
-            if (!badge) return;
-            badge.textContent = j.count > 99 ? '99+' : j.count;
-            badge.style.display = j.count > 0 ? '' : 'none';
-        } catch (err) { /* fail silently */ }
-    }, 45000);
+    sadaPoll(45000, async () => {
+        const j = await api('notification_count', {});
+        if (!j.ok) throw new Error('poll');
+        const badge = document.querySelector('[data-notification-badge]');
+        if (!badge) return;
+        badge.textContent = j.count > 99 ? '99+' : j.count;
+        badge.style.display = j.count > 0 ? '' : 'none';
+    });
 
     /* ---------- Collapsible sections (My Steps etc.) ---------- */
     $$('[data-collapse]').forEach(box => {
@@ -203,7 +222,7 @@
         const entry = localStorage.getItem(setting_key);
         // collapsed by default; apply the saved preference if any
         if (entry === 'acik') box.classList.remove('kapali');
-        box.querySelector('[data-collapse-btn]').addEventListener('click', () => {
+        box.querySelector('[data-collapse-btn]')?.addEventListener('click', () => {
             box.classList.toggle('kapali');
             localStorage.setItem(setting_key, box.classList.contains('kapali') ? 'kapali' : 'acik');
         });
@@ -233,8 +252,9 @@
             else data[field.name] = field.files[0];
         });
 
-        const j = await api(form.dataset.ajax, data);
-        if (btn) { btn.disabled = false; btn.innerHTML = oldText; }
+        let j;
+        try { j = await api(form.dataset.ajax, data); }
+        finally { if (btn) { btn.disabled = false; btn.innerHTML = oldText; } }
 
         if (j.ok) {
             if (j.message) toast(j.message, 'basari');
@@ -554,16 +574,31 @@
         if ($('.modal-katman.acik') || $('.mention-acilir') || $('.kanban-kart.suruklenuyor')) return true;
         return false;
     }
-    setInterval(async () => {
-        if (!window.sadaLive || document.hidden || mesgulMu()) return;
-        try {
-            const j = await api('live_status', { context: sadaLive.context, id: sadaLive.id || 0 });
-            if (j.ok && j.hash !== sadaLive.hash) {
-                sadaLive.hash = j.hash;
-                location.reload();
-            }
-        } catch (e) { /* silent */ }
-    }, 10000);
+    // Reload guard: the list hash covers every task, so on a busy day one tab could
+    // reload every 10 s all day long. At most one auto-reload per 45 s, and after
+    // 4 reloads in 10 minutes the tab switches to a "Yenile" notice instead.
+    const canliReloadOk = () => {
+        let kayit = {};
+        try { kayit = JSON.parse(sessionStorage.getItem('sadaCanliReload') || '{}'); } catch (e) { /* ignore */ }
+        const simdi = Date.now();
+        const zamanlar = (kayit.z || []).filter(t => simdi - t < 600000);
+        if (zamanlar.length && simdi - zamanlar[zamanlar.length - 1] < 45000) return false;
+        if (zamanlar.length >= 4) return false;
+        zamanlar.push(simdi);
+        try { sessionStorage.setItem('sadaCanliReload', JSON.stringify({ z: zamanlar })); } catch (e) { /* ignore */ }
+        return true;
+    };
+    let canliUyarildi = false;
+    sadaPoll(10000, async () => {
+        if (!window.sadaLive || mesgulMu()) return;
+        const j = await api('live_status', { context: sadaLive.context, id: sadaLive.id || 0 });
+        if (!j.ok) throw new Error('poll');
+        if (j.hash !== sadaLive.hash) {
+            sadaLive.hash = j.hash;
+            if (canliReloadOk()) location.reload();
+            else if (!canliUyarildi) { canliUyarildi = true; toast('Sayfa içeriği değişti — güncel hâli için yenileyin.', 'info', 8000); }
+        }
+    });
 
     window.sadaBaglaCard = bagla_card; // for dynamic cards
 

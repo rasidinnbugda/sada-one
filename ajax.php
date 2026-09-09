@@ -156,14 +156,25 @@ case 'drive_files':
     if (!$ev || !$ev['drive_folder_id']) json_out(['ok' => false, 'error' => 'Klasör bağlı değil.']);
     $r = drive_list_files($ev['drive_folder_id'], 25);
     if (!$r['ok']) json_out(['ok' => false, 'error' => $r['error']]);
-    $counts = ['video' => 0, 'image' => 0, 'other' => 0];
-    foreach ($r['files'] as $d) {
-        if (str_starts_with($d['mime'], 'video/')) $counts['video']++;
-        elseif (str_starts_with($d['mime'], 'image/')) $counts['image']++;
-        else $counts['other']++;
+    json_out(['ok' => true] + drive_files_summary($ev, $r['files']));
+
+case 'drive_files_batch':
+    // One request for the whole shoot list instead of one PHP process + Google call per card
+    require_login();
+    require_once __DIR__ . '/includes/google-drive.php';
+    $ids = array_slice(array_values(array_filter(array_map('intval', (array)json_decode((string)$g('ids'), true)))), 0, 40);
+    $out = [];
+    if ($ids) {
+        $evs = rows("SELECT id, drive_folder_id, drive_link FROM events WHERE type='cekim' AND COALESCE(drive_folder_id,'')!=''
+            AND id IN (" . implode(',', array_fill(0, count($ids), '?')) . ")", $ids);
+        $deadline = microtime(true) + 20; // a slow Google day must not turn into a hung page
+        foreach ($evs as $ev) {
+            if (microtime(true) > $deadline) break;
+            $r = drive_list_files($ev['drive_folder_id'], 25);
+            if ($r['ok']) $out[$ev['id']] = drive_files_summary($ev, $r['files']);
+        }
     }
-    json_out(['ok' => true, 'files' => $r['files'], 'counts' => $counts, 'total' => count($r['files']),
-        'folder' => $ev['drive_link'] ?: ('https://drive.google.com/drive/folders/' . $ev['drive_folder_id'])]);
+    json_out(['ok' => true, 'events' => $out]);
 
 case 'drive_disconnect':
     require_admin();

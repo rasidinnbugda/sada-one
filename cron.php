@@ -9,13 +9,21 @@ require __DIR__ . '/includes/init.php';
 
 // Simple protection: the ?anahtar= parameter must match the site name (no check when called from CLI)
 if (php_sapi_name() !== 'cli') {
-    $setting_key = $_GET['setting_key'] ?? '';
-    if ($setting_key !== setting('site_adi', 'SADA One')) {
+    $anahtar = $_GET['anahtar'] ?? $_GET['key'] ?? $_GET['setting_key'] ?? '';
+    if (!hash_equals(setting('site_adi', 'SADA One'), (string)$anahtar)) {
         http_response_code(403);
-        die('Yetkisiz. ?setting_key=SITE_ADI parametresi gerekli.');
+        die('Yetkisiz. ?anahtar=SITE_ADI parametresi gerekli.');
     }
 }
 
+// Only one cron run at a time (hPanel cron + a manual hit must not replay the batch twice)
+if ((int)val("SELECT GET_LOCK('sada_cron', 0)") !== 1) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => false, 'error' => 'Başka bir cron çalışması sürüyor.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+@set_time_limit(280);
+$GLOBALS['sada_deadline'] = microtime(true) + 240;
 $count = run_recurring_jobs(true);
 
 // Mark overdue "bekliyor" (pending) finance records as "gecikti" (late)

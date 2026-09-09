@@ -681,16 +681,17 @@ SQL;
     $adminId = (int)$pdo->lastInsertId();
 
     // Settings
+    // Keys are the stored (Turkish) contract the runtime reads via setting()
     $settings = [
-        'site_name' => $siteName,
-        'default_theme' => 'lime',
-        'smtp_is_active' => '0',
+        'site_adi' => $siteName,
+        'varsayilan_tema' => 'lime',
+        'smtp_aktif' => '0',
         'smtp_host' => 'smtp.hostinger.com',
         'smtp_port' => '465',
-        'smtp_user' => '',
-        'smtp_password' => '',
-        'smtp_sender' => '',
-        'email_notification' => '1',
+        'smtp_kullanici' => '',
+        'smtp_sifre' => '',
+        'smtp_gonderen' => '',
+        'eposta_bildirim' => '1',
     ];
     $st = $pdo->prepare("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
     foreach ($settings as $k => $v) $st->execute([$k, $v]);
