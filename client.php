@@ -12,9 +12,9 @@ $clientMembers = rows("SELECT u.id, u.name, u.color, u.avatar, u.job_title FROM 
 
 $projects = rows("SELECT p.*, u.name pm_name,
     (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id) task_count,
-    (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND g.status='tamamlandi') is_done_count
+    (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND g.status='completed') is_done_count
     FROM projects p LEFT JOIN users u ON u.id=p.pm_id WHERE p.client_id=? ORDER BY p.created DESC", [$id]);
-$musteriler = rows("SELECT * FROM users WHERE client_id=? AND role='musteri'", [$id]);
+$customers = rows("SELECT * FROM users WHERE client_id=? AND role='customer'", [$id]);
 $archiveCount = (int)val("SELECT COUNT(*) FROM archive WHERE client_id=?", [$id]);
 $contracts = rows("SELECT s.*, a.file_path, a.name ek_name FROM contracts s LEFT JOIN archive a ON a.id=s.archive_id WHERE s.client_id=? ORDER BY s.end IS NULL, s.end", [$id]);
 
@@ -27,92 +27,92 @@ unset($sh);
 
 page_start($client['name'], 'clients');
 ?>
-<div class="satir-esnek mb-3" style="gap:10px">
-    <a href="clients.php" class="ikon-eylem"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></a>
-    <span class="metin-muted kucuk">Dosyalar / <?= e($client['name']) ?></span>
+<div class="row-flex mb-3" style="gap:10px">
+    <a href="clients.php" class="icon-action"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <span class="text-muted small">Dosyalar / <?= e($client['name']) ?></span>
 </div>
 
-<div class="sayfa-ust">
-    <div class="satir-esnek" style="gap:16px">
+<div class="page-top">
+    <div class="row-flex" style="gap:16px">
         <?= client_logo($client, 56, 22) ?>
         <div>
-            <div class="sayfa-baslik" style="font-size:24px"><?= e($client['name']) ?></div>
-            <div class="satir-esnek mt-1" style="gap:8px">
-                <span class="rozet rozet-tur"><?= CLIENT_TYPES[$client['type']] ?></span>
-                <?= badge($client['status'], ['is_active' => 'Aktif', 'pasif' => 'Pasif']) ?>
+            <div class="page-title" style="font-size:24px"><?= e($client['name']) ?></div>
+            <div class="row-flex mt-1" style="gap:8px">
+                <span class="badge badge-type"><?= CLIENT_TYPES[$client['type']] ?></span>
+                <?= badge($client['status'], CLIENT_STATUSES) ?>
             </div>
         </div>
     </div>
-    <?php if (permission('dosya_yonet')): ?>
-    <div class="sayfa-ust-aksiyon">
-        <button class="btn btn-marka" data-modal="modalProject"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Proje Ekle</button>
+    <?php if (permission('client_manage')): ?>
+    <div class="page-top-action">
+        <button class="btn btn-brand" data-modal="modalProject"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Proje Ekle</button>
         <button class="btn" onclick="clientEdit()"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg> Düzenle</button>
     </div>
     <?php endif; ?>
 </div>
 
-<div class="izgara" style="grid-template-columns:1fr 320px" id="clientDuzen">
+<div class="grid" style="grid-template-columns:1fr 320px" id="clientEditBox">
     <div>
         <!-- Projects -->
-        <div class="satir-esnek arasi mb-2"><div class="kart-baslik">Projeler (<?= count($projects) ?>)</div></div>
+        <div class="row-flex between mb-2"><div class="card-title">Projeler (<?= count($projects) ?>)</div></div>
         <?php if (!$projects): ?>
-        <div class="kart orta metin-muted kucuk" style="padding:30px">Bu dosyada henüz proje yok.</div>
-        <?php else: foreach (PROJECT_TYPES as $turK => $turV):
-            $grup = array_filter($projects, fn($p) => $p['type'] === $turK);
-            if (!$grup) continue; ?>
-        <div class="nav-bolum" style="padding:14px 0 8px"><?= $turV ?> Hizmetler</div>
-        <div class="izgara izgara-2">
-            <?php foreach ($grup as $p):
+        <div class="card orta text-muted small" style="padding:30px">Bu dosyada henüz proje yok.</div>
+        <?php else: foreach (PROJECT_TYPES as $typeKey => $typeLabel):
+            $group = array_filter($projects, fn($p) => $p['type'] === $typeKey);
+            if (!$group) continue; ?>
+        <div class="nav-section" style="padding:14px 0 8px"><?= $typeLabel ?> Hizmetler</div>
+        <div class="grid grid-2">
+            <?php foreach ($group as $p):
                 $rate = $p['task_count'] ? round($p['is_done_count'] / $p['task_count'] * 100) : 0; ?>
-            <a href="project.php?id=<?= $p['id'] ?>" class="kart kart-tik" style="padding:16px">
-                <div class="satir-esnek arasi mb-2">
-                    <div class="kart-baslik" style="font-size:15px"><?= e($p['name']) ?></div>
+            <a href="project.php?id=<?= $p['id'] ?>" class="card card-tick" style="padding:16px">
+                <div class="row-flex between mb-2">
+                    <div class="card-title" style="font-size:15px"><?= e($p['name']) ?></div>
                     <?= badge($p['status'], PROJECT_STATUSES) ?>
                 </div>
-                <?php if ($p['pm_name']): ?><div class="hucre-alt">PM: <?= e($p['pm_name']) ?></div><?php endif; ?>
-                <div class="ilerleme mt-2"><div class="ilerleme-dolu" data-rate="<?= $rate ?>" style="width:0"></div></div>
-                <div class="hucre-alt mt-1"><?= $p['is_done_count'] ?>/<?= $p['task_count'] ?> görev · %<?= $rate ?></div>
+                <?php if ($p['pm_name']): ?><div class="cell-bottom">PM: <?= e($p['pm_name']) ?></div><?php endif; ?>
+                <div class="progress mt-2"><div class="progress-full" data-rate="<?= $rate ?>" style="width:0"></div></div>
+                <div class="cell-bottom mt-1"><?= $p['is_done_count'] ?>/<?= $p['task_count'] ?> görev · %<?= $rate ?></div>
             </a>
             <?php endforeach; ?>
         </div>
         <?php endforeach; endif; ?>
 
         <!-- Social media tracking -->
-        <div class="satir-esnek arasi mb-2 mt-3">
-            <div class="kart-baslik"><?= icon('grafik', 16) ?> Sosyal Medya (<?= count($socialAccounts) ?>)</div>
-            <?php if (permission('icerik_yonet')): ?><button class="btn btn-sm btn-marka" data-modal="modalSocialAccount"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Hesap Ekle</button><?php endif; ?>
+        <div class="row-flex between mb-2 mt-3">
+            <div class="card-title"><?= icon('chart', 16) ?> Sosyal Medya (<?= count($socialAccounts) ?>)</div>
+            <?php if (permission('content_manage')): ?><button class="btn btn-sm btn-brand" data-modal="modalSocialAccount"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Hesap Ekle</button><?php endif; ?>
         </div>
         <?php if (!$socialAccounts): ?>
-        <div class="kart orta metin-muted kucuk" style="padding:24px">Bu dosya için sosyal medya hesabı eklenmemiş.<?= permission('icerik_yonet') ? ' Hesap ekleyip takipçi verilerini düzenli girerek büyümeyi izleyin.' : '' ?></div>
+        <div class="card orta text-muted small" style="padding:24px">Bu dosya için sosyal medya hesabı eklenmemiş.<?= permission('content_manage') ? ' Hesap ekleyip takipçi verilerini düzenli girerek büyümeyi izleyin.' : '' ?></div>
         <?php else: ?>
-        <div class="izgara izgara-2">
+        <div class="grid grid-2">
             <?php foreach ($socialAccounts as $sh):
                 $last = $sh['metrics'][0] ?? null;
-                $onceki = $sh['metrics'][1] ?? null;
-                $fark = ($last && $onceki) ? (int)$last['followers'] - (int)$onceki['followers'] : null;
+                $previous = $sh['metrics'][1] ?? null;
+                $diff = ($last && $previous) ? (int)$last['followers'] - (int)$previous['followers'] : null;
                 $maxFollowers = $sh['metrics'] ? max(array_column($sh['metrics'], 'followers')) : 1; ?>
-            <div class="kart" style="padding:16px">
-                <div class="satir-esnek arasi">
-                    <div class="satir-esnek" style="gap:10px;min-width:0">
-                        <span class="dosya-avatar" style="width:40px;height:40px;background:var(--parlak);color:var(--marka)"><?= icon(isset(ICONS[$sh['platform']]) ? $sh['platform'] : 'diger', 20) ?></span>
+            <div class="card" style="padding:16px">
+                <div class="row-flex between">
+                    <div class="row-flex" style="gap:10px;min-width:0">
+                        <span class="file-avatar" style="width:40px;height:40px;background:var(--bright);color:var(--brand)"><?= icon(isset(ICONS[$sh['platform']]) ? $sh['platform'] : 'other', 20) ?></span>
                         <div style="min-width:0">
-                            <div class="kalin kucuk"><?php if ($sh['url']): ?><a href="<?= e($sh['url']) ?>" target="_blank" style="color:var(--marka)">@<?= e(ltrim($sh['username'], '@')) ?></a><?php else: ?>@<?= e(ltrim($sh['username'], '@')) ?><?php endif; ?></div>
-                            <div class="hucre-alt"><?= PLATFORMS[$sh['platform']] ?? $sh['platform'] ?></div>
+                            <div class="bold small"><?php if ($sh['url']): ?><a href="<?= e($sh['url']) ?>" target="_blank" style="color:var(--brand)">@<?= e(ltrim($sh['username'], '@')) ?></a><?php else: ?>@<?= e(ltrim($sh['username'], '@')) ?><?php endif; ?></div>
+                            <div class="cell-bottom"><?= PLATFORMS[$sh['platform']] ?? $sh['platform'] ?></div>
                         </div>
                     </div>
-                    <?php if (permission('icerik_yonet')): ?>
-                    <button class="ikon-eylem tehlike" style="width:26px;height:26px" data-action="social_account_delete" data-id="<?= $sh['id'] ?>" data-approval="Hesap ve tüm metrik geçmişi silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="13"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <?php if (permission('content_manage')): ?>
+                    <button class="icon-action danger" style="width:26px;height:26px" data-action="social_account_delete" data-id="<?= $sh['id'] ?>" data-confirm="Hesap ve tüm metrik geçmişi silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="13"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
                     <?php endif; ?>
                 </div>
-                <div class="satir-esnek mt-2" style="gap:14px;align-items:baseline">
-                    <span class="stat-deger" style="font-size:26px"><?= $last ? number_format((int)$last['followers'], 0, ',', '.') : '—' ?></span>
-                    <span class="hucre-alt">takipçi</span>
-                    <?php if ($fark !== null): ?>
-                    <span class="kucuk kalin" style="color:<?= $fark >= 0 ? 'var(--basari)' : 'var(--tehlike)' ?>"><?= $fark >= 0 ? '▲ +' : '▼ ' ?><?= number_format($fark, 0, ',', '.') ?></span>
+                <div class="row-flex mt-2" style="gap:14px;align-items:baseline">
+                    <span class="stat-value" style="font-size:26px"><?= $last ? number_format((int)$last['followers'], 0, ',', '.') : '—' ?></span>
+                    <span class="cell-bottom">takipçi</span>
+                    <?php if ($diff !== null): ?>
+                    <span class="small bold" style="color:<?= $diff >= 0 ? 'var(--success)' : 'var(--danger)' ?>"><?= $diff >= 0 ? '▲ +' : '▼ ' ?><?= number_format($diff, 0, ',', '.') ?></span>
                     <?php endif; ?>
                 </div>
                 <?php if ($last && ($last['post'] !== null || $last['engagement'] !== null)): ?>
-                <div class="hucre-alt mt-1">
+                <div class="cell-bottom mt-1">
                     <?= $last['post'] !== null ? $last['post'] . ' gönderi' : '' ?><?= $last['post'] !== null && $last['engagement'] !== null ? ' · ' : '' ?><?= $last['engagement'] !== null ? number_format((int)$last['engagement'], 0, ',', '.') . ' etkileşim' : '' ?>
                 </div>
                 <?php endif; ?>
@@ -120,13 +120,13 @@ page_start($client['name'], 'clients');
                 <!-- Mini history chart (old→new) -->
                 <div style="display:flex;gap:3px;align-items:flex-end;height:36px;margin-top:10px" title="Son <?= count($sh['metrics']) ?> kayıt">
                     <?php foreach (array_reverse($sh['metrics']) as $m): ?>
-                    <div style="flex:1;background:var(--marka);opacity:.75;border-radius:3px 3px 0 0;height:<?= max(8, round((int)$m['followers'] / max(1, $maxFollowers) * 100)) ?>%" title="<?= format_date($m['date']) ?>: <?= number_format((int)$m['followers'], 0, ',', '.') ?>"></div>
+                    <div style="flex:1;background:var(--brand);opacity:.75;border-radius:3px 3px 0 0;height:<?= max(8, round((int)$m['followers'] / max(1, $maxFollowers) * 100)) ?>%" title="<?= format_date($m['date']) ?>: <?= number_format((int)$m['followers'], 0, ',', '.') ?>"></div>
                     <?php endforeach; ?>
                 </div>
                 <?php endif; ?>
-                <div class="satir-esnek arasi mt-2">
-                    <span class="hucre-alt"><?= $last ? 'Son veri: ' . format_date($last['date']) : 'Henüz veri girilmedi' ?></span>
-                    <?php if (is_staff()): ?><button class="mini-btn" onclick="metricGir(<?= $sh['id'] ?>, '<?= e($sh['username']) ?>')">+ Veri Gir</button><?php endif; ?>
+                <div class="row-flex between mt-2">
+                    <span class="cell-bottom"><?= $last ? 'Son veri: ' . format_date($last['date']) : 'Henüz veri girilmedi' ?></span>
+                    <?php if (is_staff()): ?><button class="mini-btn" onclick="metricEnter(<?= $sh['id'] ?>, '<?= e($sh['username']) ?>')">+ Veri Gir</button><?php endif; ?>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -134,111 +134,110 @@ page_start($client['name'], 'clients');
         <?php endif; ?>
 
         <?php if (!$customerView):
-            $kisiler = rows("SELECT * FROM client_contacts WHERE client_id=? ORDER BY name", [$id]); ?>
+            $people = rows("SELECT * FROM client_contacts WHERE client_id=? ORDER BY name", [$id]); ?>
         <!-- Contact people (team only) -->
-        <div class="satir-esnek arasi mb-2 mt-3">
-            <div class="kart-baslik"><?= icon('team', 16) ?> İletişim Kişileri (<?= count($kisiler) ?>)</div>
-            <?php if (permission('dosya_yonet')): ?><button class="btn btn-sm btn-marka" onclick="kisiNew()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><path d="M12 5v14M5 12h14"/></svg> Kişi Ekle</button><?php endif; ?>
+        <div class="row-flex between mb-2 mt-3">
+            <div class="card-title"><?= icon('team', 16) ?> İletişim Kişileri (<?= count($people) ?>)</div>
+            <?php if (permission('client_manage')): ?><button class="btn btn-sm btn-brand" onclick="personNew()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><path d="M12 5v14M5 12h14"/></svg> Kişi Ekle</button><?php endif; ?>
         </div>
-        <?php if (!$kisiler): ?>
-        <div class="kart orta metin-muted kucuk" style="padding:18px">Bu dosyada iletişim kurulacak kişileri ekleyin — rapor maili gönderirken buradan seçilirler.</div>
+        <?php if (!$people): ?>
+        <div class="card orta text-muted small" style="padding:18px">Bu dosyada iletişim kurulacak kişileri ekleyin — rapor maili gönderirken buradan seçilirler.</div>
         <?php else: ?>
-        <div class="izgara mb-3" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
-            <?php foreach ($kisiler as $ki): ?>
-            <div class="kart" style="padding:13px 15px">
-                <div class="satir-esnek arasi">
-                    <div class="kalin kucuk"><?= e($ki['name']) ?></div>
-                    <?php if (permission('dosya_yonet')): ?>
-                    <div class="satir-esnek" style="gap:2px">
-                        <button class="ikon-eylem" style="width:24px;height:24px" onclick='kisiEdit(<?= json_encode($ki, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 12) ?></button>
-                        <button class="ikon-eylem tehlike" style="width:24px;height:24px" data-action="client_contact_delete" data-id="<?= $ki['id'] ?>" data-approval="Kişi silinsin mi?"><?= icon('cop', 12) ?></button>
+        <div class="grid mb-3" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+            <?php foreach ($people as $ki): ?>
+            <div class="card" style="padding:13px 15px">
+                <div class="row-flex between">
+                    <div class="bold small"><?= e($ki['name']) ?></div>
+                    <?php if (permission('client_manage')): ?>
+                    <div class="row-flex" style="gap:2px">
+                        <button class="icon-action" style="width:24px;height:24px" onclick='personEdit(<?= json_encode($ki, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 12) ?></button>
+                        <button class="icon-action danger" style="width:24px;height:24px" data-action="client_contact_delete" data-id="<?= $ki['id'] ?>" data-confirm="Kişi silinsin mi?"><?= icon('cop', 12) ?></button>
                     </div>
                     <?php endif; ?>
                 </div>
-                <?php if ($ki['title']): ?><div class="hucre-alt mt-1"><?= e($ki['title']) ?></div><?php endif; ?>
-                <?php if ($ki['email']): ?><div class="kucuk mt-1"><a href="mailto:<?= e($ki['email']) ?>" style="color:var(--marka)"><?= e($ki['email']) ?></a></div><?php endif; ?>
-                <?php if ($ki['phone']): ?><div class="kucuk metin-muted mt-1"><?= e($ki['phone']) ?></div><?php endif; ?>
+                <?php if ($ki['title']): ?><div class="cell-bottom mt-1"><?= e($ki['title']) ?></div><?php endif; ?>
+                <?php if ($ki['email']): ?><div class="small mt-1"><a href="mailto:<?= e($ki['email']) ?>" style="color:var(--brand)"><?= e($ki['email']) ?></a></div><?php endif; ?>
+                <?php if ($ki['phone']): ?><div class="small text-muted mt-1"><?= e($ki['phone']) ?></div><?php endif; ?>
             </div>
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
-        <div class="modal-katman" id="modalKisi">
-            <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="kisiTitle">İletişim Kişisi</div><button class="modal-kapat" data-modal-close>✕</button></div>
+        <div class="modal-overlay" id="modalPerson">
+            <div class="modal"><div class="modal-top"><div class="modal-title" id="personTitle">İletişim Kişisi</div><button class="modal-close" data-modal-close>✕</button></div>
             <form data-ajax="client_contact_save">
                 <input type="hidden" name="id" id="ki_id"><input type="hidden" name="client_id" value="<?= $id ?>">
-                <div class="modal-govde">
-                    <div class="form-satir">
-                        <div class="form-grup"><label class="form-etiket">Ad Soyad <span class="zorunlu">*</span></label><input name="name" id="ki_name" class="girdi" required></div>
-                        <div class="form-grup"><label class="form-etiket">Ünvan / Rol</label><input name="title" id="ki_title" class="girdi" placeholder="Örn. Pazarlama Müdürü"></div>
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Ad Soyad <span class="required">*</span></label><input name="name" id="ki_name" class="input" required></div>
+                        <div class="form-group"><label class="form-label">Ünvan / Rol</label><input name="title" id="ki_title" class="input" placeholder="Örn. Pazarlama Müdürü"></div>
                     </div>
-                    <div class="form-satir">
-                        <div class="form-grup"><label class="form-etiket">E-posta</label><input type="email" name="email" id="ki_email" class="girdi" autocomplete="off"></div>
-                        <div class="form-grup"><label class="form-etiket">Telefon</label><input name="phone" id="ki_phone" class="girdi"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">E-posta</label><input type="email" name="email" id="ki_email" class="input" autocomplete="off"></div>
+                        <div class="form-group"><label class="form-label">Telefon</label><input name="phone" id="ki_phone" class="input"></div>
                     </div>
                 </div>
-                <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+                <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button></div>
             </form></div>
         </div>
         <script>
-        function kisiNew() { ['ki_id','ki_name','ki_title','ki_email','ki_phone'].forEach(i => document.getElementById(i).value = ''); document.getElementById('kisiTitle').textContent = 'Yeni İletişim Kişisi'; modalOpen('modalKisi'); }
-        function kisiEdit(k) { document.getElementById('ki_id').value = k.id; document.getElementById('ki_name').value = k.name; document.getElementById('ki_title').value = k.title || ''; document.getElementById('ki_email').value = k.email || ''; document.getElementById('ki_phone').value = k.phone || ''; document.getElementById('kisiTitle').textContent = 'Kişiyi Düzenle'; modalOpen('modalKisi'); }
+        function personNew() { ['ki_id','ki_name','ki_title','ki_email','ki_phone'].forEach(i => document.getElementById(i).value = ''); document.getElementById('personTitle').textContent = 'Yeni İletişim Kişisi'; modalOpen('modalPerson'); }
+        function personEdit(k) { document.getElementById('ki_id').value = k.id; document.getElementById('ki_name').value = k.name; document.getElementById('ki_title').value = k.title || ''; document.getElementById('ki_email').value = k.email || ''; document.getElementById('ki_phone').value = k.phone || ''; document.getElementById('personTitle').textContent = 'Kişiyi Düzenle'; modalOpen('modalPerson'); }
         </script>
         <?php
-            $infoNotes = rows("SELECT bn.*, us.name updater_name FROM client_notes bn LEFT JOIN users us ON us.id=bn.updated_by WHERE bn.client_id=? ORDER BY bn.pinned DESC, bn.sort_order", [$id]);
-            $BB_KATEGORI = ['genel' => 'Genel', 'marka' => 'Marka Rehberi', 'erisim' => 'Erişim Bilgileri', 'kitle' => 'Hedef Kitle', 'surec' => 'Süreç']; ?>
+            $infoNotes = rows("SELECT bn.*, us.name updater_name FROM client_notes bn LEFT JOIN users us ON us.id=bn.updated_by WHERE bn.client_id=? ORDER BY bn.pinned DESC, bn.sort_order", [$id]); ?>
         <!-- Knowledge base (team only) -->
-        <div class="satir-esnek arasi mb-2 mt-3">
-            <div class="kart-baslik"><?= icon('document', 16) ?> Bilgi Bankası (<?= count($infoNotes) ?>)</div>
-            <button class="btn btn-sm btn-marka" onclick="notNew()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><path d="M12 5v14M5 12h14"/></svg> Bölüm Ekle</button>
+        <div class="row-flex between mb-2 mt-3">
+            <div class="card-title"><?= icon('document', 16) ?> Bilgi Bankası (<?= count($infoNotes) ?>)</div>
+            <button class="btn btn-sm btn-brand" onclick="kbNoteNew()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14"><path d="M12 5v14M5 12h14"/></svg> Bölüm Ekle</button>
         </div>
         <?php if ($infoNotes): ?>
-        <div class="filtre-bar mb-2">
-            <div class="arama-kutu"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="girdi" placeholder="Bilgi bankasında ara..." data-search="#bbListe .kart"></div>
-            <div class="pill-filtre" data-pill-grup="#bbListe .kart">
-                <button class="pill aktif" data-setting_value="">Tümü</button>
-                <?php foreach ($BB_KATEGORI as $bk => $bv): ?><button class="pill" data-setting_value="<?= $bk ?>"><?= $bv ?></button><?php endforeach; ?>
+        <div class="filter-bar mb-2">
+            <div class="search-box"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="input" placeholder="Bilgi bankasında ara..." data-search="#kbList .card"></div>
+            <div class="pill-filter" data-pill-group="#kbList .card">
+                <button class="pill active" data-value="">Tümü</button>
+                <?php foreach (NOTE_CATEGORIES as $catKey => $catLabel): ?><button class="pill" data-value="<?= $catKey ?>"><?= $catLabel ?></button><?php endforeach; ?>
             </div>
         </div>
         <?php endif; ?>
-        <div id="bbListe">
+        <div id="kbList">
         <?php if (!$infoNotes): ?>
-        <div class="kart orta metin-muted kucuk" style="padding:22px">Marka rehberi, hedef kitle, yazım dili gibi süreç notlarını buraya ekleyin — müşteri görmez, ekip her zaman ulaşır.</div>
-        <?php else: foreach ($infoNotes as $bn): ?>
-        <div class="kart mb-2" style="padding:14px 16px" data-filter="<?= e($bn['category'] ?? 'genel') ?>" data-search="<?= e($bn['title'] . ' ' . $bn['text']) ?>">
-            <div class="satir-esnek arasi">
-                <div class="satir-esnek" style="gap:8px"><?= !empty($bn['pinned']) ? '📌 ' : '' ?><span class="kalin kucuk"><?= e($bn['title']) ?></span>
-                    <span class="rozet rozet-tur" style="font-size:10.5px"><?= $BB_KATEGORI[$bn['category'] ?? 'genel'] ?? 'Genel' ?></span></div>
-                <div class="satir-esnek" style="gap:2px">
-                    <button class="ikon-eylem" style="width:26px;height:26px" onclick='notDuzenleBB(<?= json_encode($bn, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 13) ?></button>
-                    <button class="ikon-eylem tehlike" style="width:26px;height:26px" data-action="clientnote_delete" data-id="<?= $bn['id'] ?>" data-approval="Bölüm silinsin mi?"><?= icon('cop', 13) ?></button>
+        <div class="card orta text-muted small" style="padding:22px">Marka rehberi, hedef kitle, yazım dili gibi süreç notlarını buraya ekleyin — müşteri görmez, ekip her zaman ulaşır.</div>
+        <?php else: foreach ($infoNotes as $kbNote): ?>
+        <div class="card mb-2" style="padding:14px 16px" data-filter="<?= e($kbNote['category'] ?? 'general') ?>" data-search="<?= e($kbNote['title'] . ' ' . $kbNote['text']) ?>">
+            <div class="row-flex between">
+                <div class="row-flex" style="gap:8px"><?= !empty($kbNote['pinned']) ? '📌 ' : '' ?><span class="bold small"><?= e($kbNote['title']) ?></span>
+                    <span class="badge badge-type" style="font-size:10.5px"><?= NOTE_CATEGORIES[$kbNote['category'] ?? 'general'] ?? 'Genel' ?></span></div>
+                <div class="row-flex" style="gap:2px">
+                    <button class="icon-action" style="width:26px;height:26px" onclick='noteEditKb(<?= json_encode($kbNote, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><?= icon('item', 13) ?></button>
+                    <button class="icon-action danger" style="width:26px;height:26px" data-action="clientnote_delete" data-id="<?= $kbNote['id'] ?>" data-confirm="Bölüm silinsin mi?"><?= icon('cop', 13) ?></button>
                 </div>
             </div>
-            <div class="kucuk metin-2 mt-1" style="white-space:pre-wrap"><?= e($bn['text']) ?></div>
-            <?php if ($bn['update']): ?><div class="hucre-alt mt-2"><?= e($bn['updater_name']) ?> güncelledi · <?= time_ago($bn['update']) ?></div><?php endif; ?>
+            <div class="small text-2 mt-1" style="white-space:pre-wrap"><?= e($kbNote['text']) ?></div>
+            <?php if ($kbNote['update']): ?><div class="cell-bottom mt-2"><?= e($kbNote['updater_name']) ?> güncelledi · <?= time_ago($kbNote['update']) ?></div><?php endif; ?>
         </div>
         <?php endforeach; endif; ?>
         </div>
 
-        <div class="modal-katman" id="modalInfoNot">
-            <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="bnTitleTop">Bilgi Bölümü</div><button class="modal-kapat" data-modal-close>✕</button></div>
+        <div class="modal-overlay" id="modalInfoNot">
+            <div class="modal"><div class="modal-top"><div class="modal-title" id="kbTitleTop">Bilgi Bölümü</div><button class="modal-close" data-modal-close>✕</button></div>
             <form data-ajax="clientnote_save">
-                <input type="hidden" name="id" id="bn_id"><input type="hidden" name="client_id" value="<?= $id ?>">
-                <div class="modal-govde">
-                    <div class="form-satir">
-                        <div class="form-grup"><label class="form-etiket">Bölüm Başlığı <span class="zorunlu">*</span></label><input name="title" id="bn_title" class="girdi" required placeholder="Örn. Marka Sesi & Yazım Dili"></div>
-                        <div class="form-grup"><label class="form-etiket">Kategori</label><select name="category" id="bn_category" class="secim">
-                            <?php foreach ($BB_KATEGORI as $bk => $bv): ?><option value="<?= $bk ?>"><?= $bv ?></option><?php endforeach; ?>
+                <input type="hidden" name="id" id="kb_id"><input type="hidden" name="client_id" value="<?= $id ?>">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Bölüm Başlığı <span class="required">*</span></label><input name="title" id="kb_title" class="input" required placeholder="Örn. Marka Sesi & Yazım Dili"></div>
+                        <div class="form-group"><label class="form-label">Kategori</label><select name="category" id="kb_category" class="select">
+                            <?php foreach (NOTE_CATEGORIES as $catKey => $catLabel): ?><option value="<?= $catKey ?>"><?= $catLabel ?></option><?php endforeach; ?>
                         </select></div>
                     </div>
-                    <label class="satir-esnek kucuk mb-2" style="gap:8px;cursor:pointer"><input type="checkbox" name="pinned" id="bn_pinned" value="1"> 📌 Üste sabitle</label>
-                    <div class="form-grup"><label class="form-etiket">İçerik</label><textarea name="text" id="bn_text" class="metin-alani" style="min-height:150px"></textarea></div>
+                    <label class="row-flex small mb-2" style="gap:8px;cursor:pointer"><input type="checkbox" name="pinned" id="kb_pinned" value="1"> 📌 Üste sabitle</label>
+                    <div class="form-group"><label class="form-label">İçerik</label><textarea name="text" id="kb_text" class="text-area" style="min-height:150px"></textarea></div>
                 </div>
-                <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+                <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button></div>
             </form></div>
         </div>
         <script>
-        function notNew() { document.getElementById('bn_id').value = ''; document.getElementById('bn_title').value = ''; document.getElementById('bn_text').value = ''; document.getElementById('bn_category').value = 'genel'; document.getElementById('bn_pinned').checked = false; document.getElementById('bnTitleTop').textContent = 'Yeni Bilgi Bölümü'; modalOpen('modalInfoNot'); }
-        function notDuzenleBB(n) { document.getElementById('bn_id').value = n.id; document.getElementById('bn_title').value = n.title; document.getElementById('bn_text').value = n.text || ''; document.getElementById('bn_category').value = n.category || 'genel'; document.getElementById('bn_pinned').checked = !!+n.pinned; document.getElementById('bnTitleTop').textContent = 'Bölümü Düzenle'; modalOpen('modalInfoNot'); }
+        function kbNoteNew() { document.getElementById('kb_id').value = ''; document.getElementById('kb_title').value = ''; document.getElementById('kb_text').value = ''; document.getElementById('kb_category').value = 'general'; document.getElementById('kb_pinned').checked = false; document.getElementById('kbTitleTop').textContent = 'Yeni Bilgi Bölümü'; modalOpen('modalInfoNot'); }
+        function noteEditKb(n) { document.getElementById('kb_id').value = n.id; document.getElementById('kb_title').value = n.title; document.getElementById('kb_text').value = n.text || ''; document.getElementById('kb_category').value = n.category || 'general'; document.getElementById('kb_pinned').checked = !!+n.pinned; document.getElementById('kbTitleTop').textContent = 'Bölümü Düzenle'; modalOpen('modalInfoNot'); }
         </script>
         <?php endif; ?>
     </div>
@@ -246,86 +245,86 @@ page_start($client['name'], 'clients');
     <div>
         <?php if ($customerView): ?>
         <!-- Restricted customer side panel: archive only -->
-        <a href="archive.php?client=<?= $id ?>" class="kart kart-tik satir-esnek arasi">
-            <div class="satir-esnek" style="gap:10px"><svg width="20" fill="none" stroke="var(--marka)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/></svg><span class="kalin kucuk">Paylaşılan Dosyalar</span></div>
-            <span class="rozet"><?= $archiveCount ?></span>
+        <a href="archive.php?client=<?= $id ?>" class="card card-tick row-flex between">
+            <div class="row-flex" style="gap:10px"><svg width="20" fill="none" stroke="var(--brand)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/></svg><span class="bold small">Paylaşılan Dosyalar</span></div>
+            <span class="badge"><?= $archiveCount ?></span>
         </a>
         <?php else: ?>
         <!-- Contact -->
-        <div class="kart mb-2">
-            <div class="kart-baslik" style="font-size:14px" class="mb-2">İletişim</div>
-            <div class="dikey mt-2" style="gap:12px">
-                <?php if ($client['contact_name']): ?><div><div class="hucre-alt">Kişi</div><div class="hucre-ana"><?= e($client['contact_name']) ?></div></div><?php endif; ?>
-                <?php if ($client['contact_email']): ?><div><div class="hucre-alt">E-posta</div><a href="mailto:<?= e($client['contact_email']) ?>" class="hucre-ana" style="color:var(--marka)"><?= e($client['contact_email']) ?></a></div><?php endif; ?>
-                <?php if ($client['contact_phone']): ?><div><div class="hucre-alt">Telefon</div><div class="hucre-ana"><?= e($client['contact_phone']) ?></div></div><?php endif; ?>
-                <?php if (!$client['contact_name'] && !$client['contact_email']): ?><div class="metin-muted kucuk">İletişim bilgisi eklenmemiş.</div><?php endif; ?>
-                <?php if ($client['description']): ?><div><div class="hucre-alt">Açıklama</div><div class="kucuk metin-2"><?= nl2br(e($client['description'])) ?></div></div><?php endif; ?>
+        <div class="card mb-2">
+            <div class="card-title" style="font-size:14px" class="mb-2">İletişim</div>
+            <div class="vertical mt-2" style="gap:12px">
+                <?php if ($client['contact_name']): ?><div><div class="cell-bottom">Kişi</div><div class="cell-main"><?= e($client['contact_name']) ?></div></div><?php endif; ?>
+                <?php if ($client['contact_email']): ?><div><div class="cell-bottom">E-posta</div><a href="mailto:<?= e($client['contact_email']) ?>" class="cell-main" style="color:var(--brand)"><?= e($client['contact_email']) ?></a></div><?php endif; ?>
+                <?php if ($client['contact_phone']): ?><div><div class="cell-bottom">Telefon</div><div class="cell-main"><?= e($client['contact_phone']) ?></div></div><?php endif; ?>
+                <?php if (!$client['contact_name'] && !$client['contact_email']): ?><div class="text-muted small">İletişim bilgisi eklenmemiş.</div><?php endif; ?>
+                <?php if ($client['description']): ?><div><div class="cell-bottom">Açıklama</div><div class="small text-2"><?= nl2br(e($client['description'])) ?></div></div><?php endif; ?>
             </div>
         </div>
         <!-- Responsible team -->
-        <div class="kart mb-2">
-            <div class="satir-esnek arasi mb-2"><div class="kart-baslik" style="font-size:14px">Sorumlu Ekip</div><?= member_avatars($clientMembers) ?></div>
-            <?php if (!$clientMembers): ?><div class="metin-muted kucuk">Henüz üye atanmamış.<?php if (permission('dosya_yonet')): ?> Düzenle penceresinden ekleyin.<?php endif; ?></div>
+        <div class="card mb-2">
+            <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px">Sorumlu Ekip</div><?= member_avatars($clientMembers) ?></div>
+            <?php if (!$clientMembers): ?><div class="text-muted small">Henüz üye atanmamış.<?php if (permission('client_manage')): ?> Düzenle penceresinden ekleyin.<?php endif; ?></div>
             <?php else: foreach ($clientMembers as $du): ?>
-            <div class="satir-esnek mt-2" style="gap:10px"><?= avatar($du, 30) ?><div><div class="hucre-ana kucuk"><?= e($du['name']) ?></div><?php if ($du['job_title']): ?><div class="hucre-alt"><?= e($du['job_title']) ?></div><?php endif; ?></div></div>
+            <div class="row-flex mt-2" style="gap:10px"><?= avatar($du, 30) ?><div><div class="cell-main small"><?= e($du['name']) ?></div><?php if ($du['job_title']): ?><div class="cell-bottom"><?= e($du['job_title']) ?></div><?php endif; ?></div></div>
             <?php endforeach; endif; ?>
         </div>
         <!-- Customer access -->
-        <div class="kart mb-2">
-            <div class="satir-esnek arasi mb-2"><div class="kart-baslik" style="font-size:14px">Müşteri Erişimi</div></div>
-            <?php if (!$musteriler): ?>
-            <div class="metin-muted kucuk mt-2">Bu dosya için müşteri hesabı yok.
-                <?php if (is_admin()): ?><br><a href="users.php" style="color:var(--marka)">Kullanıcı ekle →</a><?php endif; ?>
+        <div class="card mb-2">
+            <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px">Müşteri Erişimi</div></div>
+            <?php if (!$customers): ?>
+            <div class="text-muted small mt-2">Bu dosya için müşteri hesabı yok.
+                <?php if (is_admin()): ?><br><a href="users.php" style="color:var(--brand)">Kullanıcı ekle →</a><?php endif; ?>
             </div>
-            <?php else: foreach ($musteriler as $m): ?>
-            <div class="satir-esnek mt-2" style="gap:10px"><?= avatar($m, 32) ?><div><div class="hucre-ana kucuk"><?= e($m['name']) ?></div><div class="hucre-alt"><?= e($m['email']) ?></div></div></div>
+            <?php else: foreach ($customers as $m): ?>
+            <div class="row-flex mt-2" style="gap:10px"><?= avatar($m, 32) ?><div><div class="cell-main small"><?= e($m['name']) ?></div><div class="cell-bottom"><?= e($m['email']) ?></div></div></div>
             <?php endforeach; endif; ?>
         </div>
         <!-- Contracts -->
-        <div class="kart mb-2">
-            <div class="satir-esnek arasi mb-2">
-                <div class="kart-baslik" style="font-size:14px">Sözleşmeler</div>
-                <?php if (permission('dosya_yonet')): ?><button class="mini-btn" data-modal="modalContract">+ Ekle</button><?php endif; ?>
+        <div class="card mb-2">
+            <div class="row-flex between mb-2">
+                <div class="card-title" style="font-size:14px">Sözleşmeler</div>
+                <?php if (permission('client_manage')): ?><button class="mini-btn" data-modal="modalContract">+ Ekle</button><?php endif; ?>
             </div>
-            <?php if (!$contracts): ?><div class="metin-muted kucuk">Sözleşme kaydı yok. Bitiş tarihine 30 gün kala otomatik hatırlatılır.</div>
+            <?php if (!$contracts): ?><div class="text-muted small">Sözleşme kaydı yok. Bitiş tarihine 30 gün kala otomatik hatırlatılır.</div>
             <?php else: foreach ($contracts as $sz):
-                $kalanDay = $sz['end'] ? floor((strtotime($sz['end']) - time()) / 86400) : null;
-                $color = $kalanDay !== null && $kalanDay < 0 ? 'var(--tehlike)' : ($kalanDay !== null && $kalanDay <= 30 ? 'var(--warning)' : 'var(--text-2)'); ?>
+                $remainingDays = $sz['end'] ? floor((strtotime($sz['end']) - time()) / 86400) : null;
+                $color = $remainingDays !== null && $remainingDays < 0 ? 'var(--danger)' : ($remainingDays !== null && $remainingDays <= 30 ? 'var(--warning)' : 'var(--text-2)'); ?>
             <div class="mt-2" style="padding:10px 12px;background:var(--surface-2);border-radius:10px">
-                <div class="satir-esnek arasi">
-                    <span class="kucuk kalin"><?= e($sz['title']) ?></span>
-                    <?php if (permission('dosya_yonet')): ?><button class="ikon-eylem tehlike" style="width:24px;height:24px" data-action="contract_delete" data-id="<?= $sz['id'] ?>" data-approval="Sözleşme silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="12"><path d="M6 18L18 6M6 6l12 12"/></svg></button><?php endif; ?>
+                <div class="row-flex between">
+                    <span class="small bold"><?= e($sz['title']) ?></span>
+                    <?php if (permission('client_manage')): ?><button class="icon-action danger" style="width:24px;height:24px" data-action="contract_delete" data-id="<?= $sz['id'] ?>" data-confirm="Sözleşme silinsin mi?"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="12"><path d="M6 18L18 6M6 6l12 12"/></svg></button><?php endif; ?>
                 </div>
-                <div class="hucre-alt mt-1">
+                <div class="cell-bottom mt-1">
                     <?php if ($sz['amount'] > 0): ?><?= money($sz['amount']) ?> · <?php endif; ?>
-                    <?= format_date($sz['start']) ?> → <span style="color:<?= $color ?>"><?= format_date($sz['end']) ?><?= $kalanDay !== null && $kalanDay >= 0 && $kalanDay <= 30 ? " ({$kalanDay} gün)" : ($kalanDay !== null && $kalanDay < 0 ? ' (süresi doldu)' : '') ?></span>
-                    <?php if ($sz['file_path']): ?> · <a href="uploads/<?= e($sz['file_path']) ?>" target="_blank" style="color:var(--marka)"><?= icon('atac', 11) ?> Belge</a><?php endif; ?>
+                    <?= format_date($sz['start']) ?> → <span style="color:<?= $color ?>"><?= format_date($sz['end']) ?><?= $remainingDays !== null && $remainingDays >= 0 && $remainingDays <= 30 ? " ({$remainingDays} gün)" : ($remainingDays !== null && $remainingDays < 0 ? ' (süresi doldu)' : '') ?></span>
+                    <?php if ($sz['file_path']): ?> · <a href="uploads/<?= e($sz['file_path']) ?>" target="_blank" style="color:var(--brand)"><?= icon('paperclip', 11) ?> Belge</a><?php endif; ?>
                 </div>
             </div>
             <?php endforeach; endif; ?>
         </div>
-        <a href="archive.php?client=<?= $id ?>" class="kart kart-tik satir-esnek arasi">
-            <div class="satir-esnek" style="gap:10px"><svg width="20" fill="none" stroke="var(--marka)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/></svg><span class="kalin kucuk">Dosya Arşivi</span></div>
-            <span class="rozet"><?= $archiveCount ?></span>
+        <a href="archive.php?client=<?= $id ?>" class="card card-tick row-flex between">
+            <div class="row-flex" style="gap:10px"><svg width="20" fill="none" stroke="var(--brand)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/></svg><span class="bold small">Dosya Arşivi</span></div>
+            <span class="badge"><?= $archiveCount ?></span>
         </a>
 
-        <?php if (permission('dosya_yonet')): ?>
+        <?php if (permission('client_manage')): ?>
         <!-- Add contract modal -->
-        <div class="modal-katman" id="modalContract">
-            <div class="modal"><div class="modal-ust"><div class="modal-baslik">Sözleşme Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
+        <div class="modal-overlay" id="modalContract">
+            <div class="modal"><div class="modal-top"><div class="modal-title">Sözleşme Ekle</div><button class="modal-close" data-modal-close>✕</button></div>
             <form data-ajax="contract_save">
                 <input type="hidden" name="client_id" value="<?= $id ?>">
-                <div class="modal-govde">
-                    <div class="form-grup"><label class="form-etiket">Başlık <span class="zorunlu">*</span></label><input name="title" class="girdi" required placeholder="Örn. 2026 Sosyal Medya Yönetim Sözleşmesi"></div>
-                    <div class="form-satir">
-                        <div class="form-grup"><label class="form-etiket">Başlangıç</label><input type="date" name="start" class="girdi"></div>
-                        <div class="form-grup"><label class="form-etiket">Bitiş</label><input type="date" name="end" class="girdi"><div class="form-ipucu">30 gün kala hatırlatılır.</div></div>
+                <div class="modal-body">
+                    <div class="form-group"><label class="form-label">Başlık <span class="required">*</span></label><input name="title" class="input" required placeholder="Örn. 2026 Sosyal Medya Yönetim Sözleşmesi"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Başlangıç</label><input type="date" name="start" class="input"></div>
+                        <div class="form-group"><label class="form-label">Bitiş</label><input type="date" name="end" class="input"><div class="form-hint">30 gün kala hatırlatılır.</div></div>
                     </div>
-                    <div class="form-grup"><label class="form-etiket">Tutar (₺)</label><input name="amount" class="girdi" placeholder="0,00"></div>
-                    <div class="form-grup"><label class="form-etiket">Sözleşme Belgesi</label><input type="file" name="client" class="girdi"></div>
-                    <div class="form-grup"><label class="form-etiket">Not</label><input name="description" class="girdi"></div>
+                    <div class="form-group"><label class="form-label">Tutar (₺)</label><input name="amount" class="input" placeholder="0,00"></div>
+                    <div class="form-group"><label class="form-label">Sözleşme Belgesi</label><input type="file" name="client" class="input"></div>
+                    <div class="form-group"><label class="form-label">Not</label><input name="description" class="input"></div>
                 </div>
-                <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+                <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button></div>
             </form></div>
         </div>
         <?php endif; ?>
@@ -335,125 +334,125 @@ page_start($client['name'], 'clients');
 
 <?php
 // Project modal
-$clients = rows("SELECT id, name FROM clients WHERE status='aktif' ORDER BY name");
-$pmler = rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm') AND is_active=1 ORDER BY name");
-if (permission('dosya_yonet')):
+$clients = rows("SELECT id, name FROM clients WHERE status='active' ORDER BY name");
+$pms = rows("SELECT id, name FROM users WHERE role IN ('admin','pm') AND is_active=1 ORDER BY name");
+if (permission('client_manage')):
 ?>
-<div class="modal-katman" id="modalProject">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Yeni Proje — <?= e($client['name']) ?></div><button class="modal-kapat" data-modal-close>✕</button></div>
+<div class="modal-overlay" id="modalProject">
+    <div class="modal"><div class="modal-top"><div class="modal-title">Yeni Proje — <?= e($client['name']) ?></div><button class="modal-close" data-modal-close>✕</button></div>
         <form data-ajax="project_save">
             <input type="hidden" name="client_id" value="<?= $id ?>">
-            <div class="modal-govde">
-                <div class="form-grup"><label class="form-etiket">Proje Adı <span class="zorunlu">*</span></label><input name="name" class="girdi" required></div>
-                <div class="form-satir">
-                    <div class="form-grup"><label class="form-etiket">Hizmet Türü</label><select name="type" class="secim"><?php foreach (PROJECT_TYPES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
-                    <div class="form-grup"><label class="form-etiket">Proje Yöneticisi</label><select name="pm_id" class="secim"><option value="">—</option><?php foreach ($pmler as $pm): ?><option value="<?= $pm['id'] ?>"><?= e($pm['name']) ?></option><?php endforeach; ?></select></div>
+            <div class="modal-body">
+                <div class="form-group"><label class="form-label">Proje Adı <span class="required">*</span></label><input name="name" class="input" required></div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Hizmet Türü</label><select name="type" class="select"><?php foreach (PROJECT_TYPES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                    <div class="form-group"><label class="form-label">Proje Yöneticisi</label><select name="pm_id" class="select"><option value="">—</option><?php foreach ($pms as $pm): ?><option value="<?= $pm['id'] ?>"><?= e($pm['name']) ?></option><?php endforeach; ?></select></div>
                 </div>
-                <div class="form-satir">
-                    <div class="form-grup"><label class="form-etiket">Başlangıç</label><input type="date" name="start" class="girdi"></div>
-                    <div class="form-grup"><label class="form-etiket">Sözleşme Tutarı (₺)</label><input name="contract_amount" class="girdi" placeholder="0,00"></div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Başlangıç</label><input type="date" name="start" class="input"></div>
+                    <div class="form-group"><label class="form-label">Sözleşme Tutarı (₺)</label><input name="contract_amount" class="input" placeholder="0,00"></div>
                 </div>
-                <div class="form-grup"><label class="form-etiket">Proje Şablonu (opsiyonel)</label><select name="ptemplate_id" class="secim"><option value="">— Boş proje</option><?php foreach (rows("SELECT id, name FROM project_templates ORDER BY name") as $psx): ?><option value="<?= $psx['id'] ?>"><?= e($psx['name']) ?></option><?php endforeach; ?></select><div class="form-ipucu">Seçilirse şablondaki görevler akışlarıyla birlikte kurulur.</div></div>
+                <div class="form-group"><label class="form-label">Proje Şablonu (opsiyonel)</label><select name="ptemplate_id" class="select"><option value="">— Boş proje</option><?php foreach (rows("SELECT id, name FROM project_templates ORDER BY name") as $templateRow): ?><option value="<?= $templateRow['id'] ?>"><?= e($templateRow['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse şablondaki görevler akışlarıyla birlikte kurulur.</div></div>
                 <?php member_picker(array_column($clientMembers, 'id')); ?>
-                <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="description" class="metin-alani"></textarea></div>
+                <div class="form-group"><label class="form-label">Açıklama</label><textarea name="description" class="text-area"></textarea></div>
             </div>
-            <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Oluştur</button></div>
+            <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Oluştur</button></div>
         </form>
     </div>
 </div>
 
 <!-- Edit client file modal -->
-<div class="modal-katman" id="modalClientDuzen">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Dosyayı Düzenle</div><button class="modal-kapat" data-modal-close>✕</button></div>
+<div class="modal-overlay" id="modalClientEdit">
+    <div class="modal"><div class="modal-top"><div class="modal-title">Dosyayı Düzenle</div><button class="modal-close" data-modal-close>✕</button></div>
         <form data-ajax="client_save">
             <input type="hidden" name="id" value="<?= $id ?>">
-            <div class="modal-govde">
-                <div class="form-satir">
-                    <div class="form-grup"><label class="form-etiket">Dosya Adı</label><input name="name" class="girdi" value="<?= e($client['name']) ?>" required></div>
-                    <div class="form-grup"><label class="form-etiket">Tür</label><select name="type" class="secim"><?php foreach (CLIENT_TYPES as $k => $v): ?><option value="<?= $k ?>" <?= $client['type'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Dosya Adı</label><input name="name" class="input" value="<?= e($client['name']) ?>" required></div>
+                    <div class="form-group"><label class="form-label">Tür</label><select name="type" class="select"><?php foreach (CLIENT_TYPES as $k => $v): ?><option value="<?= $k ?>" <?= $client['type'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
                 </div>
-                <div class="form-grup"><label class="form-etiket">Renk</label><div class="satir-esnek sarma" id="renkSecim2"><?php foreach (['#b1fb01', '#182f5d', '#610714', '#f8f2cb', '#3b9df0', '#35c66b', '#f5a524', '#a58bf0'] as $r): ?><label style="cursor:pointer"><input type="radio" name="color" value="<?= $r ?>" <?= $r === $client['color'] ? 'checked' : '' ?> style="display:none" class="renk-radio2"><span class="etiket-nokta" style="width:28px;height:28px;background:<?= $r ?>;border:2px solid <?= $r === $client['color'] ? 'var(--text)' : 'transparent' ?>"></span></label><?php endforeach; ?></div></div>
-                <div class="form-grup"><label class="form-etiket">Logo <?= $client['logo'] ? '(mevcut logoyu değiştirir)' : '' ?></label><input type="file" name="logo" class="girdi" accept="image/*"></div>
+                <div class="form-group"><label class="form-label">Renk</label><div class="row-flex wrap" id="colorSelect2"><?php foreach (['#b1fb01', '#182f5d', '#610714', '#f8f2cb', '#3b9df0', '#35c66b', '#f5a524', '#a58bf0'] as $r): ?><label style="cursor:pointer"><input type="radio" name="color" value="<?= $r ?>" <?= $r === $client['color'] ? 'checked' : '' ?> style="display:none" class="color-radio2"><span class="label-dot" style="width:28px;height:28px;background:<?= $r ?>;border:2px solid <?= $r === $client['color'] ? 'var(--text)' : 'transparent' ?>"></span></label><?php endforeach; ?></div></div>
+                <div class="form-group"><label class="form-label">Logo <?= $client['logo'] ? '(mevcut logoyu değiştirir)' : '' ?></label><input type="file" name="logo" class="input" accept="image/*"></div>
                 <?php member_picker(array_column($clientMembers, 'id'), 'Sorumlu Ekip Üyeleri'); ?>
-                <div class="form-grup"><label class="form-etiket">Açıklama</label><textarea name="description" class="metin-alani"><?= e($client['description']) ?></textarea></div>
-                <div class="form-satir">
-                    <div class="form-grup"><label class="form-etiket">İletişim Kişisi</label><input name="contact_name" class="girdi" value="<?= e($client['contact_name']) ?>"></div>
-                    <div class="form-grup"><label class="form-etiket">Dosya Yöneticisi</label>
-                        <select name="manager_id" class="secim">
+                <div class="form-group"><label class="form-label">Açıklama</label><textarea name="description" class="text-area"><?= e($client['description']) ?></textarea></div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">İletişim Kişisi</label><input name="contact_name" class="input" value="<?= e($client['contact_name']) ?>"></div>
+                    <div class="form-group"><label class="form-label">Dosya Yöneticisi</label>
+                        <select name="manager_id" class="select">
                             <option value="">— Atanmadı</option>
-                            <?php foreach (rows("SELECT id, name FROM users WHERE role IN ('yonetici','pm','ekip') AND is_active=1 ORDER BY name") as $m2): ?>
+                            <?php foreach (rows("SELECT id, name FROM users WHERE role IN ('admin','pm','team') AND is_active=1 ORDER BY name") as $m2): ?>
                             <option value="<?= $m2['id'] ?>" <?= ($client['manager_id'] ?? null) == $m2['id'] ? 'selected' : '' ?>><?= e($m2['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <div class="form-ipucu">Aylık rapordan sorumlu kişi; hatırlatmalar ona gider.</div>
+                        <div class="form-hint">Aylık rapordan sorumlu kişi; hatırlatmalar ona gider.</div>
                     </div>
-                    <div class="form-grup"><label class="form-etiket">Drive Klasörü <span class="metin-muted" style="font-weight:400">(opsiyonel)</span></label>
-                        <input name="drive_folder" class="girdi" value="<?= e($client['drive_folder_id'] ?? '') ?>" placeholder="Klasör linki veya ID">
-                        <div class="form-ipucu">Bu dosyanın çekim aktarımları bu klasörden otomatik denetlenir (Ayarlar → Drive Entegrasyonu kuruluysa).</div>
+                    <div class="form-group"><label class="form-label">Drive Klasörü <span class="text-muted" style="font-weight:400">(opsiyonel)</span></label>
+                        <input name="drive_folder" class="input" value="<?= e($client['drive_folder_id'] ?? '') ?>" placeholder="Klasör linki veya ID">
+                        <div class="form-hint">Bu dosyanın çekim aktarımları bu klasörden otomatik denetlenir (Ayarlar → Drive Entegrasyonu kuruluysa).</div>
                     </div>
-                    <div class="form-grup"><label class="form-etiket">Telefon</label><input name="contact_phone" class="girdi" value="<?= e($client['contact_phone']) ?>"></div>
+                    <div class="form-group"><label class="form-label">Telefon</label><input name="contact_phone" class="input" value="<?= e($client['contact_phone']) ?>"></div>
                 </div>
-                <div class="form-satir">
-                    <div class="form-grup"><label class="form-etiket">E-posta</label><input type="email" name="contact_email" class="girdi" value="<?= e($client['contact_email']) ?>"></div>
-                    <div class="form-grup"><label class="form-etiket">Durum</label><select name="status" class="secim"><option value="aktif" <?= $client['status'] === 'aktif' ? 'selected' : '' ?>>Aktif</option><option value="pasif" <?= $client['status'] === 'pasif' ? 'selected' : '' ?>>Pasif</option></select></div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">E-posta</label><input type="email" name="contact_email" class="input" value="<?= e($client['contact_email']) ?>"></div>
+                    <div class="form-group"><label class="form-label">Durum</label><select name="status" class="select"><option value="active" <?= $client['status'] === 'active' ? 'selected' : '' ?>>Aktif</option><option value="inactive" <?= $client['status'] === 'inactive' ? 'selected' : '' ?>>Pasif</option></select></div>
                 </div>
             </div>
             <div class="modal-alt">
-                <?php if (is_admin()): ?><button type="button" class="btn btn-tehlike" data-action="client_delete" data-id="<?= $id ?>" data-approval="Bu dosyayı silmek istediğinize emin misiniz?" style="margin-right:auto">Sil</button><?php endif; ?>
-                <button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button>
+                <?php if (is_admin()): ?><button type="button" class="btn btn-danger" data-action="client_delete" data-id="<?= $id ?>" data-confirm="Bu dosyayı silmek istediğinize emin misiniz?" style="margin-right:auto">Sil</button><?php endif; ?>
+                <button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button>
             </div>
         </form>
     </div>
 </div>
 <script>
-function clientEdit() { modalOpen('modalClientDuzen'); }
-document.getElementById('renkSecim2')?.addEventListener('change', () => {
-    document.querySelectorAll('.renk-radio2').forEach(r => r.nextElementSibling.style.borderColor = r.checked ? 'var(--text)' : 'transparent');
+function clientEdit() { modalOpen('modalClientEdit'); }
+document.getElementById('colorSelect2')?.addEventListener('change', () => {
+    document.querySelectorAll('.color-radio2').forEach(r => r.nextElementSibling.style.borderColor = r.checked ? 'var(--text)' : 'transparent');
 });
 </script>
-<?php endif; /* /dosya_yonet modals */ ?>
+<?php endif; /* /client_manage modals */ ?>
 
-<?php if (permission('icerik_yonet')): ?>
+<?php if (permission('content_manage')): ?>
 <!-- Add social account -->
-<div class="modal-katman" id="modalSocialAccount">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik">Sosyal Medya Hesabı Ekle</div><button class="modal-kapat" data-modal-close>✕</button></div>
+<div class="modal-overlay" id="modalSocialAccount">
+    <div class="modal"><div class="modal-top"><div class="modal-title">Sosyal Medya Hesabı Ekle</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="social_account_add">
         <input type="hidden" name="client_id" value="<?= $id ?>">
-        <div class="modal-govde">
-            <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Platform</label><select name="platform" class="secim"><?php foreach (PLATFORMS as $k => $v): if ($k === 'diger') continue; ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
-                <div class="form-grup"><label class="form-etiket">Kullanıcı Adı <span class="zorunlu">*</span></label><input name="username" class="girdi" required placeholder="@markaadi"></div>
+        <div class="modal-body">
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Platform</label><select name="platform" class="select"><?php foreach (PLATFORMS as $k => $v): if ($k === 'other') continue; ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-group"><label class="form-label">Kullanıcı Adı <span class="required">*</span></label><input name="username" class="input" required placeholder="@markaadi"></div>
             </div>
-            <div class="form-grup"><label class="form-etiket">Profil Linki</label><input name="url" class="girdi" placeholder="instagram.com/markaadi"></div>
+            <div class="form-group"><label class="form-label">Profil Linki</label><input name="url" class="input" placeholder="instagram.com/markaadi"></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Ekle</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Ekle</button></div>
     </form></div>
 </div>
 <?php endif; ?>
 
 <?php if (is_staff()): ?>
 <!-- Enter metrics -->
-<div class="modal-katman" id="modalMetric">
-    <div class="modal"><div class="modal-ust"><div class="modal-baslik" id="metricTitle">Veri Gir</div><button class="modal-kapat" data-modal-close>✕</button></div>
+<div class="modal-overlay" id="modalMetric">
+    <div class="modal"><div class="modal-top"><div class="modal-title" id="metricTitle">Veri Gir</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="social_metric_add">
         <input type="hidden" name="account_id" id="mt_account">
-        <div class="modal-govde">
-            <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Tarih</label><input type="date" name="date" class="girdi" value="<?= date('Y-m-d') ?>"><div class="form-ipucu">Aynı güne ikinci giriş, öncekini günceller.</div></div>
-                <div class="form-grup"><label class="form-etiket">Takipçi Sayısı <span class="zorunlu">*</span></label><input name="followers" class="girdi" required placeholder="Örn. 12500"></div>
+        <div class="modal-body">
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Tarih</label><input type="date" name="date" class="input" value="<?= date('Y-m-d') ?>"><div class="form-hint">Aynı güne ikinci giriş, öncekini günceller.</div></div>
+                <div class="form-group"><label class="form-label">Takipçi Sayısı <span class="required">*</span></label><input name="followers" class="input" required placeholder="Örn. 12500"></div>
             </div>
-            <div class="form-satir">
-                <div class="form-grup"><label class="form-etiket">Gönderi Sayısı</label><input name="post" class="girdi" placeholder="Opsiyonel"></div>
-                <div class="form-grup"><label class="form-etiket">Etkileşim</label><input name="engagement" class="girdi" placeholder="Beğeni+yorum vb."></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Gönderi Sayısı</label><input name="post" class="input" placeholder="Opsiyonel"></div>
+                <div class="form-group"><label class="form-label">Etkileşim</label><input name="engagement" class="input" placeholder="Beğeni+yorum vb."></div>
             </div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-hayalet" data-modal-close>İptal</button><button type="submit" class="btn btn-marka">Kaydet</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button></div>
     </form></div>
 </div>
 <?php endif; ?>
 
 <script>
-function metricGir(accountId, kadi) {
+function metricEnter(accountId, kadi) {
     document.getElementById('mt_account').value = accountId;
     document.getElementById('metricTitle').textContent = kadi + ' — Veri Gir';
     modalOpen('modalMetric');

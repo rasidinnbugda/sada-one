@@ -11,25 +11,25 @@ $u = require_admin();
 
 require_once __DIR__ . '/includes/migration.php';
 // Same lock as the automatic self-heal: never two migration runs at once
-$kilit = 'sada_migrate_' . substr(md5((string)($GLOBALS['config']['db_name'] ?? '')), 0, 20);
-if ((int)val("SELECT GET_LOCK(?, 20)", [$kilit]) !== 1) die('Başka bir şema güncellemesi sürüyor, biraz sonra tekrar deneyin.');
+$lock = 'sada_migrate_' . substr(md5((string)($GLOBALS['config']['db_name'] ?? '')), 0, 20);
+if ((int)val("SELECT GET_LOCK(?, 20)", [$lock]) !== 1) die('Başka bir şema güncellemesi sürüyor, biraz sonra tekrar deneyin.');
 $results = run_migrations(db());
 q("INSERT INTO settings (setting_key, setting_value) VALUES ('schema_version', ?) ON DUPLICATE KEY UPDATE setting_value=?", [APP_VERSION, APP_VERSION]);
-val("SELECT RELEASE_LOCK(?)", [$kilit]);
+val("SELECT RELEASE_LOCK(?)", [$lock]);
 ?>
 <!DOCTYPE html>
 <html lang="tr" data-theme="lime">
-<head><meta charset="UTF-8"><title>Güncelleme</title><link rel="stylesheet" href="assets/css/app.css"></head>
+<head><meta charset="UTF-8"><title>Güncelleme</title><link rel="stylesheet" href="assets/css/app.css?v=<?= APP_VERSION ?>"></head>
 <body style="padding:40px;max-width:820px;margin:0 auto">
 <h1 style="font-family:'Space Grotesk',sans-serif;margin-bottom:8px">Veritabanı Güncellemesi</h1>
-<p class="metin-2" style="margin-bottom:24px">v2 şema değişiklikleri uygulandı. "Atlandı" satırları zaten güncel olan kısımlardır.</p>
+<p class="text-2" style="margin-bottom:24px">Şema değişiklikleri uygulandı. "Atlandı" satırları zaten güncel olan kısımlardır.</p>
 <?php foreach ($results as [$status, $sql]): ?>
 <div style="padding:9px 14px;margin-bottom:6px;border-radius:10px;font-size:12.5px;font-family:monospace;background:var(--surface);border:1px solid var(--border)">
-    <?= ['ok' => '✅', 'skip' => '⏭️', 'hata' => '❌', 'error' => '❌'][$status] ?? '❔' ?> <?= e(mb_substr($sql, 0, 110)) ?>
+    <?= ['ok' => '✅', 'skip' => '⏭️', 'error' => '❌'][$status] ?? '❔' ?> <?= e(mb_substr($sql, 0, 110)) ?>
 </div>
 <?php endforeach; ?>
-<div style="margin-top:24px;padding:14px 18px;border-radius:12px;background:var(--parlak);border:1px solid var(--border-2)">
-    <b>Bitti!</b> Güvenlik için bu dosyayı (<code>migrate.php</code>) sunucudan silin. <a href="index.php" style="color:var(--marka);font-weight:600">Panele dön →</a>
+<div style="margin-top:24px;padding:14px 18px;border-radius:12px;background:var(--bright);border:1px solid var(--border-2)">
+    <b>Bitti!</b> Güvenlik için bu dosyayı (<code>migrate.php</code>) sunucudan silin. <a href="index.php" style="color:var(--brand);font-weight:600">Panele dön →</a>
 </div>
 </body>
 </html>

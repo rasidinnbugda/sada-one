@@ -12,7 +12,7 @@ require_once __DIR__ . '/includes/google-drive.php';
 
 $redirect = full_url('oauth-google.php');
 
-if (isset($_GET['baslat'])) {
+if (isset($_GET['start'])) {
     if (setting('google_client_id') === '' || setting('google_client_secret') === '') {
         header('Location: settings.php?drive_err=' . urlencode('Önce Client ID ve Client Secret alanlarını kaydedin.'));
         exit;

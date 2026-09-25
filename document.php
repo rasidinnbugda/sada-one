@@ -3,16 +3,16 @@
  * SADA One — Quote / Invoice Document (printable)
  */
 require __DIR__ . '/includes/init.php';
-require_permission('finans');
+require_permission('finance');
 
 $id = (int)($_GET['id'] ?? 0);
 $b = row("SELECT b.*, d.name client_name, d.contact_name, d.contact_email, us.name creator_name FROM documents b LEFT JOIN clients d ON d.id=b.client_id LEFT JOIN users us ON us.id=b.created_by WHERE b.id=?", [$id]);
 if (!$b) { header('Location: finance.php'); exit; }
 $items = json_decode($b['items'], true) ?: [];
-$searchTotal = array_sum(array_map(fn($k) => $k['adet'] * $k['price'], $items));
+$searchTotal = array_sum(array_map(fn($k) => $k['qty'] * $k['price'], $items));
 $vat = $searchTotal * $b['vat_rate'] / 100;
-$siteName = setting('site_adi', 'SADA One');
-$typeName = $b['type'] === 'fatura' ? 'FATURA' : 'TEKLİF';
+$siteName = setting('site_name', 'SADA One');
+$typeName = $b['type'] === 'invoice' ? 'FATURA' : 'TEKLİF';
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -22,21 +22,21 @@ $typeName = $b['type'] === 'fatura' ? 'FATURA' : 'TEKLİF';
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',sans-serif; color:#1a2233; background:#f0f2f7; font-size:13.5px; line-height:1.55; }
-.yazdir-bar { position:sticky; top:0; background:#182f5d; color:#fff; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; }
-.belge { max-width:800px; margin:24px auto; background:#fff; padding:48px; border-radius:4px; box-shadow:0 4px 20px rgba(0,0,0,.08); }
-@media print { .yazdir-bar { display:none; } .belge { margin:0; box-shadow:none; padding:20px; } body { background:#fff; } }
+.print-bar { position:sticky; top:0; background:#182f5d; color:#fff; padding:12px 24px; display:flex; justify-content:space-between; align-items:center; }
+.document { max-width:800px; margin:24px auto; background:#fff; padding:48px; border-radius:4px; box-shadow:0 4px 20px rgba(0,0,0,.08); }
+@media print { .print-bar { display:none; } .document { margin:0; box-shadow:none; padding:20px; } body { background:#fff; } }
 table { width:100%; border-collapse:collapse; margin:24px 0; }
 th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#5a6780; padding:9px 12px; background:#f0f3f9; }
 td { padding:10px 12px; border-bottom:1px solid #eef0f5; }
-.sag { text-align:right; }
+.right { text-align:right; }
 </style>
 </head>
 <body>
-<div class="yazdir-bar">
+<div class="print-bar">
     <span style="font-weight:600"><?= e($b['doc_no']) ?> önizleme</span>
     <button onclick="window.print()" style="background:#b1fb01;color:#14210a;border:none;padding:8px 18px;border-radius:9px;font-weight:700;cursor:pointer">🖨 Yazdır / PDF</button>
 </div>
-<div class="belge">
+<div class="document">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #182f5d;padding-bottom:20px">
         <div>
             <?php if (setting('site_logo')): ?><img src="uploads/<?= e(setting('site_logo')) ?>" style="max-height:48px;max-width:200px;object-fit:contain">
@@ -61,10 +61,10 @@ td { padding:10px 12px; border-bottom:1px solid #eef0f5; }
     <div style="margin-top:18px;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600"><?= e($b['title']) ?></div>
 
     <table>
-        <thead><tr><th>Hizmet / Ürün</th><th class="sag">Adet</th><th class="sag">Birim Fiyat</th><th class="sag">Tutar</th></tr></thead>
+        <thead><tr><th>Hizmet / Ürün</th><th class="right">Adet</th><th class="right">Birim Fiyat</th><th class="right">Tutar</th></tr></thead>
         <tbody>
         <?php foreach ($items as $k): ?>
-        <tr><td><?= e($k['name']) ?></td><td class="sag"><?= rtrim(rtrim(number_format($k['adet'], 2, ',', '.'), '0'), ',') ?></td><td class="sag"><?= money($k['price']) ?></td><td class="sag" style="font-weight:600"><?= money($k['adet'] * $k['price']) ?></td></tr>
+        <tr><td><?= e($k['name']) ?></td><td class="right"><?= rtrim(rtrim(number_format($k['qty'], 2, ',', '.'), '0'), ',') ?></td><td class="right"><?= money($k['price']) ?></td><td class="right" style="font-weight:600"><?= money($k['qty'] * $k['price']) ?></td></tr>
         <?php endforeach; ?>
         </tbody>
     </table>

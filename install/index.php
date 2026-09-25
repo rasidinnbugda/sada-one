@@ -22,7 +22,7 @@ $step = isset($_GET['step']) ? (int)$_GET['step'] : 1;
 $error = '';
 
 /* ---------- Step 1: Requirements check ---------- */
-$gereksinimler = [
+$requirements = [
     'PHP 7.4 veya üzeri' => version_compare(PHP_VERSION, '7.4.0', '>='),
     'PDO MySQL eklentisi' => extension_loaded('pdo_mysql'),
     'mbstring eklentisi' => extension_loaded('mbstring'),
@@ -31,7 +31,7 @@ $gereksinimler = [
     'Ana dizin yazılabilir (config.php için)' => is_writable(dirname(__DIR__)),
     'uploads/ klasörü yazılabilir' => is_writable(dirname(__DIR__) . '/uploads') || @mkdir(dirname(__DIR__) . '/uploads', 0755, true),
 ];
-$gereksinimTamam = !in_array(false, $gereksinimler, true);
+$requirementsMet = !in_array(false, $requirements, true);
 
 /* ---------- Step 2: Database connection ---------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
@@ -57,14 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
     $siteName   = trim($_POST['site_name'] ?? 'SADA One');
     $adminAd   = trim($_POST['admin_name'] ?? '');
     $adminMail = trim($_POST['admin_email'] ?? '');
-    $adminSifre = $_POST['admin_password'] ?? '';
-    $adminSifre2 = $_POST['admin_password2'] ?? '';
+    $adminPassword = $_POST['admin_password'] ?? '';
+    $adminPassword2 = $_POST['admin_password2'] ?? '';
 
     if ($adminAd === '' || !filter_var($adminMail, FILTER_VALIDATE_EMAIL)) {
         $error = 'Ad ve geçerli bir e-posta adresi girin.';
-    } elseif (strlen($adminSifre) < 6) {
+    } elseif (strlen($adminPassword) < 6) {
         $error = 'Şifre en az 6 karakter olmalı.';
-    } elseif ($adminSifre !== $adminSifre2) {
+    } elseif ($adminPassword !== $adminPassword2) {
         $error = 'Şifreler eşleşmiyor.';
     } else {
         $db = $_SESSION['install_db'];
@@ -72,16 +72,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
             $pdo = new PDO("mysql:host={$db['host']};dbname={$db['name']};charset=utf8mb4", $db['user'], $db['pass'], [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             ]);
-            install_run($pdo, $siteName, $adminAd, $adminMail, $adminSifre);
+            install_run($pdo, $siteName, $adminAd, $adminMail, $adminPassword);
 
-            $configIcerik = "<?php\nreturn [\n"
+            $configContent = "<?php\nreturn [\n"
                 . "    'db_host' => " . var_export($db['host'], true) . ",\n"
                 . "    'db_name' => " . var_export($db['name'], true) . ",\n"
                 . "    'db_user' => " . var_export($db['user'], true) . ",\n"
                 . "    'db_pass' => " . var_export($db['pass'], true) . ",\n"
                 . "    'installed' => true,\n"
                 . "];\n";
-            if (file_put_contents($configPath, $configIcerik) === false) {
+            if (file_put_contents($configPath, $configContent) === false) {
                 $error = 'config.php yazılamadı. Ana dizin izinlerini kontrol edin.';
             } else {
                 unset($_SESSION['install_db']);
@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 3) {
 }
 
 /* ---------- Schema + seed data ---------- */
-function install_run(PDO $pdo, $siteName, $adminAd, $adminMail, $adminSifre) {
+function install_run(PDO $pdo, $siteName, $adminAd, $adminMail, $adminPassword) {
     $sql = <<<'SQL'
 CREATE TABLE IF NOT EXISTS settings (
     setting_key VARCHAR(64) PRIMARY KEY,
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(150) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    role ENUM('yonetici','pm','ekip','finans','stajyer','musteri') NOT NULL DEFAULT 'ekip',
+    role ENUM('admin','pm','team','finance','intern','customer') NOT NULL DEFAULT 'team',
     job_title VARCHAR(100) DEFAULT NULL,
     client_id INT DEFAULT NULL,
     theme VARCHAR(20) NOT NULL DEFAULT 'lime',
@@ -129,14 +129,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS clients (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
-    type ENUM('marka','sirket','stk') NOT NULL DEFAULT 'marka',
+    type ENUM('brand','company','ngo') NOT NULL DEFAULT 'brand',
     color VARCHAR(7) NOT NULL DEFAULT '#182f5d',
     logo VARCHAR(255) DEFAULT NULL,
     description TEXT,
     contact_name VARCHAR(100) DEFAULT NULL,
     contact_email VARCHAR(150) DEFAULT NULL,
     contact_phone VARCHAR(30) DEFAULT NULL,
-    status ENUM('aktif','pasif') NOT NULL DEFAULT 'aktif',
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
@@ -144,9 +144,9 @@ CREATE TABLE IF NOT EXISTS projects (
     id INT AUTO_INCREMENT PRIMARY KEY,
     client_id INT NOT NULL,
     name VARCHAR(200) NOT NULL,
-    type ENUM('aylik','donemsel','tek') NOT NULL DEFAULT 'aylik',
+    type ENUM('monthly','periodic','one_off') NOT NULL DEFAULT 'monthly',
     description TEXT,
-    status ENUM('aktif','beklemede','tamamlandi','iptal') NOT NULL DEFAULT 'aktif',
+    status ENUM('active','on_hold','completed','cancelled') NOT NULL DEFAULT 'active',
     start DATE DEFAULT NULL,
     `end` DATE DEFAULT NULL,
     pm_id INT DEFAULT NULL,
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS periods (
     project_id INT NOT NULL,
     year SMALLINT NOT NULL,
     month TINYINT NOT NULL,
-    status ENUM('acik','kapali') NOT NULL DEFAULT 'acik',
+    status ENUM('open','closed') NOT NULL DEFAULT 'open',
     created DATETIME NOT NULL,
     UNIQUE KEY uniq_period (project_id, year, month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
@@ -188,14 +188,14 @@ CREATE TABLE IF NOT EXISTS tasks (
     description TEXT,
     assignee_id INT DEFAULT NULL,
     created_by INT NOT NULL,
-    priority ENUM('dusuk','normal','yuksek','acil') NOT NULL DEFAULT 'normal',
-    status ENUM('yapilacak','devam','incelemede','onayda','tamamlandi') NOT NULL DEFAULT 'yapilacak',
+    priority ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
+    status ENUM('todo','in_progress','in_review','awaiting_approval','completed') NOT NULL DEFAULT 'todo',
     due_date DATE DEFAULT NULL,
     completion DATETIME DEFAULT NULL,
     sort_order INT NOT NULL DEFAULT 0,
-    bagimli_id INT DEFAULT NULL,
+    depends_on_id INT DEFAULT NULL,
     lock_bypassed TINYINT(1) NOT NULL DEFAULT 0,
-    `repeat` ENUM('yok','haftalik','aylik') NOT NULL DEFAULT 'yok',
+    `repeat` ENUM('none','weekly','monthly') NOT NULL DEFAULT 'none',
     last_repeat VARCHAR(10) DEFAULT NULL,
     tags VARCHAR(255) DEFAULT NULL,
     estimated_minutes INT NOT NULL DEFAULT 0,
@@ -233,7 +233,7 @@ CREATE TABLE IF NOT EXISTS task_steps (
     sort_order TINYINT NOT NULL DEFAULT 1,
     name VARCHAR(120) NOT NULL,
     owner_id INT DEFAULT NULL,
-    status ENUM('bekliyor','aktif','tamam') NOT NULL DEFAULT 'bekliyor',
+    status ENUM('pending','active','done') NOT NULL DEFAULT 'pending',
     done_date DATETIME DEFAULT NULL,
     INDEX(task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
@@ -251,11 +251,11 @@ CREATE TABLE IF NOT EXISTS comments (
     INDEX(ref_type, ref_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS comment_box_reactions (
-    comment_box_id INT NOT NULL,
+CREATE TABLE IF NOT EXISTS comment_reactions (
+    comment_id INT NOT NULL,
     user_id INT NOT NULL,
     emoji VARCHAR(8) NOT NULL,
-    PRIMARY KEY (comment_box_id, user_id, emoji)
+    PRIMARY KEY (comment_id, user_id, emoji)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
 CREATE TABLE IF NOT EXISTS task_watchers (
@@ -272,12 +272,12 @@ CREATE TABLE IF NOT EXISTS task_assignees (
 
 CREATE TABLE IF NOT EXISTS expenses (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    type ENUM('maas','kira','abonelik','ekipman','vergi','diger') NOT NULL DEFAULT 'diger',
+    type ENUM('salary','rent','subscription','equipment','tax','other') NOT NULL DEFAULT 'other',
     title VARCHAR(200) NOT NULL,
     amount DECIMAL(12,2) NOT NULL DEFAULT 0,
     date DATE NOT NULL,
-    status ENUM('bekliyor','odendi') NOT NULL DEFAULT 'bekliyor',
-    `repeat` ENUM('yok','aylik') NOT NULL DEFAULT 'yok',
+    status ENUM('pending','paid') NOT NULL DEFAULT 'pending',
+    `repeat` ENUM('none','monthly') NOT NULL DEFAULT 'none',
     last_repeat VARCHAR(10) DEFAULT NULL,
     user_id INT DEFAULT NULL,
     description VARCHAR(255) DEFAULT NULL,
@@ -313,15 +313,15 @@ CREATE TABLE IF NOT EXISTS equipment (
     id INT AUTO_INCREMENT PRIMARY KEY,
     code VARCHAR(20) DEFAULT NULL,
     name VARCHAR(150) NOT NULL,
-    category ENUM('kamera','lens','sd_kart','tripod','isik','ses','drone','aksesuar','diger') NOT NULL DEFAULT 'diger',
+    category ENUM('camera','lens','sd_card','tripod','light','audio','drone','accessory','other') NOT NULL DEFAULT 'other',
     photo VARCHAR(255) DEFAULT NULL,
-    status ENUM('studyoda','zimmette','cekimde','arizali','bakimda') NOT NULL DEFAULT 'studyoda',
+    status ENUM('in_studio','checked_out','on_shoot','faulty','in_maintenance') NOT NULL DEFAULT 'in_studio',
     custody_user_id INT DEFAULT NULL,
     custody_event_id INT DEFAULT NULL,
     fault_note VARCHAR(255) DEFAULT NULL,
     purchase_date DATE DEFAULT NULL,
     price DECIMAL(12,2) NOT NULL DEFAULT 0,
-    sd_status ENUM('bos','dolu','aktarildi') DEFAULT NULL,
+    sd_status ENUM('empty','full','transferred') DEFAULT NULL,
     sd_content VARCHAR(255) DEFAULT NULL,
     sd_drive_link VARCHAR(255) DEFAULT NULL,
     description VARCHAR(255) DEFAULT NULL,
@@ -396,7 +396,7 @@ CREATE TABLE IF NOT EXISTS contents (
     platform VARCHAR(120) NOT NULL DEFAULT 'instagram',
     date DATE NOT NULL,
     time TIME DEFAULT NULL,
-    status ENUM('taslak','ic_onay','musteri_onay','revize','onaylandi','yayinlandi') NOT NULL DEFAULT 'taslak',
+    status ENUM('draft','internal_approval','customer_approval','revision','approved','published') NOT NULL DEFAULT 'draft',
     created_by INT NOT NULL,
     created DATETIME NOT NULL,
     INDEX(client_id), INDEX(project_id), INDEX(date)
@@ -424,13 +424,13 @@ CREATE TABLE IF NOT EXISTS client_notes (
 
 CREATE TABLE IF NOT EXISTS documents (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    type ENUM('teklif','fatura') NOT NULL DEFAULT 'teklif',
+    type ENUM('quote','invoice') NOT NULL DEFAULT 'quote',
     doc_no VARCHAR(20) NOT NULL,
     client_id INT DEFAULT NULL,
     title VARCHAR(200) NOT NULL,
     items TEXT,
     vat_rate TINYINT NOT NULL DEFAULT 20,
-    status ENUM('taslak','gonderildi','onaylandi','reddedildi') NOT NULL DEFAULT 'taslak',
+    status ENUM('draft','sent','approved','rejected') NOT NULL DEFAULT 'draft',
     valid_until DATE DEFAULT NULL,
     notes VARCHAR(500) DEFAULT NULL,
     created_by INT NOT NULL,
@@ -465,7 +465,7 @@ CREATE TABLE IF NOT EXISTS events (
     client_id INT DEFAULT NULL,
     project_id INT DEFAULT NULL,
     title VARCHAR(200) NOT NULL,
-    type ENUM('cekim','toplanti','teslim','diger') NOT NULL DEFAULT 'cekim',
+    type ENUM('shoot','meeting','delivery','other') NOT NULL DEFAULT 'shoot',
     start DATETIME NOT NULL,
     `end` DATETIME DEFAULT NULL,
     place VARCHAR(200) DEFAULT NULL,
@@ -489,7 +489,7 @@ CREATE TABLE IF NOT EXISTS personal_notes (
     user_id INT NOT NULL,
     title VARCHAR(150) DEFAULT NULL,
     text TEXT,
-    color VARCHAR(20) NOT NULL DEFAULT 'varsayilan',
+    color VARCHAR(20) NOT NULL DEFAULT 'default',
     created DATETIME NOT NULL,
     `update` DATETIME DEFAULT NULL,
     INDEX(user_id)
@@ -512,12 +512,12 @@ CREATE TABLE IF NOT EXISTS customer_clients (
 
 CREATE TABLE IF NOT EXISTS ratings (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    ref_type ENUM('gorev','onay') NOT NULL,
+    ref_type ENUM('task','approval') NOT NULL,
     ref_id INT NOT NULL,
     project_id INT NOT NULL,
     user_id INT NOT NULL,
     rating TINYINT NOT NULL,
-    comment_box VARCHAR(500) DEFAULT NULL,
+    comment VARCHAR(500) DEFAULT NULL,
     created DATETIME NOT NULL,
     UNIQUE KEY uniq_rating (ref_type, ref_id, user_id),
     INDEX(project_id)
@@ -531,7 +531,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     date DATETIME NOT NULL,
     online_request TINYINT(1) NOT NULL DEFAULT 0,
     notes VARCHAR(500) DEFAULT NULL,
-    status ENUM('bekliyor','onaylandi','alternatif','reddedildi') NOT NULL DEFAULT 'bekliyor',
+    status ENUM('pending','approved','alternative','rejected') NOT NULL DEFAULT 'pending',
     alternative_date DATETIME DEFAULT NULL,
     online_link VARCHAR(255) DEFAULT NULL,
     event_id INT DEFAULT NULL,
@@ -557,7 +557,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     drive_link VARCHAR(500) DEFAULT NULL,
     content_id INT DEFAULT NULL,
     task_id INT DEFAULT NULL,
-    status ENUM('bekliyor','onaylandi','revize','reddedildi') NOT NULL DEFAULT 'bekliyor',
+    status ENUM('pending','approved','revision','rejected') NOT NULL DEFAULT 'pending',
     sender_id INT NOT NULL,
     reply_note TEXT,
     reply_date DATETIME DEFAULT NULL,
@@ -569,7 +569,7 @@ CREATE TABLE IF NOT EXISTS approvals (
 CREATE TABLE IF NOT EXISTS channels (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(120) NOT NULL,
-    type ENUM('genel','proje','ozel','musteri') NOT NULL DEFAULT 'genel',
+    type ENUM('general','project','private','customer') NOT NULL DEFAULT 'general',
     project_id INT DEFAULT NULL,
     icon VARCHAR(8) DEFAULT NULL,
     created DATETIME NOT NULL
@@ -604,8 +604,8 @@ CREATE TABLE IF NOT EXISTS form_fields (
     id INT AUTO_INCREMENT PRIMARY KEY,
     template_id INT NOT NULL,
     sort_order TINYINT NOT NULL DEFAULT 1,
-    tag VARCHAR(150) NOT NULL,
-    type ENUM('metin','uzun_metin','secim','tarih','sayi','dosya') NOT NULL DEFAULT 'metin',
+    label VARCHAR(150) NOT NULL,
+    type ENUM('text','long_text','select','date','number','file') NOT NULL DEFAULT 'text',
     options TEXT,
     is_required TINYINT(1) NOT NULL DEFAULT 1,
     INDEX(template_id)
@@ -618,7 +618,7 @@ CREATE TABLE IF NOT EXISTS requests (
     project_id INT DEFAULT NULL,
     sender_id INT NOT NULL,
     title VARCHAR(200) NOT NULL,
-    status ENUM('yeni','inceleniyor','gorev_olusturuldu','tamamlandi','reddedildi') NOT NULL DEFAULT 'yeni',
+    status ENUM('new','reviewing','task_created','completed','rejected') NOT NULL DEFAULT 'new',
     assignee_id INT DEFAULT NULL,
     task_id INT DEFAULT NULL,
     created DATETIME NOT NULL,
@@ -629,18 +629,18 @@ CREATE TABLE IF NOT EXISTS request_replies (
     id INT AUTO_INCREMENT PRIMARY KEY,
     request_id INT NOT NULL,
     field_id INT NOT NULL,
-    setting_value TEXT,
+    value TEXT,
     INDEX(request_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
 CREATE TABLE IF NOT EXISTS payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT NOT NULL,
-    type ENUM('fatura','tahsilat') NOT NULL DEFAULT 'fatura',
+    type ENUM('invoice','collection') NOT NULL DEFAULT 'invoice',
     title VARCHAR(200) NOT NULL,
     amount DECIMAL(12,2) NOT NULL DEFAULT 0,
     date DATE NOT NULL,
-    status ENUM('bekliyor','odendi','gecikti') NOT NULL DEFAULT 'bekliyor',
+    status ENUM('pending','paid','overdue') NOT NULL DEFAULT 'pending',
     description VARCHAR(255) DEFAULT NULL,
     created DATETIME NOT NULL,
     INDEX(project_id)
@@ -676,22 +676,22 @@ SQL;
     $now = date('Y-m-d H:i:s');
 
     // Admin account
-    $st = $pdo->prepare("INSERT INTO users (name, email, password, role, job_title, theme, color, is_active, created) VALUES (?, ?, ?, 'yonetici', 'Kurucu', 'lime', '#b1fb01', 1, ?)");
-    $st->execute([$adminAd, $adminMail, password_hash($adminSifre, PASSWORD_DEFAULT), $now]);
+    $st = $pdo->prepare("INSERT INTO users (name, email, password, role, job_title, theme, color, is_active, created) VALUES (?, ?, ?, 'admin', 'Kurucu', 'lime', '#b1fb01', 1, ?)");
+    $st->execute([$adminAd, $adminMail, password_hash($adminPassword, PASSWORD_DEFAULT), $now]);
     $adminId = (int)$pdo->lastInsertId();
 
     // Settings
     // Keys are the stored (Turkish) contract the runtime reads via setting()
     $settings = [
-        'site_adi' => $siteName,
-        'varsayilan_tema' => 'lime',
-        'smtp_aktif' => '0',
+        'site_name' => $siteName,
+        'default_theme' => 'lime',
+        'smtp_enabled' => '0',
         'smtp_host' => 'smtp.hostinger.com',
         'smtp_port' => '465',
-        'smtp_kullanici' => '',
-        'smtp_sifre' => '',
-        'smtp_gonderen' => '',
-        'eposta_bildirim' => '1',
+        'smtp_user' => '',
+        'smtp_password' => '',
+        'smtp_sender' => '',
+        'email_notifications' => '1',
     ];
     $st = $pdo->prepare("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
     foreach ($settings as $k => $v) $st->execute([$k, $v]);
@@ -714,23 +714,23 @@ SQL;
     // Ready-made request form templates
     $forms = [
         ['Yeni İş Talebi', 'Yeni bir iş veya proje talebi iletin', [
-            ['Talep konusu', 'metin', null], ['Detaylı açıklama', 'uzun_metin', null],
-            ['İstenen teslim tarihi', 'tarih', null], ['Öncelik', 'secim', "Normal\nYüksek\nAcil"],
+            ['Talep konusu', 'text', null], ['Detaylı açıklama', 'long_text', null],
+            ['İstenen teslim tarihi', 'date', null], ['Öncelik', 'select', "Normal\nYüksek\nAcil"],
         ]],
         ['Revizyon Talebi', 'Mevcut bir iş için revizyon isteyin', [
-            ['Hangi iş / içerik için?', 'metin', null], ['İstenen değişiklikler', 'uzun_metin', null],
+            ['Hangi iş / içerik için?', 'text', null], ['İstenen değişiklikler', 'long_text', null],
         ]],
         ['Çekim Talebi', 'Fotoğraf / video çekimi planlayın', [
-            ['Çekim konusu', 'metin', null], ['Tercih edilen tarih', 'tarih', null],
-            ['Lokasyon', 'metin', null], ['Çekim türü', 'secim', "Fotoğraf\nVideo\nFotoğraf + Video\nDrone"],
-            ['Ek notlar', 'uzun_metin', null],
+            ['Çekim konusu', 'text', null], ['Tercih edilen tarih', 'date', null],
+            ['Lokasyon', 'text', null], ['Çekim türü', 'select', "Fotoğraf\nVideo\nFotoğraf + Video\nDrone"],
+            ['Ek notlar', 'long_text', null],
         ]],
         ['Destek Talebi', 'Teknik veya genel destek isteyin', [
-            ['Konu', 'metin', null], ['Açıklama', 'uzun_metin', null],
+            ['Konu', 'text', null], ['Açıklama', 'long_text', null],
         ]],
     ];
     $stF = $pdo->prepare("INSERT INTO form_templates (name, description, is_active, created) VALUES (?, ?, 1, ?)");
-    $stFa = $pdo->prepare("INSERT INTO form_fields (template_id, sort_order, tag, type, options, is_required) VALUES (?, ?, ?, ?, ?, 1)");
+    $stFa = $pdo->prepare("INSERT INTO form_fields (template_id, sort_order, label, type, options, is_required) VALUES (?, ?, ?, ?, ?, 1)");
     foreach ($forms as $f) {
         $stF->execute([$f[0], $f[1], $now]);
         $fid = (int)$pdo->lastInsertId();
@@ -742,12 +742,12 @@ SQL;
     run_migrations($pdo);
 
     // General channel + make the admin a member
-    $pdo->prepare("INSERT INTO channels (name, type, created) VALUES ('Genel', 'genel', ?)")->execute([$now]);
+    $pdo->prepare("INSERT INTO channels (name, type, created) VALUES ('Genel', 'general', ?)")->execute([$now]);
     $channelId = (int)$pdo->lastInsertId();
     $pdo->prepare("INSERT INTO channel_members (channel_id, user_id) VALUES (?, ?)")->execute([$channelId, $adminId]);
 }
 
-$adimBasliklari = [1 => 'Gereksinimler', 2 => 'Veritabanı', 3 => 'Site & Yönetici', 4 => 'Tamamlandı'];
+$stepTitles = [1 => 'Gereksinimler', 2 => 'Veritabanı', 3 => 'Site & Yönetici', 4 => 'Tamamlandı'];
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -762,69 +762,69 @@ $adimBasliklari = [1 => 'Gereksinimler', 2 => 'Veritabanı', 3 => 'Site & Yönet
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',sans-serif; background:var(--ink); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
   background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(177,251,1,.08), transparent), radial-gradient(ellipse 60% 40% at 90% 110%, rgba(97,7,20,.25), transparent); }
-.kutu { width:100%; max-width:640px; animation:giris .6s cubic-bezier(.22,1,.36,1); }
-@keyframes giris { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:none; } }
+.box { width:100%; max-width:640px; animation:fadeIn .6s cubic-bezier(.22,1,.36,1); }
+@keyframes fadeIn { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:none; } }
 .logo { font-family:'Unbounded',sans-serif; font-weight:700; font-size:26px; letter-spacing:.06em; margin-bottom:6px; }
 .logo span { color:var(--lime); }
-.altbaslik { color:var(--muted); font-size:14px; margin-bottom:28px; }
-.adimlar { display:flex; gap:8px; margin-bottom:28px; }
-.adim-nokta { flex:1; height:4px; border-radius:99px; background:var(--surface2); position:relative; overflow:hidden; }
-.adim-nokta.tamam::after { content:''; position:absolute; inset:0; background:var(--lime); border-radius:99px; animation:dolum .5s ease; }
-@keyframes dolum { from { transform:scaleX(0); transform-origin:left; } to { transform:scaleX(1); } }
+.subtitle { color:var(--muted); font-size:14px; margin-bottom:28px; }
+.steps { display:flex; gap:8px; margin-bottom:28px; }
+.step-dot { flex:1; height:4px; border-radius:99px; background:var(--surface2); position:relative; overflow:hidden; }
+.step-dot.done::after { content:''; position:absolute; inset:0; background:var(--lime); border-radius:99px; animation:fill .5s ease; }
+@keyframes fill { from { transform:scaleX(0); transform-origin:left; } to { transform:scaleX(1); } }
 .panel { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:32px; }
 h1 { font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; margin-bottom:4px; }
-.aciklama { color:var(--muted); font-size:13.5px; margin-bottom:24px; }
-.gereksinim { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--surface2); border-radius:12px; margin-bottom:8px; font-size:14px; }
-.rozet { font-size:12px; font-weight:600; padding:4px 12px; border-radius:99px; }
-.rozet.ok { background:rgba(177,251,1,.15); color:var(--lime); }
-.rozet.no { background:rgba(255,80,80,.15); color:#ff7070; }
+.description { color:var(--muted); font-size:13.5px; margin-bottom:24px; }
+.requirement { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--surface2); border-radius:12px; margin-bottom:8px; font-size:14px; }
+.badge { font-size:12px; font-weight:600; padding:4px 12px; border-radius:99px; }
+.badge.ok { background:rgba(177,251,1,.15); color:var(--lime); }
+.badge.no { background:rgba(255,80,80,.15); color:#ff7070; }
 label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--text); }
 input { width:100%; padding:12px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:12px; color:var(--text); font-family:inherit; font-size:14px; margin-bottom:16px; transition:border-color .2s, box-shadow .2s; }
 input:focus { outline:none; border-color:var(--lime); box-shadow:0 0 0 3px rgba(177,251,1,.12); }
-.satir { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .btn { display:inline-flex; align-items:center; gap:8px; padding:13px 28px; background:var(--lime); color:var(--ink); border:none; border-radius:12px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; cursor:pointer; transition:transform .15s, box-shadow .15s; text-decoration:none; }
 .btn:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(177,251,1,.25); }
 .btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
-.hata { background:rgba(255,80,80,.12); border:1px solid rgba(255,80,80,.3); color:#ff9090; padding:12px 16px; border-radius:12px; font-size:13.5px; margin-bottom:20px; }
-.ipucu { background:rgba(177,251,1,.06); border:1px solid rgba(177,251,1,.15); padding:12px 16px; border-radius:12px; font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.6; }
-.ipucu b { color:var(--lime); }
-.tamam-ikon { width:72px; height:72px; border-radius:50%; background:rgba(177,251,1,.12); display:flex; align-items:center; justify-content:center; margin:0 auto 20px; animation:zipla .6s cubic-bezier(.34,1.56,.64,1) .2s both; }
-@keyframes zipla { from { transform:scale(0); } to { transform:scale(1); } }
-.tamam-ikon svg { width:36px; height:36px; stroke:var(--lime); }
-.merkez { text-align:center; }
+.error { background:rgba(255,80,80,.12); border:1px solid rgba(255,80,80,.3); color:#ff9090; padding:12px 16px; border-radius:12px; font-size:13.5px; margin-bottom:20px; }
+.hint { background:rgba(177,251,1,.06); border:1px solid rgba(177,251,1,.15); padding:12px 16px; border-radius:12px; font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.6; }
+.hint b { color:var(--lime); }
+.done-icon { width:72px; height:72px; border-radius:50%; background:rgba(177,251,1,.12); display:flex; align-items:center; justify-content:center; margin:0 auto 20px; animation:bounce .6s cubic-bezier(.34,1.56,.64,1) .2s both; }
+@keyframes bounce { from { transform:scale(0); } to { transform:scale(1); } }
+.done-icon svg { width:36px; height:36px; stroke:var(--lime); }
+.center { text-align:center; }
 </style>
 </head>
 <body>
-<div class="kutu">
+<div class="box">
     <div class="logo">SADA<span>.</span></div>
-    <div class="altbaslik">Ajans Yönetim Sistemi — Kurulum Sihirbazı · Adım <?= $step ?>/4: <?= $adimBasliklari[$step] ?></div>
-    <div class="adimlar">
-        <?php for ($i = 1; $i <= 4; $i++): ?><div class="adim-nokta <?= $i <= $step ? 'tamam' : '' ?>"></div><?php endfor; ?>
+    <div class="subtitle">Ajans Yönetim Sistemi — Kurulum Sihirbazı · Adım <?= $step ?>/4: <?= $stepTitles[$step] ?></div>
+    <div class="steps">
+        <?php for ($i = 1; $i <= 4; $i++): ?><div class="step-dot <?= $i <= $step ? 'done' : '' ?>"></div><?php endfor; ?>
     </div>
     <div class="panel">
-    <?php if ($error): ?><div class="hata"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
     <?php if ($step === 1): ?>
         <h1>Sistem Gereksinimleri</h1>
-        <p class="aciklama">Sunucunuzun gereksinimleri karşılayıp karşılamadığını kontrol ediyoruz.</p>
-        <?php foreach ($gereksinimler as $name => $ok): ?>
-            <div class="gereksinim"><span><?= $name ?></span><span class="rozet <?= $ok ? 'ok' : 'doc_no' ?>"><?= $ok ? 'Uygun' : 'Eksik' ?></span></div>
+        <p class="description">Sunucunuzun gereksinimleri karşılayıp karşılamadığını kontrol ediyoruz.</p>
+        <?php foreach ($requirements as $name => $ok): ?>
+            <div class="requirement"><span><?= $name ?></span><span class="badge <?= $ok ? 'ok' : 'doc_no' ?>"><?= $ok ? 'Uygun' : 'Eksik' ?></span></div>
         <?php endforeach; ?>
         <div style="margin-top:24px; text-align:right">
-            <?php if ($gereksinimTamam): ?><a class="btn" href="?step=2">Devam Et →</a>
+            <?php if ($requirementsMet): ?><a class="btn" href="?step=2">Devam Et →</a>
             <?php else: ?><button class="btn" disabled>Eksikleri giderin</button><?php endif; ?>
         </div>
 
     <?php elseif ($step === 2): ?>
         <h1>Veritabanı Bağlantısı</h1>
-        <p class="aciklama">MySQL veritabanı bilgilerinizi girin.</p>
-        <div class="ipucu"><b>Hostinger ipucu:</b> hPanel → Veritabanları → MySQL Veritabanları bölümünden yeni bir veritabanı oluşturun. Sunucu adresi genellikle <b>localhost</b>'tur. Veritabanı adı ve kullanıcı adı <b>u123456789_</b> önekiyle başlar.</div>
+        <p class="description">MySQL veritabanı bilgilerinizi girin.</p>
+        <div class="hint"><b>Hostinger ipucu:</b> hPanel → Veritabanları → MySQL Veritabanları bölümünden yeni bir veritabanı oluşturun. Sunucu adresi genellikle <b>localhost</b>'tur. Veritabanı adı ve kullanıcı adı <b>u123456789_</b> önekiyle başlar.</div>
         <form method="post" action="?step=2">
             <label>Veritabanı Sunucusu</label>
             <input type="text" name="db_host" value="<?= htmlspecialchars($_POST['db_host'] ?? 'localhost') ?>" required>
             <label>Veritabanı Adı</label>
             <input type="text" name="db_name" value="<?= htmlspecialchars($_POST['db_name'] ?? '') ?>" placeholder="u123456789_sada" required>
-            <div class="satir">
+            <div class="row">
                 <div><label>Kullanıcı Adı</label><input type="text" name="db_user" value="<?= htmlspecialchars($_POST['db_user'] ?? '') ?>" required></div>
                 <div><label>Şifre</label><input type="password" name="db_pass"></div>
             </div>
@@ -834,7 +834,7 @@ input:focus { outline:none; border-color:var(--lime); box-shadow:0 0 0 3px rgba(
     <?php elseif ($step === 3): ?>
         <?php if (empty($_SESSION['install_db'])): header('Location: ?step=2'); exit; endif; ?>
         <h1>Site Bilgileri & Yönetici Hesabı</h1>
-        <p class="aciklama">Sisteme giriş yapacağınız yönetici hesabını oluşturun.</p>
+        <p class="description">Sisteme giriş yapacağınız yönetici hesabını oluşturun.</p>
         <form method="post" action="?step=3">
             <label>Site / Ajans Adı</label>
             <input type="text" name="site_name" value="<?= htmlspecialchars($_POST['site_name'] ?? 'SADA One') ?>" required>
@@ -842,7 +842,7 @@ input:focus { outline:none; border-color:var(--lime); box-shadow:0 0 0 3px rgba(
             <input type="text" name="admin_name" value="<?= htmlspecialchars($_POST['admin_name'] ?? '') ?>" required>
             <label>E-posta Adresi</label>
             <input type="email" name="admin_email" value="<?= htmlspecialchars($_POST['admin_email'] ?? '') ?>" required>
-            <div class="satir">
+            <div class="row">
                 <div><label>Şifre (en az 6 karakter)</label><input type="password" name="admin_password" required minlength="6"></div>
                 <div><label>Şifre Tekrar</label><input type="password" name="admin_password2" required minlength="6"></div>
             </div>
@@ -850,11 +850,11 @@ input:focus { outline:none; border-color:var(--lime); box-shadow:0 0 0 3px rgba(
         </form>
 
     <?php elseif ($step === 4): ?>
-        <div class="merkez">
-            <div class="tamam-ikon"><svg fill="none" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+        <div class="center">
+            <div class="done-icon"><svg fill="none" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
             <h1>Kurulum Tamamlandı 🎉</h1>
-            <p class="aciklama" style="margin-top:8px">Veritabanı tabloları oluşturuldu, yönetici hesabınız hazır.<br>Varsayılan akış şablonları ve talep formları da yüklendi.</p>
-            <div class="ipucu" style="text-align:left"><b>Önemli:</b> Güvenlik için sunucudaki <b>install</b> klasörünü hemen silin. Bu klasör silinene kadar sistem uyarı gösterecektir.</div>
+            <p class="description" style="margin-top:8px">Veritabanı tabloları oluşturuldu, yönetici hesabınız hazır.<br>Varsayılan akış şablonları ve talep formları da yüklendi.</p>
+            <div class="hint" style="text-align:left"><b>Önemli:</b> Güvenlik için sunucudaki <b>install</b> klasörünü hemen silin. Bu klasör silinene kadar sistem uyarı gösterecektir.</div>
             <a class="btn" href="../login.php">Giriş Yap →</a>
         </div>
     <?php endif; ?>

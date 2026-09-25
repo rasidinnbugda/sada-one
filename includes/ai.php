@@ -61,8 +61,8 @@ function ai_ask_claude(string $system, string $prompt, int $maxTokens): array {
         'max_tokens' => $maxTokens,
         'system' => $system,
         'messages' => [['role' => 'user', 'content' => $prompt]],
-    ], $terr);
-    if (!$j) return ['ok' => false, 'text' => '', 'error' => 'Claude ' . $terr];
+    ], $httpError);
+    if (!$j) return ['ok' => false, 'text' => '', 'error' => 'Claude ' . $httpError];
     if (isset($j['error'])) return ['ok' => false, 'text' => '', 'error' => mb_substr((string)($j['error']['message'] ?? 'bilinmeyen hata'), 0, 240)];
     // A refusal comes back as stop_reason "refusal" — surface it clearly
     if (($j['stop_reason'] ?? '') === 'refusal') {
@@ -85,15 +85,15 @@ function ai_ask_gemini(string $system, string $prompt, int $maxTokens): array {
         'system_instruction' => ['parts' => [['text' => $system]]],
         'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
         'generationConfig' => ['maxOutputTokens' => $maxTokens],
-    ], $terr);
-    if (!$j) return ['ok' => false, 'text' => '', 'error' => 'Gemini ' . $terr];
+    ], $httpError);
+    if (!$j) return ['ok' => false, 'text' => '', 'error' => 'Gemini ' . $httpError];
     if (isset($j['error'])) return ['ok' => false, 'text' => '', 'error' => mb_substr((string)($j['error']['message'] ?? 'bilinmeyen hata'), 0, 240)];
-    $aday = $j['candidates'][0] ?? null;
-    if (($aday['finishReason'] ?? '') === 'SAFETY' || ($j['promptFeedback']['blockReason'] ?? '') !== '') {
+    $candidate = $j['candidates'][0] ?? null;
+    if (($candidate['finishReason'] ?? '') === 'SAFETY' || ($j['promptFeedback']['blockReason'] ?? '') !== '') {
         return ['ok' => false, 'text' => '', 'error' => 'Model bu isteği güvenlik nedeniyle yanıtlamadı.'];
     }
     $text = '';
-    foreach (($aday['content']['parts'] ?? []) as $part) $text .= $part['text'] ?? '';
+    foreach (($candidate['content']['parts'] ?? []) as $part) $text .= $part['text'] ?? '';
     if ($text === '') return ['ok' => false, 'text' => '', 'error' => 'Model boş yanıt döndürdü.'];
     return ['ok' => true, 'text' => trim($text), 'error' => null];
 }

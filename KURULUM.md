@@ -164,15 +164,15 @@ Ayarlar'daki SMTP bilgilerini kontrol edin. Port 465 çalışmazsa 587 deneyin. 
 
 Sistemi daha önce kurduysanız ve yeni sürüm dosyalarını yüklediyseniz:
 1. Yeni dosyaları eskilerin üzerine yükleyin (`config.php`'ye dokunmayın).
-2. Tarayıcıdan `https://siteniz.com/guncelle.php` adresini açın (yönetici girişi gerekir) — veritabanına yeni kolonlar/tablolar güvenle eklenir.
-3. Bittikten sonra `guncelle.php` dosyasını sunucudan silin.
+2. Tarayıcıdan `https://siteniz.com/migrate.php` adresini açın (yönetici girişi gerekir) — veritabanına yeni kolonlar/tablolar güvenle eklenir.
+3. Bittikten sonra `migrate.php` dosyasını sunucudan silin.
 
 ## ⏰ Tekrarlayan Görevler (opsiyonel cron)
 
 Tekrarlayan görevler, herhangi bir ekip üyesi paneli açtığında saatte bir otomatik kontrol edilir — **ek kurulum gerekmez**. Daha hassas zamanlama isterseniz:
 - hPanel → **Gelişmiş → Cron İşleri** → saatlik yeni iş ekleyin:
-  `curl -s "https://siteniz.com/cron.php?anahtar=SADA One"`
-  (anahtar parametresi, Ayarlar'daki site adınızla aynı olmalıdır)
+  `curl -s "https://siteniz.com/cron.php?key=SADA One"`
+  (key parametresi, Ayarlar'daki site adınızla aynı olmalıdır; 7.0 öncesinde kurulan `?anahtar=` adresleri de çalışmaya devam eder)
 
 ## 📁 Yedekleme
 

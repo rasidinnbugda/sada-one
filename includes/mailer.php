@@ -12,11 +12,11 @@
 
 const SMTP_IO_TIMEOUT = 20; // seconds a single SMTP response may take
 
-function send_email(string $alici, string $topic, string $text): bool {
+function send_email(string $recipient, string $topic, string $text): bool {
     // Security: reject malformed addresses (also blocks CRLF header injection)
-    if (!filter_var($alici, FILTER_VALIDATE_EMAIL)) return false;
-    $siteName = setting('site_adi', 'SADA One');
-    $sender = setting('smtp_gonderen') ?: setting('smtp_kullanici');
+    if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) return false;
+    $siteName = setting('site_name', 'SADA One');
+    $sender = setting('smtp_sender') ?: setting('smtp_user');
 
     $html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a0f1e;border-radius:16px;overflow:hidden">'
         . '<div style="padding:24px 28px;border-bottom:1px solid rgba(248,242,203,.1)">'
@@ -27,14 +27,14 @@ function send_email(string $alici, string $topic, string $text): bool {
         . '</div><div style="padding:16px 28px;border-top:1px solid rgba(248,242,203,.1);color:#8b93ab;font-size:12px">'
         . htmlspecialchars($siteName) . ' Yönetim Sistemi — bu e-posta otomatik gönderilmiştir.</div></div>';
 
-    if (setting('smtp_aktif') !== '1' || !setting('smtp_host') || !$sender) {
+    if (setting('smtp_enabled') !== '1' || !setting('smtp_host') || !$sender) {
         // Try with mail()
-        $basliklar = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n";
-        if ($sender) $basliklar .= "From: $siteName <$sender>\r\n";
-        return @mail($alici, '=?UTF-8?B?' . base64_encode($topic) . '?=', $html, $basliklar);
+        $titles = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n";
+        if ($sender) $titles .= "From: $siteName <$sender>\r\n";
+        return @mail($recipient, '=?UTF-8?B?' . base64_encode($topic) . '?=', $html, $titles);
     }
 
-    return smtp_send($alici, $topic, $html, $sender, $siteName);
+    return smtp_send($recipient, $topic, $html, $sender, $siteName);
 }
 
 /**
@@ -45,11 +45,11 @@ function send_email(string $alici, string $topic, string $text): bool {
  */
 function send_email_html(string $to, string $subject, string $html, ?string $from = null): bool {
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
-    $sender = $from && filter_var($from, FILTER_VALIDATE_EMAIL) ? $from : (setting('smtp_gonderen') ?: setting('smtp_kullanici'));
-    $siteName = setting('site_adi', 'SADA One');
-    if (setting('smtp_aktif') !== '1' || !setting('smtp_host') || !$sender) {
-        $basliklar = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: $siteName <$sender>";
-        return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $html, $basliklar);
+    $sender = $from && filter_var($from, FILTER_VALIDATE_EMAIL) ? $from : (setting('smtp_sender') ?: setting('smtp_user'));
+    $siteName = setting('site_name', 'SADA One');
+    if (setting('smtp_enabled') !== '1' || !setting('smtp_host') || !$sender) {
+        $titles = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: $siteName <$sender>";
+        return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $html, $titles);
     }
     return smtp_send($to, $subject, $html, $sender, $siteName);
 }
@@ -78,14 +78,14 @@ function smtp_connection(bool $close = false): ?callable {
 
     $host = setting('smtp_host');
     $port = (int)setting('smtp_port', '465');
-    $user = setting('smtp_kullanici');
-    $password = setting('smtp_sifre');
+    $user = setting('smtp_user');
+    $password = setting('smtp_password');
 
-    $adres = ($port === 465 ? 'ssl://' : '') . $host;
+    $address = ($port === 465 ? 'ssl://' : '') . $host;
     // Inside a background-work budget (see init.php) the per-read timeout shrinks to what is left
     $ioTimeout = SMTP_IO_TIMEOUT;
     if (isset($GLOBALS['sada_deadline'])) $ioTimeout = (int)max(3, min(SMTP_IO_TIMEOUT, $GLOBALS['sada_deadline'] - microtime(true)));
-    $s = @fsockopen($adres, $port, $errno, $errstr, min(10, $ioTimeout));
+    $s = @fsockopen($address, $port, $errno, $errstr, min(10, $ioTimeout));
     if (!$s) { $GLOBALS['smtp_last_error'] = "Sunucuya bağlanılamadı ($host:$port): $errstr"; $failed = true; return null; }
     stream_set_timeout($s, $ioTimeout);
 
@@ -101,8 +101,8 @@ function smtp_connection(bool $close = false): ?callable {
         }
         return $data;
     };
-    $sendFn = function (string $komut) use ($s, $read) {
-        fwrite($s, $komut . "\r\n");
+    $sendFn = function (string $command) use ($s, $read) {
+        fwrite($s, $command . "\r\n");
         return $read();
     };
 
@@ -133,7 +133,7 @@ function smtp_connection(bool $close = false): ?callable {
     return $send;
 }
 
-function smtp_send(string $alici, string $topic, string $html, string $sender, string $sendName): bool {
+function smtp_send(string $recipient, string $topic, string $html, string $sender, string $sendName): bool {
     $send = smtp_connection();
     if (!$send) return false;
 
@@ -148,20 +148,20 @@ function smtp_send(string $alici, string $topic, string $html, string $sender, s
         $send('RSET'); // clear any half-finished transaction of a previous message
         $reply = $send("MAIL FROM:<$sender>");
         if (strpos($reply, '250') !== 0) return $fail($reply);
-        $reply = $send("RCPT TO:<$alici>");
+        $reply = $send("RCPT TO:<$recipient>");
         if (strpos($reply, '250') !== 0 && strpos($reply, '251') !== 0) return $fail($reply);
         $reply = $send('DATA');
         if (strpos($reply, '354') !== 0) return $fail($reply);
         // SMTP caps lines at ~1000 octets (RFC 5321) and Gmail enforces it: a
         // several-KB single-line HTML body gets "500 Line too long". Wrap at
         // spaces (whitespace inside HTML/CSS is safe) and dot-stuff leading dots.
-        $govde = wordwrap($html, 900, "\r\n", false);
-        $govde = preg_replace('/^\./m', '..', $govde);
+        $body = wordwrap($html, 900, "\r\n", false);
+        $body = preg_replace('/^\./m', '..', $body);
         $message = "From: =?UTF-8?B?" . base64_encode($sendName) . "?= <$sender>\r\n"
-            . "To: <$alici>\r\n"
+            . "To: <$recipient>\r\n"
             . "Subject: =?UTF-8?B?" . base64_encode($topic) . "?=\r\n"
             . "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n"
-            . $govde . "\r\n.";
+            . $body . "\r\n.";
         $reply = $send($message);
         if (strpos($reply, '250') !== 0) return $fail($reply);
         return true;

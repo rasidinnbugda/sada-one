@@ -38,7 +38,7 @@ register_shutdown_function(function () {
     // logged with its URL, so a "the panel hung" report can be traced to a cause.
     $spent = microtime(true) - (float)($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true));
     if ($spent > 5) {
-        error_log(sprintf('[SADA] yavas istek: %.1fs %s %s', $spent, $_SERVER['REQUEST_METHOD'] ?? '?',
+        error_log(sprintf('[SADA] slow request: %.1fs %s %s', $spent, $_SERVER['REQUEST_METHOD'] ?? '?',
             ($_SERVER['REQUEST_URI'] ?? '?') . (isset($_POST['action']) ? ' action=' . $_POST['action'] : '')));
     }
     if (empty($GLOBALS['sada_after_response'])) return;
@@ -55,10 +55,10 @@ register_shutdown_function(function () {
     $t = microtime(true);
     // Drained as a queue: a job may enqueue more (notify() defers its e-mail here)
     while ($fn = array_shift($GLOBALS['sada_after_response'])) {
-        try { $fn(); } catch (Throwable $e) { error_log('[SADA] arka plan isi: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine()); }
+        try { $fn(); } catch (Throwable $e) { error_log('[SADA] background job: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine()); }
     }
     $spent = microtime(true) - $t;
-    if ($spent > 10) error_log(sprintf('[SADA] arka plan isleri %.1fs surdu%s', $spent, $detached ? ' (sayfa bundan etkilenmedi)' : ' — sunucuda erken teslim yok, sayfa bekledi'));
+    if ($spent > 10) error_log(sprintf('[SADA] background jobs took %.1fs%s', $spent, $detached ? ' (the page was not held up)' : ' — no early response on this server, the page waited'));
 });
 /** True once the background-work budget of this request is spent (always false during the page itself). */
 function sada_deadline_passed(): bool {
@@ -105,8 +105,8 @@ if (!file_exists(ROOT . '/config.php')) {
 $GLOBALS['config'] = include ROOT . '/config.php';
 
 /**
- * v5.0 self-healing upgrade: installs created before the English schema rename
- * still have Turkish table names. Detect that on boot and localize the schema once.
+ * Self-healing schema: when the code version is ahead of the database, run the
+ * migrations once (under a lock) and record the new schema version.
  */
 function legacy_schema_check(): void {
     try {
@@ -126,19 +126,25 @@ function legacy_schema_check(): void {
         try {
             $st->execute();
             if ($st->fetchColumn() === APP_VERSION) return; // finished while we waited
-            if (db()->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='dosyalar'")->fetchColumn()) {
-                require_once __DIR__ . '/legacy-migration.php';
-                legacy_localization(db());
-            }
+            // After a failed run, retry at most every 10 minutes instead of on every request
+            $retry = db()->query("SELECT setting_value FROM settings WHERE setting_key='schema_retry_after'")->fetchColumn();
+            if ($retry !== false && (int)$retry > time()) return;
             require_once __DIR__ . '/migration.php';
-            $t0 = microtime(true); $yeni = 0;
+            $t0 = microtime(true); $fresh = 0; $failed = false;
             foreach (run_migrations(db()) as $mr) {
-                if (($mr[0] ?? '') === 'hata') error_log('[SADA] migration hatasi: ' . ($mr[1] ?? '?'));
-                if (($mr[0] ?? '') === 'ok') $yeni++;
+                if (($mr[0] ?? '') === 'error') { error_log('[SADA] migration error: ' . ($mr[1] ?? '?')); $failed = $failed || str_starts_with((string)($mr[1] ?? ''), 'english:'); }
+                if (($mr[0] ?? '') === 'ok') $fresh++;
             }
+            if ($failed) {
+                // the 7.0 value conversion did not finish: do not mark the schema as current
+                db()->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('schema_retry_after', ?) ON DUPLICATE KEY UPDATE setting_value=?")
+                    ->execute([time() + 600, time() + 600]);
+                return;
+            }
+            db()->exec("DELETE FROM settings WHERE setting_key='schema_retry_after'");
             db()->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('schema_version', ?) ON DUPLICATE KEY UPDATE setting_value=?")
                 ->execute([APP_VERSION, APP_VERSION]);
-            error_log(sprintf('[SADA] sema guncellendi: v%s (%d yeni komut, %.1fs)', APP_VERSION, $yeni, microtime(true) - $t0));
+            error_log(sprintf('[SADA] schema updated: v%s (%d new commands, %.1fs)', APP_VERSION, $fresh, microtime(true) - $t0));
         } finally {
             db()->query("SELECT RELEASE_LOCK(" . db()->quote($lockName) . ")");
         }
@@ -179,20 +185,20 @@ function insert(string $table, array $data): int {
     return (int)db()->lastInsertId();
 }
 
-function update_row(string $table, array $data, string $where_sql, array $kosulP = []): void {
+function update_row(string $table, array $data, string $where_sql, array $conditionP = []): void {
     $set = implode(',', array_map(fn($k) => "`$k`=?", array_keys($data)));
-    q("UPDATE $table SET $set WHERE $where_sql", array_merge(array_values($data), $kosulP));
+    q("UPDATE $table SET $set WHERE $where_sql", array_merge(array_values($data), $conditionP));
 }
 
 /* ---------------- Settings ---------------- */
 
-function setting(string $setting_key, $default = '') {
+function setting(string $key, $default = '') {
     static $cache = null;
     if ($cache === null) {
         $cache = [];
-        foreach (rows("SELECT setting_key, setting_value FROM settings") as $r) $cache[$r['setting_key']] = $r['setting_value'];
+        $cache = db()->query("SELECT setting_key, setting_value FROM settings")->fetchAll(PDO::FETCH_KEY_PAIR);
     }
-    return $cache[$setting_key] ?? $default;
+    return $cache[$key] ?? $default;
 }
 
 /* ---------------- Session & Authorization ---------------- */
@@ -211,12 +217,12 @@ function require_login(): array {
     return $u;
 }
 
-function is_admin(): bool { return (user()['role'] ?? '') === 'yonetici'; }
-function is_pm(): bool { return in_array(user()['role'] ?? '', ['yonetici', 'pm']); }
-function is_staff(): bool { return in_array(user()['role'] ?? '', ['yonetici', 'pm', 'ekip', 'finans', 'stajyer']); }
-function is_finance(): bool { return (user()['role'] ?? '') === 'finans'; }
-function is_intern(): bool { return (user()['role'] ?? '') === 'stajyer'; }
-function is_customer(): bool { return (user()['role'] ?? '') === 'musteri'; }
+function is_admin(): bool { return (user()['role'] ?? '') === 'admin'; }
+function is_pm(): bool { return in_array(user()['role'] ?? '', ['admin', 'pm']); }
+function is_staff(): bool { return in_array(user()['role'] ?? '', ['admin', 'pm', 'team', 'finance', 'intern']); }
+function is_finance(): bool { return (user()['role'] ?? '') === 'finance'; }
+function is_intern(): bool { return (user()['role'] ?? '') === 'intern'; }
+function is_customer(): bool { return (user()['role'] ?? '') === 'customer'; }
 
 /** On unauthorized access: JSON 403 for AJAX requests, redirect for regular pages */
 function deny(): void {
@@ -244,54 +250,54 @@ function require_admin(): array {
 }
 
 /* ---------------- Per-user permissions ----------------
- * Role defaults + per-user overrides (users.izinler JSON).
- * Keys: finans, rapor, dosya_yonet, gorev_sil, icerik_yonet, kapasite
+ * Role defaults + per-user overrides (users.permissions JSON).
+ * Keys: see PERMISSION_KEYS below
  */
 const PERMISSION_KEYS = [
-    'finans' => 'Finans sayfası',
-    'rapor' => 'Raporlar sayfası',
-    'kapasite' => 'Kapasite takibi',
-    'dosya_yonet' => 'Dosya/Proje oluştur-düzenle',
-    'gorev_olustur' => 'Görev oluşturma',
-    'gorev_sil' => 'Görev silme',
-    'icerik_yonet' => 'İçerik takvimi yönetimi',
-    'ekipman_yonet' => 'Ekipman envanteri yönetimi',
-    'onay_gonder' => 'Müşteri onayına gönderme',
-    'duyuru_yayinla' => 'Duyuru yayınlama',
-    'takvim_yonet' => 'Etkinlik/toplantı oluşturma',
-    'kanal_kur' => 'Sohbet kanalı kurma',
-    'belge_olustur' => 'Teklif/fatura oluşturma',
-    'arsiv_sil' => 'Arşivden dosya silme',
-    'talep_yonet' => 'Talepleri yönetme',
-    'butce_gor' => 'Proje bütçelerini görme (istasyon)',
-    'finans_yonet' => 'Finans kaydı ekleme/düzenleme/silme',
-    'randevu_yonet' => 'Randevuları yanıtlama (onay/red/alternatif)',
-    'havuz_yonet' => 'Çalışan havuzu yönetimi',
-    'mentorluk_yonet' => 'Gelişim & mentörlük yönetimi',
-    'ai_kullan' => 'Yapay zeka özelliklerini kullanma',
+    'finance' => 'Finans sayfası',
+    'report' => 'Raporlar sayfası',
+    'capacity' => 'Kapasite takibi',
+    'client_manage' => 'Dosya/Proje oluştur-düzenle',
+    'task_create' => 'Görev oluşturma',
+    'task_delete' => 'Görev silme',
+    'content_manage' => 'İçerik takvimi yönetimi',
+    'equipment_manage' => 'Ekipman envanteri yönetimi',
+    'approval_send' => 'Müşteri onayına gönderme',
+    'announcement_publish' => 'Duyuru yayınlama',
+    'calendar_manage' => 'Etkinlik/toplantı oluşturma',
+    'channel_create' => 'Sohbet kanalı kurma',
+    'document_create' => 'Teklif/fatura oluşturma',
+    'archive_delete' => 'Arşivden dosya silme',
+    'request_manage' => 'Talepleri yönetme',
+    'budget_view' => 'Proje bütçelerini görme (istasyon)',
+    'finance_manage' => 'Finans kaydı ekleme/düzenleme/silme',
+    'appointment_manage' => 'Randevuları yanıtlama (onay/red/alternatif)',
+    'pool_manage' => 'Çalışan havuzu yönetimi',
+    'mentorship_manage' => 'Gelişim & mentörlük yönetimi',
+    'ai_use' => 'Yapay zeka özelliklerini kullanma',
 ];
 
-function permission(string $setting_key): bool {
+function permission(string $key): bool {
     $u = user();
     if (!$u) return false;
-    if ($u['role'] === 'yonetici') return true;
-    if ($u['role'] === 'musteri') return false;
+    if ($u['role'] === 'admin') return true;
+    if ($u['role'] === 'customer') return false;
     // Per-user override
-    $ozel = json_decode($u['permissions'] ?? '', true);
-    if (is_array($ozel) && array_key_exists($setting_key, $ozel)) return (bool)$ozel[$setting_key];
+    $custom = json_decode($u['permissions'] ?? '', true);
+    if (is_array($custom) && array_key_exists($key, $custom)) return (bool)$custom[$key];
     // Role defaults
     $default = [
-        'pm'      => ['finans' => 1, 'rapor' => 1, 'kapasite' => 1, 'dosya_yonet' => 1, 'gorev_olustur' => 1, 'gorev_sil' => 1, 'icerik_yonet' => 1, 'ekipman_yonet' => 1, 'onay_gonder' => 1, 'duyuru_yayinla' => 1, 'takvim_yonet' => 1, 'kanal_kur' => 1, 'belge_olustur' => 1, 'arsiv_sil' => 1, 'talep_yonet' => 1, 'finans_yonet' => 1, 'randevu_yonet' => 1, 'havuz_yonet' => 1, 'mentorluk_yonet' => 1, 'ai_kullan' => 1],
-        'ekip'    => ['finans' => 0, 'rapor' => 0, 'kapasite' => 0, 'dosya_yonet' => 0, 'gorev_olustur' => 1, 'gorev_sil' => 0, 'icerik_yonet' => 1, 'ekipman_yonet' => 0, 'onay_gonder' => 1, 'duyuru_yayinla' => 0, 'takvim_yonet' => 1, 'kanal_kur' => 1, 'belge_olustur' => 0, 'arsiv_sil' => 0, 'talep_yonet' => 0, 'finans_yonet' => 0, 'randevu_yonet' => 0, 'havuz_yonet' => 0, 'mentorluk_yonet' => 0, 'ai_kullan' => 1],
-        'finans'  => ['finans' => 1, 'rapor' => 1, 'kapasite' => 1, 'dosya_yonet' => 0, 'gorev_olustur' => 0, 'gorev_sil' => 0, 'icerik_yonet' => 0, 'ekipman_yonet' => 0, 'onay_gonder' => 0, 'duyuru_yayinla' => 0, 'takvim_yonet' => 0, 'kanal_kur' => 1, 'belge_olustur' => 1, 'arsiv_sil' => 0, 'talep_yonet' => 0, 'finans_yonet' => 1, 'randevu_yonet' => 0, 'havuz_yonet' => 0, 'mentorluk_yonet' => 0, 'ai_kullan' => 1],
-        'stajyer' => ['finans' => 0, 'rapor' => 0, 'kapasite' => 0, 'dosya_yonet' => 0, 'gorev_olustur' => 0, 'gorev_sil' => 0, 'icerik_yonet' => 0, 'ekipman_yonet' => 0, 'onay_gonder' => 0, 'duyuru_yayinla' => 0, 'takvim_yonet' => 0, 'kanal_kur' => 0, 'belge_olustur' => 0, 'arsiv_sil' => 0, 'talep_yonet' => 0, 'finans_yonet' => 0, 'randevu_yonet' => 0, 'havuz_yonet' => 0, 'mentorluk_yonet' => 0, 'ai_kullan' => 0],
+        'pm'      => ['finance' => 1, 'report' => 1, 'capacity' => 1, 'client_manage' => 1, 'task_create' => 1, 'task_delete' => 1, 'content_manage' => 1, 'equipment_manage' => 1, 'approval_send' => 1, 'announcement_publish' => 1, 'calendar_manage' => 1, 'channel_create' => 1, 'document_create' => 1, 'archive_delete' => 1, 'request_manage' => 1, 'finance_manage' => 1, 'appointment_manage' => 1, 'pool_manage' => 1, 'mentorship_manage' => 1, 'ai_use' => 1],
+        'team'    => ['finance' => 0, 'report' => 0, 'capacity' => 0, 'client_manage' => 0, 'task_create' => 1, 'task_delete' => 0, 'content_manage' => 1, 'equipment_manage' => 0, 'approval_send' => 1, 'announcement_publish' => 0, 'calendar_manage' => 1, 'channel_create' => 1, 'document_create' => 0, 'archive_delete' => 0, 'request_manage' => 0, 'finance_manage' => 0, 'appointment_manage' => 0, 'pool_manage' => 0, 'mentorship_manage' => 0, 'ai_use' => 1],
+        'finance'  => ['finance' => 1, 'report' => 1, 'capacity' => 1, 'client_manage' => 0, 'task_create' => 0, 'task_delete' => 0, 'content_manage' => 0, 'equipment_manage' => 0, 'approval_send' => 0, 'announcement_publish' => 0, 'calendar_manage' => 0, 'channel_create' => 1, 'document_create' => 1, 'archive_delete' => 0, 'request_manage' => 0, 'finance_manage' => 1, 'appointment_manage' => 0, 'pool_manage' => 0, 'mentorship_manage' => 0, 'ai_use' => 1],
+        'intern' => ['finance' => 0, 'report' => 0, 'capacity' => 0, 'client_manage' => 0, 'task_create' => 0, 'task_delete' => 0, 'content_manage' => 0, 'equipment_manage' => 0, 'approval_send' => 0, 'announcement_publish' => 0, 'calendar_manage' => 0, 'channel_create' => 0, 'document_create' => 0, 'archive_delete' => 0, 'request_manage' => 0, 'finance_manage' => 0, 'appointment_manage' => 0, 'pool_manage' => 0, 'mentorship_manage' => 0, 'ai_use' => 0],
     ];
-    return (bool)($default[$u['role']][$setting_key] ?? 0);
+    return (bool)($default[$u['role']][$key] ?? 0);
 }
 
-function require_permission(string $setting_key): array {
+function require_permission(string $key): array {
     $u = require_login();
-    if (!permission($setting_key)) deny();
+    if (!permission($key)) deny();
     return $u;
 }
 
@@ -302,8 +308,8 @@ function customer_client_ids(?int $userId = null): array {
     $userId = $userId ?? (int)($u['id'] ?? 0);
     if (isset($cache[$userId])) return $cache[$userId];
     $ids = array_map('intval', array_column(rows("SELECT client_id FROM customer_clients WHERE user_id=?", [$userId]), 'client_id'));
-    $birincil = (int)val("SELECT client_id FROM users WHERE id=?", [$userId]);
-    if ($birincil && !in_array($birincil, $ids)) $ids[] = $birincil;
+    $primary = (int)val("SELECT client_id FROM users WHERE id=?", [$userId]);
+    if ($primary && !in_array($primary, $ids)) $ids[] = $primary;
     return $cache[$userId] = $ids;
 }
 
@@ -348,8 +354,6 @@ function csrf_check(): void {
 function e($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 function json_out($data, int $code = 200): void {
-    // The endpoints answer with 'mesaj', the front-end reads j.message — serve both
-    if (is_array($data) && isset($data['mesaj']) && !isset($data['message'])) $data['message'] = $data['mesaj'];
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
@@ -359,21 +363,21 @@ function json_out($data, int $code = 200): void {
 const MONTHS = [1=>'Ocak',2=>'Şubat',3=>'Mart',4=>'Nisan',5=>'Mayıs',6=>'Haziran',7=>'Temmuz',8=>'Ağustos',9=>'Eylül',10=>'Ekim',11=>'Kasım',12=>'Aralık'];
 const DAYS = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
 
-function format_date(?string $dt, bool $saatli = false): string {
+function format_date(?string $dt, bool $timed = false): string {
     if (!$dt || $dt === '0000-00-00') return '—';
     $ts = strtotime($dt);
     $s = date('j', $ts) . ' ' . MONTHS[(int)date('n', $ts)] . ' ' . date('Y', $ts);
-    if ($saatli) $s .= ' ' . date('H:i', $ts);
+    if ($timed) $s .= ' ' . date('H:i', $ts);
     return $s;
 }
 
 function time_ago(?string $dt): string {
     if (!$dt) return '—';
-    $fark = time() - strtotime($dt);
-    if ($fark < 60) return 'az önce';
-    if ($fark < 3600) return floor($fark / 60) . ' dk önce';
-    if ($fark < 86400) return floor($fark / 3600) . ' saat önce';
-    if ($fark < 604800) return floor($fark / 86400) . ' gün önce';
+    $diff = time() - strtotime($dt);
+    if ($diff < 60) return 'az önce';
+    if ($diff < 3600) return floor($diff / 60) . ' dk önce';
+    if ($diff < 86400) return floor($diff / 3600) . ' saat önce';
+    if ($diff < 604800) return floor($diff / 86400) . ' gün önce';
     return format_date($dt);
 }
 
@@ -386,9 +390,9 @@ function format_minutes(int $min): string {
 function money(?float $t): string { return number_format((float)$t, 2, ',', '.') . ' ₺'; }
 
 function initials(string $name): string {
-    $parcalar = preg_split('/\s+/', trim($name));
-    $h = mb_substr($parcalar[0], 0, 1);
-    if (count($parcalar) > 1) $h .= mb_substr(end($parcalar), 0, 1);
+    $parts = preg_split('/\s+/', trim($name));
+    $h = mb_substr($parts[0], 0, 1);
+    if (count($parts) > 1) $h .= mb_substr(end($parts), 0, 1);
     return mb_strtoupper($h);
 }
 
@@ -404,31 +408,60 @@ function avatar(?array $u, int $size = 34): string {
 /** Client logo or a colored initials box */
 function client_logo(array $d, int $size = 40, int $fontPx = 15): string {
     if (!empty($d['logo'])) {
-        return '<span class="dosya-avatar" style="width:' . $size . 'px;height:' . $size . 'px;background-image:url(\'uploads/' . e($d['logo']) . '\');background-size:cover;background-position:center"></span>';
+        return '<span class="file-avatar" style="width:' . $size . 'px;height:' . $size . 'px;background-image:url(\'uploads/' . e($d['logo']) . '\');background-size:cover;background-position:center"></span>';
     }
     $color = e($d['color'] ?? '#182f5d');
-    return '<span class="dosya-avatar" style="width:' . $size . 'px;height:' . $size . 'px;font-size:' . $fontPx . 'px;background:' . $color . '22;color:' . $color . '">' . e(initials($d['name'])) . '</span>';
+    return '<span class="file-avatar" style="width:' . $size . 'px;height:' . $size . 'px;font-size:' . $fontPx . 'px;background:' . $color . '22;color:' . $color . '">' . e(initials($d['name'])) . '</span>';
 }
 
 /* ---------------- Label dictionaries ---------------- */
 
-const PROJECT_TYPES = ['aylik' => 'Aylık Düzenli', 'donemsel' => 'Dönemsel', 'tek' => 'Tek Seferlik'];
-const CLIENT_TYPES = ['marka' => 'Marka', 'sirket' => 'Şirket', 'stk' => 'STK'];
-const TASK_STATUSES = ['yapilacak' => 'Yapılacak', 'devam' => 'Devam Ediyor', 'incelemede' => 'İncelemede', 'onayda' => 'Onayda', 'tamamlandi' => 'Tamamlandı'];
-const PRIORITIES = ['dusuk' => 'Düşük', 'normal' => 'Normal', 'yuksek' => 'Yüksek', 'acil' => 'Acil'];
-const PROJECT_STATUSES = ['is_active' => 'Aktif', 'beklemede' => 'Beklemede', 'tamamlandi' => 'Tamamlandı', 'iptal' => 'İptal'];
-const CONTENT_STATUSES = ['taslak' => 'Taslak', 'internal_approval' => 'İç Onayda', 'customer_approval' => 'Müşteri Onayında', 'revize' => 'Revize', 'onaylandi' => 'Onaylandı', 'yayinlandi' => 'Yayınlandı'];
-const APPROVAL_STATUSES = ['bekliyor' => 'Bekliyor', 'onaylandi' => 'Onaylandı', 'revize' => 'Revize İstendi', 'reddedildi' => 'Reddedildi'];
-const REQUEST_STATUSES = ['yeni' => 'Yeni', 'inceleniyor' => 'İnceleniyor', 'gorev_olusturuldu' => 'Göreve Dönüştürüldü', 'tamamlandi' => 'Tamamlandı', 'reddedildi' => 'Reddedildi'];
-const PLATFORMS = ['instagram' => 'Instagram', 'facebook' => 'Facebook', 'x' => 'X (Twitter)', 'linkedin' => 'LinkedIn', 'youtube' => 'YouTube', 'tiktok' => 'TikTok', 'web' => 'Web Sitesi', 'diger' => 'Diğer'];
-const EVENT_TYPES = ['cekim' => 'Çekim', 'toplanti' => 'Toplantı', 'is_delivered' => 'Teslim', 'diger' => 'Diğer'];
-const ROLES = ['yonetici' => 'Yönetici', 'pm' => 'Proje Yöneticisi', 'ekip' => 'Ekip Üyesi', 'finans' => 'Finans', 'stajyer' => 'Stajyer', 'musteri' => 'Müşteri'];
-const REPEAT_OPTIONS = ['yok' => 'Tekrarlamaz', 'haftalik' => 'Her Hafta', 'aylik' => 'Her Ay'];
-const EXPENSE_TYPES = ['maas' => 'Maaş', 'kira' => 'Kira', 'abonelik' => 'Abonelik', 'ekipman' => 'Ekipman', 'vergi' => 'Vergi', 'diger' => 'Diğer'];
+const PROJECT_TYPES = ['monthly' => 'Aylık Düzenli', 'periodic' => 'Dönemsel', 'one_off' => 'Tek Seferlik'];
+const CLIENT_TYPES = ['brand' => 'Marka', 'company' => 'Şirket', 'ngo' => 'STK'];
+const TASK_STATUSES = ['todo' => 'Yapılacak', 'in_progress' => 'Devam Ediyor', 'in_review' => 'İncelemede', 'awaiting_approval' => 'Onayda', 'completed' => 'Tamamlandı'];
+const PRIORITIES = ['low' => 'Düşük', 'normal' => 'Normal', 'high' => 'Yüksek', 'urgent' => 'Acil'];
+const PROJECT_STATUSES = ['active' => 'Aktif', 'on_hold' => 'Beklemede', 'completed' => 'Tamamlandı', 'cancelled' => 'İptal'];
+const CONTENT_STATUSES = ['draft' => 'Taslak', 'internal_approval' => 'İç Onayda', 'customer_approval' => 'Müşteri Onayında', 'revision' => 'Revize', 'approved' => 'Onaylandı', 'published' => 'Yayınlandı'];
+const APPROVAL_STATUSES = ['pending' => 'Bekliyor', 'approved' => 'Onaylandı', 'revision' => 'Revize İstendi', 'rejected' => 'Reddedildi'];
+const REQUEST_STATUSES = ['new' => 'Yeni', 'reviewing' => 'İnceleniyor', 'task_created' => 'Göreve Dönüştürüldü', 'completed' => 'Tamamlandı', 'rejected' => 'Reddedildi'];
+const PLATFORMS = ['instagram' => 'Instagram', 'facebook' => 'Facebook', 'x' => 'X (Twitter)', 'linkedin' => 'LinkedIn', 'youtube' => 'YouTube', 'tiktok' => 'TikTok', 'web' => 'Web Sitesi', 'other' => 'Diğer'];
+const EVENT_TYPES = ['shoot' => 'Çekim', 'meeting' => 'Toplantı', 'delivery' => 'Teslim', 'other' => 'Diğer'];
+const ROLES = ['admin' => 'Yönetici', 'pm' => 'Proje Yöneticisi', 'team' => 'Ekip Üyesi', 'finance' => 'Finans', 'intern' => 'Stajyer', 'customer' => 'Müşteri'];
+const REPEAT_OPTIONS = ['none' => 'Tekrarlamaz', 'weekly' => 'Her Hafta', 'monthly' => 'Her Ay'];
+const EXPENSE_TYPES = ['salary' => 'Maaş', 'rent' => 'Kira', 'subscription' => 'Abonelik', 'equipment' => 'Ekipman', 'tax' => 'Vergi', 'other' => 'Diğer'];
+const EXPENSE_STATUSES = ['pending' => 'Bekliyor', 'paid' => 'Ödendi'];
+const PAYMENT_TYPES = ['invoice' => 'Fatura', 'collection' => 'Tahsilat'];
+const PAYMENT_STATUSES = ['pending' => 'Bekliyor', 'paid' => 'Ödendi', 'overdue' => 'Gecikti'];
+const DOCUMENT_TYPES = ['quote' => 'Teklif', 'invoice' => 'Fatura'];
+const DOCUMENT_STATUSES = ['draft' => 'Taslak', 'sent' => 'Gönderildi', 'approved' => 'Onaylandı', 'rejected' => 'Reddedildi'];
+const CLIENT_STATUSES = ['active' => 'Aktif', 'inactive' => 'Pasif'];
+const PERIOD_STATUSES = ['open' => 'Açık', 'closed' => 'Kapalı'];
+const EXTRA_REQUEST_STATUSES = ['pending' => 'Bekliyor', 'approved' => 'Onaylandı', 'rejected' => 'Reddedildi'];
+const MENTORSHIP_STATUSES = ['planned' => 'Planlandı', 'in_progress' => 'Devam Ediyor', 'completed' => 'Tamamlandı'];
+const IDEA_STATUSES = ['new' => 'Yeni', 'liked' => 'Beğenildi', 'implemented' => 'Uygulandı'];
+const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'access' => 'Erişim Bilgileri', 'audience' => 'Hedef Kitle', 'process' => 'Süreç'];
+
+// Status colours shared by kanban, reports and the content calendar
+const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)'];
+const CONTENT_STATUS_COLORS = ['draft' => 'var(--muted)', 'internal_approval' => 'var(--info)', 'customer_approval' => 'var(--warning)', 'revision' => 'var(--info)', 'approved' => 'var(--success)', 'published' => 'var(--brand)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '6.11';
+const APP_VERSION = '7.0';
 const VERSION_NOTES = [
+    '7.0' => [
+        'Kod tabanı baştan sona İngilizceye çevrildi: CSS sınıfları, fonksiyonlar, değişkenler, AJAX eylemleri, ayar ve yetki anahtarları ile veritabanında saklanan durum/rol değerleri artık tek dilde. Arayüz Türkçe kalmaya devam ediyor',
+        'Güncelleme sırasında veritabanının tam yedeği backups/ klasörüne alınıyor, ardından tüm kayıtlar kayıpsız çevriliyor',
+        'Düzeltildi: randevu onaylama/reddetme çalışmıyordu',
+        'Düzeltildi: görev tablo görünümünde hücreden düzenleme (atanan, durum, öncelik, tarihler, süre) "Bu alan düzenlenemez" hatası veriyordu',
+        'Düzeltildi: içerik takviminde içerik detayı açılmıyordu',
+        'Düzeltildi: bütçe hedefi kaydediliyor ama finans sayfasında görünmüyordu',
+        'Düzeltildi: aktif projeler/dosyalar, teslim etkinlikleri ve iç onay / müşteri onayındaki içerikler bazı yerlerde yanlış etiket veya renkle görünüyordu; müşterisi olmayan taleplerde proje listesi boş geliyordu',
+        'Düzeltildi: 5.0 öncesinden kalan ekipman hareketleri geçmişte ham kod olarak görünüyordu; görev maddesi silme onay sorusu gelmiyordu',
+        'Düzeltildi: finansta vadesi geçmiş faturalar "Bekliyor" görünüyordu ve listeden "Gecikti" seçilince kaydedilmiyordu',
+        'Düzeltildi: yorum düzenleme ve yoruma yanıt formu açılmıyordu; kişisel not düzenlenirken seçili renk işaretlenmiyordu',
+        'Düzeltildi: uyarı ve bilgi renkleri (önemli duyurular, bekleyen randevular, incelemedeki görevler…) hiç uygulanmıyordu',
+        'Düzeltildi: finans ve zaman CSV dışa aktarımı, paneldeki "geciken görevler" bağlantısı ve panelin "Ekip durumu" kartı çalışmıyordu',
+    ],
     '6.11' => [
         'KİLİTLENME AVI: saatlik/günlük otomatik işler (hatırlatma mailleri, Drive kontrolleri) artık sayfa yüklemesinin İÇİNDE değil, sayfa tarayıcıya teslim edildikten SONRA çalışıyor — takılan bir mail sunucusu paneli bekletemez',
         'Güncelleme sonrası şema migration\'ı artık tek bir istek tarafından kilitle çalıştırılıyor; aynı anda açık sekmeler/anketler aynı ALTER TABLE listesini paralel koşturup tüm siteyi dakikalarca kilitlemiyordu artık',
@@ -613,7 +646,7 @@ const VERSION_NOTES = [
         'İçerikler dosyaya bağlandı, çoklu platform seçimi ve sosyal medya takipçi takibi (v2.8)',
     ],
 ];
-const RANDEVU_DURUMLARI = ['bekliyor' => 'Bekliyor', 'onaylandi' => 'Onaylandı', 'alternative' => 'Farklı Saat Önerildi', 'reddedildi' => 'Reddedildi'];
+const APPOINTMENT_STATUSES = ['pending' => 'Bekliyor', 'approved' => 'Onaylandı', 'alternative' => 'Farklı Saat Önerildi', 'rejected' => 'Reddedildi'];
 
 /* ---------------- Central SVG icon library (monochrome line) ---------------- */
 const ICONS = [
@@ -625,49 +658,49 @@ const ICONS = [
     'youtube'   => 'M21 8a3 3 0 00-2-2c-2-.5-7-.5-7-.5s-5 0-7 .5a3 3 0 00-2 2 30 30 0 000 8 3 3 0 002 2c2 .5 7 .5 7 .5s5 0 7-.5a3 3 0 002-2 30 30 0 000-8zM10 9.5l5 2.5-5 2.5v-5z',
     'tiktok'    => 'M14 4v9.5a3.5 3.5 0 11-3.5-3.5M14 4a5 5 0 005 5',
     'web'       => 'M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z',
-    'diger'     => 'M12 8v8m-4-4h8M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+    'other'     => 'M12 8v8m-4-4h8M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
     // Equipment categories
-    'kamera'    => 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z',
+    'camera'    => 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z',
     'lens'      => 'M12 19a7 7 0 100-14 7 7 0 000 14zm0-3.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM19 5l1.5-1.5',
-    'sd_kart'   => 'M8 3h9a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V7l3-4zM9 7v3m3-3v3m3-3v3',
+    'sd_card'   => 'M8 3h9a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V7l3-4zM9 7v3m3-3v3m3-3v3',
     'tripod'    => 'M9 4h6v4H9zM12 8v4m0 0l-5 8m5-8l5 8m-5-8v8',
-    'isik'      => 'M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.7.6 1 1.5 1 2.5h6c0-1 .3-1.9 1-2.5A6 6 0 0012 3z',
-    'ses'       => 'M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3zm-7-3a7 7 0 0014 0M12 19v3',
+    'light'      => 'M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.7.6 1 1.5 1 2.5h6c0-1 .3-1.9 1-2.5A6 6 0 0012 3z',
+    'audio'       => 'M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3zm-7-3a7 7 0 0014 0M12 19v3',
     'drone'     => 'M4 6a2 2 0 104 0 2 2 0 10-4 0zm12 0a2 2 0 104 0 2 2 0 10-4 0zM4 18a2 2 0 104 0 2 2 0 10-4 0zm12 0a2 2 0 104 0 2 2 0 10-4 0zM7.5 7.5l3 3m6-3l-3 3m-6 6l3-3m6 3l-3-3m-3 3v-3a3 3 0 013-3',
-    'aksesuar'  => 'M6 7h12l1 4H5l1-4zm-1 4v8a1 1 0 001 1h12a1 1 0 001-1v-8M12 7V4',
+    'accessory'  => 'M6 7h12l1 4H5l1-4zm-1 4v8a1 1 0 001 1h12a1 1 0 001-1v-8M12 7V4',
     // General UI
     'archive'     => 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
-    'megafon'   => 'M11 5.88V19.24a1.76 1.76 0 01-3.42.6L5.44 14M18.7 4a9 9 0 01.3 13.3M5.44 14A2 2 0 015 10h1a8 8 0 005-2l3-2v12l-3-2a8 8 0 00-5-2H5.44z',
+    'megaphone'   => 'M11 5.88V19.24a1.76 1.76 0 01-3.42.6L5.44 14M18.7 4a9 9 0 01.3 13.3M5.44 14A2 2 0 015 10h1a8 8 0 005-2l3-2v12l-3-2a8 8 0 00-5-2H5.44z',
     'pin'       => 'M12 21s-7-5.5-7-11a7 7 0 1114 0c0 5.5-7 11-7 11zm0-8.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z',
-    'takvim'    => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+    'calendar'    => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
     'time'      => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
     'lock'     => 'M7 11V7a5 5 0 0110 0v4M5 11h14v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-9z',
     'lock-open' => 'M7 11V7a5 5 0 019.5-2M5 11h14v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-9z',
     'repeat'    => 'M17 2l4 4-4 4M3 11V9a4 4 0 014-4h14M7 22l-4-4 4-4m14-3v2a4 4 0 01-4 4H3',
-    'atac'      => 'M21.4 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.2-9.19a4 4 0 015.65 5.66l-9.2 9.19a2 2 0 01-2.82-2.83l8.49-8.48',
-    'klasor'    => 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
+    'paperclip'      => 'M21.4 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.2-9.19a4 4 0 015.65 5.66l-9.2 9.19a2 2 0 01-2.82-2.83l8.49-8.48',
+    'folder'    => 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
     'video'     => 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z',
     'person'      => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
     'people'   => 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a3 3 0 11-3-3',
-    'sohbet'    => 'M8 12h8m-8-4h8m-9 8l-4 4V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H7z',
-    'el-sikisma' => 'M11 17l-1.5 1.5a2 2 0 01-3-3L8 14m3 3l2 2a2 2 0 003-3l-.5-.5M11 17l3-3m-6 0L5.5 11.5a2 2 0 010-3L8 6l4 1 3.5-1.5a2 2 0 012.5.5L21 9l-3 5.5M8 14l3-3',
+    'chat'    => 'M8 12h8m-8-4h8m-9 8l-4 4V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H7z',
+    'handshake' => 'M11 17l-1.5 1.5a2 2 0 01-3-3L8 14m3 3l2 2a2 2 0 003-3l-.5-.5M11 17l3-3m-6 0L5.5 11.5a2 2 0 010-3L8 6l4 1 3.5-1.5a2 2 0 012.5.5L21 9l-3 5.5M8 14l3-3',
     'item'     => 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z',
     'cop'       => 'M19 7l-.9 12a2 2 0 01-2 1.9H7.9a2 2 0 01-2-1.9L5 7m14 0H5m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3',
     'box'      => 'M21 8l-9-5-9 5m18 0l-9 5m9-5v8l-9 5m0-8L3 8m9 5v8m-9-13v8l9 5',
-    'onay'      => 'M9 12l2 2 4-4m5.6 2a9 9 0 11-18 0 9 9 0 0118 0z',
-    'grafik'    => 'M9 19v-6M15 19v-2M12 19v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z',
+    'approval'      => 'M9 12l2 2 4-4m5.6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    'chart'    => 'M9 19v-6M15 19v-2M12 19v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z',
     'star'    => 'M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1L12 2z',
-    'gunes'     => 'M12 17a5 5 0 100-10 5 5 0 000 10zm0-15v2m0 16v2M4.2 4.2l1.4 1.4m12.8 12.8l1.4 1.4M2 12h2m16 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
-    'roket'     => 'M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2 0-2.8-.8-.7-2-.7-3 0zM12 15l-3-3a22 22 0 012-4c3.2-3.2 7-4.5 10-4 .5 3-1 6.8-4 10a22 22 0 01-4 2l-1-1zM9 12H4s.5-3.5 2-5c1.7-1.7 5 0 5 0m1 8v5s3.5-.5 5-2c1.7-1.7 0-5 0-5M15 9h.01',
+    'sun'     => 'M12 17a5 5 0 100-10 5 5 0 000 10zm0-15v2m0 16v2M4.2 4.2l1.4 1.4m12.8 12.8l1.4 1.4M2 12h2m16 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
+    'rocket'     => 'M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2 0-2.8-.8-.7-2-.7-3 0zM12 15l-3-3a22 22 0 012-4c3.2-3.2 7-4.5 10-4 .5 3-1 6.8-4 10a22 22 0 01-4 2l-1-1zM9 12H4s.5-3.5 2-5c1.7-1.7 5 0 5 0m1 8v5s3.5-.5 5-2c1.7-1.7 0-5 0-5M15 9h.01',
     'warning'     => 'M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z',
     'money'      => 'M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8c1.66 0 3.07.5 3.6 1.2M12 8V6m0 12v-2m0 2c-1.66 0-3.07-.5-3.6-1.2M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
     'document'     => 'M9 17h6M9 13h6M9 9h1m4 12H7a2 2 0 01-2-2V5a2 2 0 012-2h5.6a1 1 0 01.7.3l5.4 5.4a1 1 0 01.3.7V19a2 2 0 01-2 2z',
 ];
 
 /** Renders a monochrome line SVG icon (currentColor — inherits the surrounding text color) */
-function icon(string $name, int $size = 16, string $stil = ''): string {
-    $path = ICONS[$name] ?? ICONS['diger'];
-    return '<svg class="ikon" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"' . ($stil ? ' style="' . $stil . '"' : '') . '><path d="' . $path . '"/></svg>';
+function icon(string $name, int $size = 16, string $style = ''): string {
+    $path = ICONS[$name] ?? ICONS['other'];
+    return '<svg class="icon" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"' . ($style ? ' style="' . $style . '"' : '') . '><path d="' . $path . '"/></svg>';
 }
 
 /** Converts CSV-stored multi-platform values into icon badges */
@@ -675,31 +708,31 @@ function platform_badges(?string $csv, bool $onlyIcon = false): string {
     if (!$csv) return '';
     $h = '';
     foreach (array_filter(array_map('trim', explode(',', $csv))) as $pl) {
-        $tag = PLATFORMS[$pl] ?? $pl;
-        $svg = icon(isset(ICONS[$pl]) ? $pl : 'diger', $onlyIcon ? 13 : 13);
+        $label = PLATFORMS[$pl] ?? $pl;
+        $svg = icon(isset(ICONS[$pl]) ? $pl : 'other', $onlyIcon ? 13 : 13);
         $h .= $onlyIcon
-            ? '<span class="p-ikon" title="' . e($tag) . '">' . $svg . '</span>'
-            : '<span class="rozet" style="padding:2px 8px;gap:5px">' . $svg . ' ' . e($tag) . '</span> ';
+            ? '<span class="p-icon" title="' . e($label) . '">' . $svg . '</span>'
+            : '<span class="badge" style="padding:2px 8px;gap:5px">' . $svg . ' ' . e($label) . '</span> ';
     }
     return $h;
 }
 
 /** Renders a 1-5 star visual */
 function stars(float $rating, int $size = 14): string {
-    $h = '<span class="yildizlar" style="font-size:' . $size . 'px">';
+    $h = '<span class="stars" style="font-size:' . $size . 'px">';
     for ($i = 1; $i <= 5; $i++) $h .= '<span style="opacity:' . ($i <= round($rating) ? '1' : '.25') . '">★</span>';
     return $h . '</span>';
 }
 
 /* Equipment module constants */
-const EQUIPMENT_CATEGORIES = ['kamera' => 'Kamera', 'lens' => 'Lens', 'sd_kart' => 'SD Kart', 'tripod' => 'Tripod', 'isik' => 'Işık', 'ses' => 'Ses', 'drone' => 'Drone', 'aksesuar' => 'Aksesuar', 'diger' => 'Diğer'];
-const EKIPMAN_DURUMLARI = ['studyoda' => 'Stüdyoda', 'zimmette' => 'Zimmette', 'cekimde' => 'Çekimde', 'arizali' => 'Arızalı', 'bakimda' => 'Bakımda'];
-const SD_DURUMLARI = ['bos' => 'Boş / Hazır', 'dolu' => 'Dolu', 'aktarildi' => "Drive'a Aktarıldı"];
-const EKIPMAN_HAREKET_TURLERI = [
-    'eklendi' => 'envantere eklendi', 'custody' => 'zimmet verildi', 'return' => 'iade edildi',
-    'shoot_output' => 'çekime çıktı', 'cekimden_dondu' => 'çekimden döndü',
-    'sd_full' => 'dolu işaretlendi', 'sd_aktarildi' => "Drive'a aktarıldı", 'sd_bosaltildi' => 'boşaltıldı',
-    'fault' => 'arızalı işaretlendi', 'bakim' => 'bakıma alındı', 'duzeltildi' => 'kullanıma döndü',
+const EQUIPMENT_CATEGORIES = ['camera' => 'Kamera', 'lens' => 'Lens', 'sd_card' => 'SD Kart', 'tripod' => 'Tripod', 'light' => 'Işık', 'audio' => 'Ses', 'drone' => 'Drone', 'accessory' => 'Aksesuar', 'other' => 'Diğer'];
+const EQUIPMENT_STATUSES = ['in_studio' => 'Stüdyoda', 'checked_out' => 'Zimmette', 'on_shoot' => 'Çekimde', 'faulty' => 'Arızalı', 'in_maintenance' => 'Bakımda'];
+const SD_STATUSES = ['empty' => 'Boş / Hazır', 'full' => 'Dolu', 'transferred' => "Drive'a Aktarıldı"];
+const EQUIPMENT_LOG_TYPES = [
+    'added' => 'envantere eklendi', 'custody' => 'zimmet verildi', 'return' => 'iade edildi',
+    'shoot_out' => 'çekime çıktı', 'shoot_return' => 'çekimden döndü',
+    'sd_full' => 'dolu işaretlendi', 'sd_transferred' => "Drive'a aktarıldı", 'sd_emptied' => 'boşaltıldı',
+    'fault' => 'arızalı işaretlendi', 'maintenance' => 'bakıma alındı', 'fixed' => 'kullanıma döndü',
 ];
 
 /** Records an equipment movement log entry */
@@ -717,7 +750,7 @@ function log_equipment(int $equipmentId, string $type, string $description = '',
 function active_theme(): string {
     $u = user();
     $theme = $u['theme'] ?? '';
-    return isset(THEMES[$theme]) ? $theme : setting('varsayilan_tema', 'lime');
+    return isset(THEMES[$theme]) ? $theme : setting('default_theme', 'lime');
 }
 /** Is the active theme a dark one? */
 function theme_is_dark(): bool {
@@ -743,9 +776,9 @@ const THEMES = [
     'cream'        => ['Krem', '#b8892b', false],
     'maroon'       => ['Bordo', '#d64560', true],
     'maroon-light' => ['Bordo Aydınlık', '#610714', false],
-    'gece'         => ['Gece', '#f8f2cb', true],
-    'koyu'         => ['Klasik Koyu', '#60a5fa', true],
-    'acik'         => ['Klasik Açık', '#2563eb', false],
+    'night'         => ['Gece', '#f8f2cb', true],
+    'classic-dark'         => ['Klasik Koyu', '#60a5fa', true],
+    'classic-light' => ['Klasik Açık', '#2563eb', false],
     // v5.0 airy styles: liquid glass / glassmorphism / claymorphism
     'liquid-glass'       => ['Liquid Glass', '#8ad8ff', true],
     'liquid-glass-light' => ['Liquid Glass Aydınlık', '#0284c7', false],
@@ -756,44 +789,44 @@ const THEMES = [
 
 /* Notification categories (subject to user preference) */
 const NOTIFICATION_CATEGORIES = [
-    'gorev' => 'Görev atama ve durum değişiklikleri',
-    'onay' => 'Onay talepleri ve yanıtları',
-    'talep' => 'Yeni talepler',
-    'mesaj' => 'Mesajlar',
+    'task' => 'Görev atama ve durum değişiklikleri',
+    'approval' => 'Onay talepleri ve yanıtları',
+    'request' => 'Yeni talepler',
+    'message' => 'Mesajlar',
 ];
 
-function notification_pref(array $alici, string $category): array {
+function notification_pref(array $recipient, string $category): array {
     // Returns: [panel_notification_on, email_on]
-    $t = json_decode($alici['notification_preferences'] ?? '', true);
+    $t = json_decode($recipient['notification_preferences'] ?? '', true);
     if (!is_array($t)) return [true, true]; // default: everything on
     $panel = !isset($t[$category]) || (bool)$t[$category];
     $email = !isset($t['email']) || (bool)$t['email'];
     return [$panel, $email];
 }
 
-function badge(string $setting_value, array $sozluk, string $sinifOn = ''): string {
-    $tag = $sozluk[$setting_value] ?? $setting_value;
-    return '<span class="rozet r-' . ($sinifOn ? $sinifOn . '-' : '') . e($setting_value) . '">' . e($tag) . '</span>';
+function badge(string $value, array $dictionary, string $classPrefix = ''): string {
+    $label = $dictionary[$value] ?? $value;
+    return '<span class="badge r-' . ($classPrefix ? $classPrefix . '-' : '') . e($value) . '">' . e($label) . '</span>';
 }
 
 /* ---------------- Notifications & Activity ---------------- */
 
-function notify(int $userId, string $title, string $message = '', string $link = '', string $category = 'gorev', bool $email = true): void {
+function notify(int $userId, string $title, string $message = '', string $link = '', string $category = 'task', bool $email = true): void {
     // No self-notifications for a user's own actions — but the scheduled jobs are
     // the system acting, so the user whose page load triggered them still gets theirs
     if (empty($GLOBALS['sada_system_actor']) && $userId === (int)(user()['id'] ?? 0)) return;
-    $alici = row("SELECT * FROM users WHERE id=? AND is_active=1", [$userId]);
-    if (!$alici) return;
-    [$panelOpen, $emailOpen] = notification_pref($alici, $category);
+    $recipient = row("SELECT * FROM users WHERE id=? AND is_active=1", [$userId]);
+    if (!$recipient) return;
+    [$panelOpen, $emailOpen] = notification_pref($recipient, $category);
     if (!$panelOpen) return; // the user has turned this category off
     insert('notifications', [
         'user_id' => $userId, 'title' => $title, 'message' => $message,
         'link' => $link, 'is_read' => 0, 'created' => date('Y-m-d H:i:s'),
     ]);
-    if ($email && $emailOpen && setting('eposta_bildirim') === '1' && setting('smtp_aktif') === '1') {
+    if ($email && $emailOpen && setting('email_notifications') === '1' && setting('smtp_enabled') === '1') {
         // The mail leaves after the response: an announcement to 15 people used to be
         // 15 SMTP transactions the clicking user waited on (minutes when the MX is slow)
-        $to = $alici['email']; $text = $message . ($link ? "\n\nGörüntüle: " . full_url($link) : '');
+        $to = $recipient['email']; $text = $message . ($link ? "\n\nGörüntüle: " . full_url($link) : '');
         after_response(function () use ($to, $title, $text) {
             if (sada_deadline_passed()) return;
             require_once __DIR__ . '/mailer.php';
@@ -803,8 +836,8 @@ function notify(int $userId, string $title, string $message = '', string $link =
 }
 
 function full_url(string $path): string {
-    $protokol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    return $protokol . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/' . ltrim($path, '/');
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    return $protocol . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . '/' . ltrim($path, '/');
 }
 
 /**
@@ -815,7 +848,7 @@ function sd_last_shoot(int $equipmentId): ?array {
     $r = row("SELECT e.id, e.title, e.created_by, c.manager_id
         FROM event_equipment ee JOIN events e ON e.id=ee.event_id
         LEFT JOIN clients c ON c.id = COALESCE(e.client_id, (SELECT client_id FROM projects WHERE id=e.project_id))
-        WHERE ee.equipment_id=? AND e.type='cekim' AND e.drive_status='bekliyor'
+        WHERE ee.equipment_id=? AND e.type='shoot' AND e.drive_status='pending'
         AND e.start > DATE_SUB(NOW(), INTERVAL 30 DAY)
         ORDER BY e.start DESC LIMIT 1", [$equipmentId]);
     return $r ?: null;
@@ -848,8 +881,8 @@ function file_upload(string $field): ?array {
         if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']) && !str_starts_with($mime, 'image/')) return null;
     }
     $newName = date('Ym') . '/' . bin2hex(random_bytes(8)) . '.' . $extension;
-    $targetKlasor = ROOT . '/uploads/' . date('Ym');
-    if (!is_dir($targetKlasor)) mkdir($targetKlasor, 0755, true);
+    $targetFolder = ROOT . '/uploads/' . date('Ym');
+    if (!is_dir($targetFolder)) mkdir($targetFolder, 0755, true);
     if (!move_uploaded_file($f['tmp_name'], ROOT . '/uploads/' . $newName)) return null;
     return ['path' => $newName, 'name' => $f['name'], 'size' => $f['size'], 'extension' => $extension];
 }
@@ -867,31 +900,31 @@ function period_name(array $d): string { return MONTHS[(int)$d['month']] . ' ' .
 function get_or_create_period(int $projectId, int $year, int $month): int {
     $d = row("SELECT id FROM periods WHERE project_id=? AND year=? AND month=?", [$projectId, $year, $month]);
     if ($d) return (int)$d['id'];
-    return insert('periods', ['project_id' => $projectId, 'year' => $year, 'month' => $month, 'status' => 'acik', 'created' => date('Y-m-d H:i:s')]);
+    return insert('periods', ['project_id' => $projectId, 'year' => $year, 'month' => $month, 'status' => 'open', 'created' => date('Y-m-d H:i:s')]);
 }
 
 /* ---------------- Mentions (@mention) & task tags ---------------- */
 
 /** Highlights @First Last mentions in text (matched against active user names, longest name first) */
-function highlight_mentions(string $kacisliText): string {
+function highlight_mentions(string $escapedText): string {
     static $names = null;
     if ($names === null) {
         $names = array_column(rows("SELECT name FROM users WHERE is_active=1 ORDER BY CHAR_LENGTH(name) DESC"), 'name');
     }
     foreach ($names as $name) {
-        $kacisli = e($name); // the text is already escaped with e()
-        $kacisliText = str_ireplace('@' . $kacisli, '<span class="mention">@' . $kacisli . '</span>', $kacisliText);
+        $escaped = e($name); // the text is already escaped with e()
+        $escapedText = str_ireplace('@' . $escaped, '<span class="mention">@' . $escaped . '</span>', $escapedText);
     }
-    return $kacisliText;
+    return $escapedText;
 }
 
 /** Converts comma-separated task tags into colored chips */
-function tag_chips(?string $tags, string $ekSinif = ''): string {
+function tag_chips(?string $tags, string $extraClass = ''): string {
     if (!$tags) return '';
     $h = '';
-    foreach (array_filter(array_map('trim', explode(',', $tags))) as $et) {
-        $ton = crc32(mb_strtolower($et)) % 360; // stable color per tag
-        $h .= '<span class="etiket-cip ' . $ekSinif . '" style="--cip-ton:' . $ton . '">' . e($et) . '</span>';
+    foreach (array_filter(array_map('trim', explode(',', $tags))) as $tag) {
+        $hue = crc32(mb_strtolower($tag)) % 360; // stable color per tag
+        $h .= '<span class="label-chip ' . $extraClass . '" style="--chip-tone:' . $hue . '">' . e($tag) . '</span>';
     }
     return $h;
 }
@@ -901,7 +934,7 @@ function notify_mentions(string $tagsJson, string $title, string $message, strin
     $ids = json_decode($tagsJson, true);
     if (!is_array($ids)) return;
     foreach (array_unique(array_map('intval', $ids)) as $uid) {
-        if ($uid > 0) notify($uid, $title, $message, $link, 'mesaj');
+        if ($uid > 0) notify($uid, $title, $message, $link, 'message');
     }
 }
 
@@ -927,20 +960,22 @@ function claim_interval(string $key, int $seconds): bool {
     $last = val("SELECT setting_value FROM settings WHERE setting_key=?", [$key]);
     if ($last !== false && (int)$last > $now - $seconds) return false; // cheap read first: no writes on ordinary page loads
     if ($last === false) q("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, '0')", [$key]);
+    // a non-numeric value (e.g. a date written by hand) would make the CAST below fail on every run
+    elseif (!ctype_digit((string)$last)) q("UPDATE settings SET setting_value='0' WHERE setting_key=? AND setting_value=?", [$key, $last]);
     $st = q("UPDATE settings SET setting_value=? WHERE setting_key=? AND CAST(setting_value AS UNSIGNED) <= ?", [(string)$now, $key, $now - $seconds]);
     return $st->rowCount() > 0;
 }
 
 function run_recurring_jobs(bool $force = false): int {
-    if ($force) q("INSERT INTO settings (setting_key, setting_value) VALUES ('son_tekrar_kontrol', ?) ON DUPLICATE KEY UPDATE setting_value=?", [time(), time()]);
-    elseif (!claim_interval('son_tekrar_kontrol', 3600)) return 0;
+    if ($force) q("INSERT INTO settings (setting_key, setting_value) VALUES ('last_repeat_check', ?) ON DUPLICATE KEY UPDATE setting_value=?", [time(), time()]);
+    elseif (!claim_interval('last_repeat_check', 3600)) return 0;
     $GLOBALS['sada_system_actor'] = true;
 
     $count = 0;
     // Housekeeping: the login log only matters for the 15-minute lockout window
     q("DELETE FROM login_attempts WHERE created < DATE_SUB(NOW(), INTERVAL 30 DAY)");
-    foreach (rows("SELECT * FROM tasks WHERE `repeat`!='yok'") as $g) {
-        $periodKey = $g['repeat'] === 'haftalik' ? date('o-W') : date('Y-m');
+    foreach (rows("SELECT * FROM tasks WHERE `repeat`!='none'") as $g) {
+        $periodKey = $g['repeat'] === 'weekly' ? date('o-W') : date('Y-m');
         if ($g['last_repeat'] === $periodKey) continue;
         if ($g['last_repeat'] === null) {
             // First period: the task itself is already this period's work — just stamp it
@@ -948,17 +983,17 @@ function run_recurring_jobs(bool $force = false): int {
             continue;
         }
         // A new period has started: create a fresh copy from the template task
-        $newLastDate = $g['repeat'] === 'haftalik' ? date('Y-m-d', strtotime('sunday this week')) : date('Y-m-t');
+        $newLastDate = $g['repeat'] === 'weekly' ? date('Y-m-d', strtotime('sunday this week')) : date('Y-m-t');
         $periodId = null;
         $projectType = val("SELECT type FROM projects WHERE id=?", [$g['project_id']]);
-        if ($projectType === 'aylik') $periodId = get_or_create_period((int)$g['project_id'], (int)date('Y'), (int)date('n'));
+        if ($projectType === 'monthly') $periodId = get_or_create_period((int)$g['project_id'], (int)date('Y'), (int)date('n'));
         $newId = insert('tasks', [
             'project_id' => $g['project_id'], 'period_id' => $periodId,
             'title' => $g['title'],
             'description' => $g['description'],
             'assignee_id' => $g['assignee_id'], 'created_by' => $g['created_by'],
-            'priority' => $g['priority'], 'status' => 'yapilacak',
-            'due_date' => $newLastDate, 'repeat' => 'yok',
+            'priority' => $g['priority'], 'status' => 'todo',
+            'due_date' => $newLastDate, 'repeat' => 'none',
             'created' => date('Y-m-d H:i:s'),
         ]);
         // Copy the workflow steps in a reset state
@@ -966,7 +1001,7 @@ function run_recurring_jobs(bool $force = false): int {
         foreach ($steps as $i => $a) {
             insert('task_steps', [
                 'task_id' => $newId, 'sort_order' => $a['sort_order'], 'name' => $a['name'],
-                'owner_id' => $a['owner_id'], 'status' => $i === 0 ? 'aktif' : 'bekliyor',
+                'owner_id' => $a['owner_id'], 'status' => $i === 0 ? 'active' : 'pending',
             ]);
         }
         // Copy the checklist in a reset state
@@ -974,29 +1009,29 @@ function run_recurring_jobs(bool $force = false): int {
             insert('task_checklist', ['task_id' => $newId, 'name' => $k['name'], 'is_done' => 0, 'sort_order' => $k['sort_order']]);
         }
         update_row('tasks', ['last_repeat' => $periodKey], 'id=?', [$g['id']]);
-        if ($g['assignee_id']) notify((int)$g['assignee_id'], 'Tekrarlayan görev oluşturuldu', $g['title'], 'task.php?id=' . $newId, 'gorev');
+        if ($g['assignee_id']) notify((int)$g['assignee_id'], 'Tekrarlayan görev oluşturuldu', $g['title'], 'task.php?id=' . $newId, 'task');
         $count++;
     }
 
     /* --- Monthly salary expenses: auto-created at the start of each month --- */
     $buMonth = date('Y-m');
     foreach (rows("SELECT id, name, salary FROM users WHERE salary>0 AND is_active=1") as $person) {
-        $var = val("SELECT COUNT(*) FROM expenses WHERE type='maas' AND user_id=? AND last_repeat=?", [$person['id'], $buMonth]);
+        $var = val("SELECT COUNT(*) FROM expenses WHERE type='salary' AND user_id=? AND last_repeat=?", [$person['id'], $buMonth]);
         if (!$var) {
             insert('expenses', [
-                'type' => 'maas', 'title' => $person['name'] . ' — ' . MONTHS[(int)date('n')] . ' maaşı',
-                'amount' => $person['salary'], 'date' => date('Y-m-01'), 'status' => 'bekliyor',
-                'repeat' => 'yok', 'last_repeat' => $buMonth, 'user_id' => $person['id'], 'created' => date('Y-m-d H:i:s'),
+                'type' => 'salary', 'title' => $person['name'] . ' — ' . MONTHS[(int)date('n')] . ' maaşı',
+                'amount' => $person['salary'], 'date' => date('Y-m-01'), 'status' => 'pending',
+                'repeat' => 'none', 'last_repeat' => $buMonth, 'user_id' => $person['id'], 'created' => date('Y-m-d H:i:s'),
             ]);
         }
     }
     /* --- Monthly recurring expenses (rent, subscriptions, etc.) --- */
-    foreach (rows("SELECT * FROM expenses WHERE `repeat`='aylik'") as $gd) {
+    foreach (rows("SELECT * FROM expenses WHERE `repeat`='monthly'") as $gd) {
         if ($gd['last_repeat'] === $buMonth) continue;
         if ($gd['last_repeat'] === null) { update_row('expenses', ['last_repeat' => $buMonth], 'id=?', [$gd['id']]); continue; }
         insert('expenses', [
             'type' => $gd['type'], 'title' => $gd['title'], 'amount' => $gd['amount'],
-            'date' => date('Y-m-01'), 'status' => 'bekliyor', 'repeat' => 'yok',
+            'date' => date('Y-m-01'), 'status' => 'pending', 'repeat' => 'none',
             'last_repeat' => $buMonth, 'user_id' => $gd['user_id'], 'description' => $gd['description'],
             'created' => date('Y-m-d H:i:s'),
         ]);
@@ -1004,68 +1039,68 @@ function run_recurring_jobs(bool $force = false): int {
     }
 
     /* --- Meeting reminder: notify participants ~1 hour ahead --- */
-    $upcomingMeetings = rows("SELECT * FROM events WHERE type='toplanti' AND is_reminded=0
+    $upcomingMeetings = rows("SELECT * FROM events WHERE type='meeting' AND is_reminded=0
         AND start BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 75 MINUTE)");
     foreach ($upcomingMeetings as $top) {
         $time = date('H:i', strtotime($top['start']));
         $messageText = $time . ' — ' . ($top['place'] ?: '') . ($top['online_link'] ? ' (online)' : '');
-        $alicilar = array_column(rows("SELECT user_id FROM event_participants WHERE event_id=?", [$top['id']]), 'user_id');
-        $alicilar[] = (int)$top['created_by'];
-        foreach (array_unique($alicilar) as $aid) {
-            notify((int)$aid, '⏰ Toplantı yaklaşıyor: ' . $top['title'], $messageText, 'meetings.php', 'gorev');
+        $recipients = array_column(rows("SELECT user_id FROM event_participants WHERE event_id=?", [$top['id']]), 'user_id');
+        $recipients[] = (int)$top['created_by'];
+        foreach (array_unique($recipients) as $aid) {
+            notify((int)$aid, '⏰ Toplantı yaklaşıyor: ' . $top['title'], $messageText, 'meetings.php', 'task');
         }
         update_row('events', ['is_reminded' => 1], 'id=?', [$top['id']]);
     }
 
     /* --- Daily digest: once a day per user — "what awaits you today" --- */
-    if (claim_once('son_gunluk_ozet', date('Y-m-d'))) {
+    if (claim_once('last_user_daily_digest', date('Y-m-d'))) {
         $today = date('Y-m-d');
-        foreach (rows("SELECT id FROM users WHERE is_active=1 AND role!='musteri'") as $person) {
+        foreach (rows("SELECT id FROM users WHERE is_active=1 AND role!='customer'") as $person) {
             $kid = (int)$person['id'];
-            $parcalar = [];
-            $taskCount = (int)val("SELECT COUNT(*) FROM tasks g WHERE g.is_archived=0 AND g.status!='tamamlandi' AND g.due_date=?
+            $parts = [];
+            $taskCount = (int)val("SELECT COUNT(*) FROM tasks g WHERE g.is_archived=0 AND g.status!='completed' AND g.due_date=?
                 AND (g.assignee_id=? OR EXISTS(SELECT 1 FROM task_assignees ga WHERE ga.task_id=g.id AND ga.user_id=?))", [$today, $kid, $kid]);
-            if ($taskCount) $parcalar[] = $taskCount . ' görev teslimi';
-            $topCount = (int)val("SELECT COUNT(*) FROM events e WHERE e.type='toplanti' AND DATE(e.start)=?
+            if ($taskCount) $parts[] = $taskCount . ' görev teslimi';
+            $topCount = (int)val("SELECT COUNT(*) FROM events e WHERE e.type='meeting' AND DATE(e.start)=?
                 AND (e.created_by=? OR EXISTS(SELECT 1 FROM event_participants ek WHERE ek.event_id=e.id AND ek.user_id=?))", [$today, $kid, $kid]);
-            if ($topCount) $parcalar[] = $topCount . ' toplantı';
-            $shootCount = (int)val("SELECT COUNT(*) FROM events WHERE type!='toplanti' AND DATE(start)<=? AND DATE(COALESCE(`end`,start))>=?", [$today, $today]);
-            if ($shootCount) $parcalar[] = $shootCount . ' etkinlik';
-            $contentCount = (int)val("SELECT COUNT(*) FROM contents WHERE date=? AND status NOT IN ('yayinlandi')", [$today]);
-            if ($contentCount) $parcalar[] = $contentCount . ' içerik yayını';
-            if ($parcalar) {
-                notify($kid, '🌅 Bugün seni bekleyenler', implode(' · ', $parcalar), 'index.php', 'gorev', false);
+            if ($topCount) $parts[] = $topCount . ' toplantı';
+            $shootCount = (int)val("SELECT COUNT(*) FROM events WHERE type!='meeting' AND DATE(start)<=? AND DATE(COALESCE(`end`,start))>=?", [$today, $today]);
+            if ($shootCount) $parts[] = $shootCount . ' etkinlik';
+            $contentCount = (int)val("SELECT COUNT(*) FROM contents WHERE date=? AND status NOT IN ('published')", [$today]);
+            if ($contentCount) $parts[] = $contentCount . ' içerik yayını';
+            if ($parts) {
+                notify($kid, '🌅 Bugün seni bekleyenler', implode(' · ', $parts), 'index.php', 'task', false);
             }
         }
     }
 
     /* --- Weekly manager digest: once every Monday --- */
     $buWeek = date('o-W');
-    if (date('N') == 1 && claim_once('son_haftalik_ozet', $buWeek)) {
+    if (date('N') == 1 && claim_once('last_user_weekly_digest', $buWeek)) {
         $hb = date('Y-m-d', strtotime('-7 days'));
         $summary = [];
-        $t1 = (int)val("SELECT COUNT(*) FROM tasks WHERE status='tamamlandi' AND completion>=?", [$hb]);
+        $t1 = (int)val("SELECT COUNT(*) FROM tasks WHERE status='completed' AND completion>=?", [$hb]);
         if ($t1) $summary[] = $t1 . ' görev tamamlandı';
-        $t2 = (int)val("SELECT COUNT(*) FROM tasks WHERE is_archived=0 AND status!='tamamlandi' AND due_date<CURDATE()");
+        $t2 = (int)val("SELECT COUNT(*) FROM tasks WHERE is_archived=0 AND status!='completed' AND due_date<CURDATE()");
         if ($t2) $summary[] = $t2 . ' görev gecikmede';
         $t3 = (int)val("SELECT COUNT(*) FROM requests WHERE created>=?", [$hb]);
         if ($t3) $summary[] = $t3 . ' yeni talep';
         $t4 = val("SELECT ROUND(AVG(rating),1) FROM ratings WHERE created>=?", [$hb]);
         if ($t4) $summary[] = 'ort. puan ' . $t4 . '★';
-        $t5 = (float)val("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status='odendi' AND date>=?", [$hb]);
-        $t6 = (float)val("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE status='odendi' AND date>=?", [$hb]);
+        $t5 = (float)val("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status='paid' AND date>=?", [$hb]);
+        $t6 = (float)val("SELECT COALESCE(SUM(amount),0) FROM expenses WHERE status='paid' AND date>=?", [$hb]);
         if ($t5 || $t6) $summary[] = 'gelir ' . money($t5) . ' / gider ' . money($t6);
         if ($summary) {
-            foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $yo) {
-                notify((int)$yo['id'], '📅 Haftalık özet', implode(' · ', $summary), 'reports.php', 'gorev');
+            foreach (rows("SELECT id FROM users WHERE role IN ('admin','pm') AND is_active=1") as $yo) {
+                notify((int)$yo['id'], '📅 Haftalık özet', implode(' · ', $summary), 'reports.php', 'task');
             }
         }
     }
 
     /* --- Contract expiry reminder (30 days ahead, once) --- */
     foreach (rows("SELECT s.*, d.name client_name FROM contracts s JOIN clients d ON d.id=s.client_id WHERE s.is_reminded=0 AND s.end IS NOT NULL AND s.end <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND s.end >= CURDATE()") as $sz) {
-        foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $ya) {
-            notify((int)$ya['id'], '⏰ Sözleşme bitiyor: ' . $sz['client_name'], '"' . $sz['title'] . '" sözleşmesi ' . format_date($sz['end']) . ' tarihinde sona eriyor.', 'client.php?id=' . $sz['client_id'], 'gorev');
+        foreach (rows("SELECT id FROM users WHERE role IN ('admin','pm') AND is_active=1") as $ya) {
+            notify((int)$ya['id'], '⏰ Sözleşme bitiyor: ' . $sz['client_name'], '"' . $sz['title'] . '" sözleşmesi ' . format_date($sz['end']) . ' tarihinde sona eriyor.', 'client.php?id=' . $sz['client_id'], 'task');
         }
         update_row('contracts', ['is_reminded' => 1], 'id=?', [$sz['id']]);
     }
@@ -1076,7 +1111,7 @@ function run_recurring_jobs(bool $force = false): int {
     if (claim_once('last_due_check', date('Y-m-d'))) {
         $dueTasks = rows("SELECT g.id, g.title, g.due_date, g.assignee_id,
             (SELECT GROUP_CONCAT(ga.user_id) FROM task_assignees ga WHERE ga.task_id=g.id) assignee_ids
-            FROM tasks g WHERE g.is_archived=0 AND g.status!='tamamlandi' AND g.due_date IS NOT NULL
+            FROM tasks g WHERE g.is_archived=0 AND g.status!='completed' AND g.due_date IS NOT NULL
             AND g.due_date <= DATE_ADD(CURDATE(), INTERVAL 1 DAY)");
         foreach ($dueTasks as $dt) {
             if (sada_deadline_passed()) break;
@@ -1089,27 +1124,27 @@ function run_recurring_jobs(bool $force = false): int {
                     : 'Görevin son tarihi yarın (' . format_date($dt['due_date']) . ').';
                 // notify() mails too (when e-mail notifications are on) — a second explicit
                 // send here used to double every reminder and double the SMTP time
-                notify($uid, $title, $body, 'task.php?id=' . $dt['id'], 'gorev');
+                notify($uid, $title, $body, 'task.php?id=' . $dt['id'], 'task');
             }
         }
     }
 
     /* --- Daily manager digest e-mail (first run of the day after 07:00) --- */
     if ((int)date('G') >= 7 && claim_once('last_daily_digest', date('Y-m-d'))) {
-        $overdueList = rows("SELECT g.title, g.due_date, u.name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id WHERE g.is_archived=0 AND g.status!='tamamlandi' AND g.due_date < CURDATE() ORDER BY g.due_date LIMIT 15");
-        $todayShoots = rows("SELECT title, start FROM events WHERE type='cekim' AND DATE(start)=CURDATE()");
-        $pendingApprovals = (int)val("SELECT COUNT(*) FROM approvals WHERE status='bekliyor'");
-        $missingDrive = (int)val("SELECT COUNT(*) FROM events WHERE type='cekim' AND drive_status='bekliyor' AND COALESCE(`end`, start) < DATE_SUB(NOW(), INTERVAL 24 HOUR) AND start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        $overdueList = rows("SELECT g.title, g.due_date, u.name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id WHERE g.is_archived=0 AND g.status!='completed' AND g.due_date < CURDATE() ORDER BY g.due_date LIMIT 15");
+        $todayShoots = rows("SELECT title, start FROM events WHERE type='shoot' AND DATE(start)=CURDATE()");
+        $pendingApprovals = (int)val("SELECT COUNT(*) FROM approvals WHERE status='pending'");
+        $missingDrive = (int)val("SELECT COUNT(*) FROM events WHERE type='shoot' AND drive_status='pending' AND COALESCE(`end`, start) < DATE_SUB(NOW(), INTERVAL 24 HOUR) AND start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
         if ($overdueList || $todayShoots || $pendingApprovals || $missingDrive) {
-            $ozet = "Günaydın! " . date('d.m.Y') . " özeti:\n\n";
-            if ($overdueList) { $ozet .= "GECİKEN GÖREVLER (" . count($overdueList) . "):\n"; foreach ($overdueList as $o2) $ozet .= "- " . $o2['title'] . ' (' . ($o2['name'] ?: 'atanmamış') . ', son: ' . format_date($o2['due_date']) . ")\n"; $ozet .= "\n"; }
-            if ($todayShoots) { $ozet .= "BUGÜNÜN ÇEKİMLERİ:\n"; foreach ($todayShoots as $s2) $ozet .= "- " . $s2['title'] . ' (' . substr($s2['start'], 11, 5) . ")\n"; $ozet .= "\n"; }
-            if ($pendingApprovals) $ozet .= "Bekleyen onay: $pendingApprovals\n";
-            if ($missingDrive) $ozet .= "Drive'a aktarılmamış çekim: $missingDrive\n";
-            $ozet .= "\nPanel: " . full_url('index.php');
-            foreach (rows("SELECT email FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $yd) {
+            $summaryText = "Günaydın! " . date('d.m.Y') . " özeti:\n\n";
+            if ($overdueList) { $summaryText .= "GECİKEN GÖREVLER (" . count($overdueList) . "):\n"; foreach ($overdueList as $o2) $summaryText .= "- " . $o2['title'] . ' (' . ($o2['name'] ?: 'atanmamış') . ', son: ' . format_date($o2['due_date']) . ")\n"; $summaryText .= "\n"; }
+            if ($todayShoots) { $summaryText .= "BUGÜNÜN ÇEKİMLERİ:\n"; foreach ($todayShoots as $s2) $summaryText .= "- " . $s2['title'] . ' (' . substr($s2['start'], 11, 5) . ")\n"; $summaryText .= "\n"; }
+            if ($pendingApprovals) $summaryText .= "Bekleyen onay: $pendingApprovals\n";
+            if ($missingDrive) $summaryText .= "Drive'a aktarılmamış çekim: $missingDrive\n";
+            $summaryText .= "\nPanel: " . full_url('index.php');
+            foreach (rows("SELECT email FROM users WHERE role IN ('admin','pm') AND is_active=1") as $yd) {
                 if (sada_deadline_passed()) break;
-                if ($yd['email']) send_email($yd['email'], '📋 SADA One günlük özet — ' . date('d.m.Y'), $ozet);
+                if ($yd['email']) send_email($yd['email'], '📋 SADA One günlük özet — ' . date('d.m.Y'), $summaryText);
             }
         }
     }
@@ -1126,7 +1161,7 @@ function run_recurring_jobs(bool $force = false): int {
             c.drive_folder_id client_folder, c.manager_id,
             (SELECT GROUP_CONCAT(ep.user_id) FROM event_participants ep WHERE ep.event_id=e.id) participant_ids
             FROM events e LEFT JOIN clients c ON c.id = COALESCE(e.client_id, (SELECT client_id FROM projects WHERE id=e.project_id))
-            WHERE e.type='cekim' AND e.drive_status='bekliyor'
+            WHERE e.type='shoot' AND e.drive_status='pending'
             AND COALESCE(e.`end`, e.start) < DATE_SUB(NOW(), INTERVAL 24 HOUR)
             AND e.start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
         foreach ($pendingShoots as $sh) {
@@ -1135,14 +1170,14 @@ function run_recurring_jobs(bool $force = false): int {
             $who = array_filter(array_unique(array_merge(
                 array_map('intval', explode(',', (string)$sh['participant_ids'])),
                 [(int)$sh['created_by'], (int)$sh['manager_id']])));
-            $uyar = function (string $title, string $text) use ($who) {
-                foreach ($who as $uid) notify($uid, $title, $text, 'shoot-list.php', 'gorev'); // mails per preference
+            $warn = function (string $title, string $text) use ($who) {
+                foreach ($who as $uid) notify($uid, $title, $text, 'shoot-list.php', 'task'); // mails per preference
             };
             // A link counts as human confirmation only when someone actually ADDED it —
             // auto-created folders store their own URL in drive_link, that must not count
             $autoLink = $sh['drive_folder_id'] ? 'https://drive.google.com/drive/folders/' . $sh['drive_folder_id'] : null;
             if ($sh['drive_link'] && $sh['drive_link'] !== $autoLink) {
-                update_row('events', ['drive_status' => 'aktarildi'], 'id=?', [$sh['id']]);
+                update_row('events', ['drive_status' => 'transferred'], 'id=?', [$sh['id']]);
                 continue;
             }
             // Files in the folder are a signal, not proof of completeness: the panel ASKS
@@ -1153,17 +1188,17 @@ function run_recurring_jobs(bool $force = false): int {
                 if ($r['ok'] && $r['count'] > 0) {
                     if (empty($sh['drive_files_seen'])) {
                         update_row('events', ['drive_files_seen' => 1], 'id=?', [$sh['id']]);
-                        $uyar('📁 Klasörde dosyalar görüldü: ' . $sh['title'],
+                        $warn('📁 Klasörde dosyalar görüldü: ' . $sh['title'],
                             '"' . $sh['title'] . '" çekiminin klasöründe ' . $r['count'] . '+ dosya var. Yüklenmesi gereken HER ŞEY yüklendiyse çekim listesinden "Tümü yüklendi" olarak işaretleyin.');
                     } else {
-                        $uyar('⏳ Yükleme onayı bekleniyor: ' . $sh['title'],
+                        $warn('⏳ Yükleme onayı bekleniyor: ' . $sh['title'],
                             'Klasörde dosyalar var ama "tümü yüklendi" onayı verilmedi. Eksik kalmadıysa çekim listesinden işaretleyin.');
                     }
                     continue;
                 }
             }
-            // Hiç dosya yok → sert uyarı
-            $uyar('📁 Drive aktarımı bekleniyor: ' . $sh['title'],
+            // No files at all → strong warning
+            $warn('📁 Drive aktarımı bekleniyor: ' . $sh['title'],
                 format_date($sh['start'], true) . ' tarihli çekimin görüntüleri henüz Drive\'a aktarılmadı. Aktardıysanız çekim listesinden işaretleyin.');
         }
     }
@@ -1179,14 +1214,14 @@ function run_recurring_jobs(bool $force = false): int {
         $missing = function (string $period): array {
             return rows("SELECT c.id, c.name, c.manager_id, r.status
                 FROM clients c LEFT JOIN monthly_reports r ON r.client_id=c.id AND r.period=?
-                WHERE c.status='aktif' AND c.manager_id IS NOT NULL AND (r.id IS NULL OR r.status='taslak')", [$period]);
+                WHERE c.status='active' AND c.manager_id IS NOT NULL AND (r.id IS NULL OR r.status='draft')", [$period]);
         };
         if ($day >= $lastDay - 2) {
             $period = date('Y-m');
             foreach ($missing($period) as $cl) {
                 notify((int)$cl['manager_id'], '📊 Aylık rapor zamanı: ' . $cl['name'],
-                    ($cl['status'] === 'taslak' ? 'Taslak raporu tamamlayıp' : 'Bu ayın raporunu doldurup') . ' "Tamamlandı" olarak kaydedin.',
-                    'monthly-reports.php?client=' . $cl['id'] . '&period=' . $period, 'gorev');
+                    ($cl['status'] === 'draft' ? 'Taslak raporu tamamlayıp' : 'Bu ayın raporunu doldurup') . ' "Tamamlandı" olarak kaydedin.',
+                    'monthly-reports.php?client=' . $cl['id'] . '&period=' . $period, 'task');
             }
         }
         if ($day <= 3) {
@@ -1194,7 +1229,7 @@ function run_recurring_jobs(bool $force = false): int {
             foreach ($missing($period) as $cl) {
                 notify((int)$cl['manager_id'], '📊 Geçen ayın raporu bekliyor: ' . $cl['name'],
                     'Önceki ayın (' . $period . ') raporu henüz tamamlanmadı.',
-                    'monthly-reports.php?client=' . $cl['id'] . '&period=' . $period, 'gorev');
+                    'monthly-reports.php?client=' . $cl['id'] . '&period=' . $period, 'task');
             }
         }
         if ($day === 4) {
@@ -1205,10 +1240,10 @@ function run_recurring_jobs(bool $force = false): int {
                 foreach ($late as $cl) {
                     notify((int)$cl['manager_id'], '🔴 Rapor gecikti: ' . $cl['name'],
                         $period . ' raporu hâlâ tamamlanmadı. Lütfen en kısa sürede doldurun.',
-                        'monthly-reports.php?client=' . $cl['id'] . '&period=' . $period, 'gorev');
+                        'monthly-reports.php?client=' . $cl['id'] . '&period=' . $period, 'task');
                 }
-                foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm') AND is_active=1") as $ya) {
-                    notify((int)$ya['id'], '🔴 Geciken aylık raporlar', $period . ' dönemi için eksik: ' . mb_substr($names, 0, 180), 'monthly-reports.php', 'gorev');
+                foreach (rows("SELECT id FROM users WHERE role IN ('admin','pm') AND is_active=1") as $ya) {
+                    notify((int)$ya['id'], '🔴 Geciken aylık raporlar', $period . ' dönemi için eksik: ' . mb_substr($names, 0, 180), 'monthly-reports.php', 'task');
                 }
             }
         }
@@ -1221,16 +1256,16 @@ function run_recurring_jobs(bool $force = false): int {
  * Open pages check this hash every 10 s; if it changed, the page refreshes.
  */
 function live_hash_task(int $id): string {
-    $g = row("SELECT status, lock_bypassed, bagimli_id, assignee_id, is_archived, title, due_date FROM tasks WHERE id=?", [$id]);
+    $g = row("SELECT status, lock_bypassed, depends_on_id, assignee_id, is_archived, title, due_date FROM tasks WHERE id=?", [$id]);
     $steps = val("SELECT GROUP_CONCAT(CONCAT(id,':',status) ORDER BY sort_order) FROM task_steps WHERE task_id=?", [$id]);
     $check = val("SELECT GROUP_CONCAT(CONCAT(id,':',is_done) ORDER BY sort_order) FROM task_checklist WHERE task_id=?", [$id]);
-    $comment_box = val("SELECT CONCAT(COUNT(*),':',COALESCE(MAX(id),0),':',SUM(is_edited)) FROM comments WHERE ref_type='gorev' AND ref_id=?", [$id]);
-    $reaction = val("SELECT COUNT(*) FROM comment_box_reactions t JOIN comments y ON y.id=t.comment_box_id WHERE y.ref_type='gorev' AND y.ref_id=?", [$id]);
+    $comment = val("SELECT CONCAT(COUNT(*),':',COALESCE(MAX(id),0),':',SUM(is_edited)) FROM comments WHERE ref_type='task' AND ref_id=?", [$id]);
+    $reaction = val("SELECT COUNT(*) FROM comment_reactions t JOIN comments y ON y.id=t.comment_id WHERE y.ref_type='task' AND y.ref_id=?", [$id]);
     $ek = val("SELECT COUNT(*) FROM archive WHERE task_id=?", [$id]);
     $watcher = val("SELECT COUNT(*) FROM task_watchers WHERE task_id=?", [$id]);
     // The dependency task's status also affects the lock
-    $bagimliStatus = $g && $g['bagimli_id'] ? val("SELECT status FROM tasks WHERE id=?", [$g['bagimli_id']]) : '';
-    return md5(json_encode([$g, $steps, $check, $comment_box, $reaction, $ek, $watcher, $bagimliStatus]));
+    $dependentStatus = $g && $g['depends_on_id'] ? val("SELECT status FROM tasks WHERE id=?", [$g['depends_on_id']]) : '';
+    return md5(json_encode([$g, $steps, $check, $comment, $reaction, $ek, $watcher, $dependentStatus]));
 }
 
 function live_hash_list(): string {
@@ -1249,7 +1284,7 @@ function only_own_steps(): bool {
 /** When a task is completed, moves the linked content to 'approved' (unless already published) */
 function task_content_sync(int $taskId): void {
     $contentId = (int)val("SELECT content_id FROM tasks WHERE id=?", [$taskId]);
-    if ($contentId) q("UPDATE contents SET status='onaylandi' WHERE id=? AND status NOT IN ('yayinlandi','onaylandi')", [$contentId]);
+    if ($contentId) q("UPDATE contents SET status='approved' WHERE id=? AND status NOT IN ('published','approved')", [$contentId]);
 }
 
 /* ---------------- Task lock checks ---------------- */
@@ -1257,34 +1292,34 @@ function task_content_sync(int $taskId): void {
 /** Returns the reason blocking the task from progressing; null if there is none. */
 function task_lock_reason(array $task, string $targetStatus): ?string {
     if (!empty($task['lock_bypassed'])) return null; // an admin has bypassed the lock
-    // Dependency: cannot move past 'yapilacak' until the linked task is finished
-    if ($task['bagimli_id'] && $targetStatus !== 'yapilacak') {
-        $bagimli = row("SELECT title, status FROM tasks WHERE id=?", [$task['bagimli_id']]);
-        if ($bagimli && $bagimli['status'] !== 'tamamlandi') {
-            return '"' . $bagimli['title'] . '" görevi tamamlanmadan bu görev ilerleyemez.';
+    // Dependency: cannot move past 'todo' until the linked task is finished
+    if ($task['depends_on_id'] && $targetStatus !== 'todo') {
+        $dependent = row("SELECT title, status FROM tasks WHERE id=?", [$task['depends_on_id']]);
+        if ($dependent && $dependent['status'] !== 'completed') {
+            return '"' . $dependent['title'] . '" görevi tamamlanmadan bu görev ilerleyemez.';
         }
     }
     // Status lock: cannot be marked completed until the workflow steps are done
-    if ($targetStatus === 'tamamlandi') {
-        $eksik = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND status!='tamam'", [$task['id']]);
-        if ($eksik > 0) return "Akışta $eksik tamamlanmamış adım var. Önce adımları bitirin.";
+    if ($targetStatus === 'completed') {
+        $missing = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND status!='done'", [$task['id']]);
+        if ($missing > 0) return "Akışta $missing tamamlanmamış adım var. Önce adımları bitirin.";
     }
     return null;
 }
 
-function project_channel(int $projectId, string $type = 'proje'): int {
+function project_channel(int $projectId, string $type = 'project'): int {
     $k = row("SELECT id FROM channels WHERE project_id=? AND type=?", [$projectId, $type]);
     if ($k) return (int)$k['id'];
     $project = row("SELECT name FROM projects WHERE id=?", [$projectId]);
     $name = $project['name'] ?? 'Proje';
     $channelId = insert('channels', ['name' => $name, 'type' => $type, 'project_id' => $projectId, 'created' => date('Y-m-d H:i:s')]);
     // Auto-add team members
-    foreach (rows("SELECT id FROM users WHERE role IN ('yonetici','pm','ekip') AND is_active=1") as $u) {
+    foreach (rows("SELECT id FROM users WHERE role IN ('admin','pm','team') AND is_active=1") as $u) {
         q("INSERT IGNORE INTO channel_members (channel_id, user_id) VALUES (?,?)", [$channelId, $u['id']]);
     }
-    if ($type === 'musteri') {
+    if ($type === 'customer') {
         $clientId = val("SELECT client_id FROM projects WHERE id=?", [$projectId]);
-        foreach (rows("SELECT id FROM users WHERE role='musteri' AND client_id=? AND is_active=1", [$clientId]) as $u) {
+        foreach (rows("SELECT id FROM users WHERE role='customer' AND client_id=? AND is_active=1", [$clientId]) as $u) {
             q("INSERT IGNORE INTO channel_members (channel_id, user_id) VALUES (?,?)", [$channelId, $u['id']]);
         }
     }

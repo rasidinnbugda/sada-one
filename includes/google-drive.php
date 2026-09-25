@@ -236,7 +236,7 @@ function drive_files_summary(array $ev, array $files): array {
 function drive_ensure_root(?string $token = null): ?string {
     $root = setting('google_drive_root');
     if ($root !== '') return $root;
-    $r = drive_create_folder(setting('site_adi', 'SADA One') . ' Çekimler', null, $token);
+    $r = drive_create_folder(setting('site_name', 'SADA One') . ' Çekimler', null, $token);
     if (!$r) return null;
     q("INSERT INTO settings (setting_key, setting_value) VALUES ('google_drive_root', ?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)", [$r['id']]);
     return $r['id'];
