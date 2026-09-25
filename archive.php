@@ -63,7 +63,7 @@ page_start('Dosya Arşivi', 'archive');
     <div class="modal"><div class="modal-top"><div class="modal-title">Dosya Yükle</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="archive_upload" data-refresh="yes">
         <div class="modal-body">
-            <div class="form-group"><label class="form-label">Dosya <span class="required">*</span></label><input type="file" name="client" class="input" required><div class="form-hint">Maksimum 50MB. PHP/HTML/script dosyaları kabul edilmez.</div></div>
+            <div class="form-group"><label class="form-label">Dosya <span class="required">*</span></label><input type="file" name="file" class="input" required><div class="form-hint">Maksimum 50MB. PHP/HTML/script dosyaları kabul edilmez.</div></div>
             <?php if ($clients): ?>
             <div class="form-group"><label class="form-label">İlgili Dosya</label><select name="client_id" class="select"><option value="">— Genel</option><?php foreach ($clients as $d): ?><option value="<?= $d['id'] ?>" <?= $clientFilter == $d['id'] ? 'selected' : '' ?>><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
             <?php elseif ($clientFilter): ?><input type="hidden" name="client_id" value="<?= $clientFilter ?>"><?php endif; ?>

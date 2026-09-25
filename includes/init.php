@@ -446,8 +446,11 @@ const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--in
 const CONTENT_STATUS_COLORS = ['draft' => 'var(--muted)', 'internal_approval' => 'var(--info)', 'customer_approval' => 'var(--warning)', 'revision' => 'var(--info)', 'approved' => 'var(--success)', 'published' => 'var(--brand)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.0';
+const APP_VERSION = '7.0.1';
 const VERSION_NOTES = [
+    '7.0.1' => [
+        'Düzeltildi: dosya yüklemeleri çalışmıyordu — projeye/göreve dosya ekleme, onaya dosya ekleme, yorum eki ve sözleşme belgesi (6.11\'den beri)',
+    ],
     '7.0' => [
         'Kod tabanı baştan sona İngilizceye çevrildi: CSS sınıfları, fonksiyonlar, değişkenler, AJAX eylemleri, ayar ve yetki anahtarları ile veritabanında saklanan durum/rol değerleri artık tek dilde. Arayüz Türkçe kalmaya devam ediyor',
         'Güncelleme sırasında veritabanının tam yedeği backups/ klasörüne alınıyor, ardından tüm kayıtlar kayıpsız çevriliyor',

@@ -267,7 +267,7 @@ function comment_feed(string $refType, int $refId): void {
     <textarea name="message" class="text-area" data-mention style="min-height:44px;flex:1;min-width:200px" placeholder="Yorum yazın... (@ ile etiketleyin)" required></textarea>
     <label class="icon-action" title="Dosya ekle" style="cursor:pointer">
         <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="18"><path d="M21.4 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.2-9.19a4 4 0 015.65 5.66l-9.2 9.19a2 2 0 01-2.82-2.83l8.49-8.48"/></svg>
-        <input type="file" name="client" style="display:none" onchange="this.parentElement.style.color=this.files.length?'var(--brand)':''">
+        <input type="file" name="file" style="display:none" onchange="this.parentElement.style.color=this.files.length?'var(--brand)':''">
     </label>
     <button type="submit" class="btn btn-brand">Gönder</button>
 </form>

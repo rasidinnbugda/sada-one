@@ -117,7 +117,7 @@ page_start($task['title'], 'tasks');
                 <button class="btn btn-sm" onclick="modalOpen('modalDriveLink')" type="button"><?= icon('web', 13) ?> Drive Linki</button>
                 <form data-ajax="archive_upload" style="display:inline">
                     <input type="hidden" name="task_id" value="<?= $id ?>"><input type="hidden" name="project_id" value="<?= $task['project_id'] ?>">
-                    <label class="btn btn-sm" style="cursor:pointer"><?= icon('paperclip', 14) ?> Dosya Ekle<input type="file" name="client" style="display:none" onchange="this.closest('form').requestSubmit()"></label>
+                    <label class="btn btn-sm" style="cursor:pointer"><?= icon('paperclip', 14) ?> Dosya Ekle<input type="file" name="file" style="display:none" onchange="this.closest('form').requestSubmit()"></label>
                 </form>
                 </span>
             </div>

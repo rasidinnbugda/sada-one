@@ -385,7 +385,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
         <div class="modal-body">
             <div class="form-group"><label class="form-label">Başlık <span class="required">*</span></label><input name="title" class="input" required placeholder="Örn. Ekim ayı 1. gönderi tasarımı"></div>
             <div class="form-group"><label class="form-label">Açıklama / Not</label><textarea name="description" class="text-area" placeholder="Müşteriye iletmek istedikleriniz..."></textarea></div>
-            <div class="form-group"><label class="form-label">Dosya Eki</label><input type="file" name="client" class="input"><div class="form-hint">Görsel, PDF, video vb. (max 50MB)</div></div>
+            <div class="form-group"><label class="form-label">Dosya Eki</label><input type="file" name="file" class="input"><div class="form-hint">Görsel, PDF, video vb. (max 50MB)</div></div>
             <div class="form-group"><label class="form-label">veya Drive Linki</label><input name="drive_link" class="input" placeholder="https://drive.google.com/..."></div>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Onaya Gönder</button></div>
@@ -397,7 +397,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
     <div class="modal"><div class="modal-top"><div class="modal-title">Dosya Yükle</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="archive_upload" data-refresh="yes">
         <input type="hidden" name="project_id" value="<?= $id ?>">
-        <div class="modal-body"><div class="form-group"><label class="form-label">Dosya Seç <span class="required">*</span></label><input type="file" name="client" class="input" required></div></div>
+        <div class="modal-body"><div class="form-group"><label class="form-label">Dosya Seç <span class="required">*</span></label><input type="file" name="file" class="input" required></div></div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Yükle</button></div>
     </form></div>
 </div>

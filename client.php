@@ -321,7 +321,7 @@ page_start($client['name'], 'clients');
                         <div class="form-group"><label class="form-label">Bitiş</label><input type="date" name="end" class="input"><div class="form-hint">30 gün kala hatırlatılır.</div></div>
                     </div>
                     <div class="form-group"><label class="form-label">Tutar (₺)</label><input name="amount" class="input" placeholder="0,00"></div>
-                    <div class="form-group"><label class="form-label">Sözleşme Belgesi</label><input type="file" name="client" class="input"></div>
+                    <div class="form-group"><label class="form-label">Sözleşme Belgesi</label><input type="file" name="file" class="input"></div>
                     <div class="form-group"><label class="form-label">Not</label><input name="description" class="input"></div>
                 </div>
                 <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button></div>
