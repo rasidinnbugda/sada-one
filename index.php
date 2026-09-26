@@ -36,14 +36,20 @@ if ($reportWarnings): ?>
 <?php endif;
 
 /* ---------- Release notes (dismissible) ---------- */
-if (is_admin() && ($u['seen_version'] ?? '') !== APP_VERSION && isset(VERSION_NOTES[APP_VERSION])): ?>
+// Every version since the one the admin last saw (an update may jump several versions at once)
+$unseenNotes = is_admin() ? array_filter(VERSION_NOTES, fn($notes, $version) => ($u['seen_version'] ?? '') === ''
+    ? $version === APP_VERSION : version_compare((string)$version, (string)$u['seen_version'], '>'), ARRAY_FILTER_USE_BOTH) : [];
+if ($unseenNotes): ?>
 <div class="card mb-3" id="versionCard" style="border-color:var(--brand);background:linear-gradient(135deg,var(--surface),var(--bright))">
     <div class="row-flex between" style="align-items:flex-start;gap:12px">
         <div>
-            <div class="card-title"><?= icon('rocket', 17) ?> Yenilikler — sürüm <?= APP_VERSION ?></div>
+            <div class="card-title"><?= icon('rocket', 17) ?> Yenilikler — sürüm <?= APP_VERSION ?><?= count($unseenNotes) > 1 ? ' <span class="cell-bottom" style="font-weight:400">(' . count($unseenNotes) . ' sürümün notları)</span>' : '' ?></div>
+            <?php foreach ($unseenNotes as $noteVersion => $versionNotes): ?>
+            <?php if (count($unseenNotes) > 1): ?><div class="small bold mt-3"><?= e((string)$noteVersion) ?></div><?php endif; ?>
             <ul class="small text-2 mt-2" style="list-style:none;display:flex;flex-direction:column;gap:6px">
-                <?php foreach (VERSION_NOTES[APP_VERSION] as $noteRow): ?><li><?= $noteRow ?></li><?php endforeach; ?>
+                <?php foreach ($versionNotes as $noteRow): ?><li><?= $noteRow ?></li><?php endforeach; ?>
             </ul>
+            <?php endforeach; ?>
         </div>
         <button class="btn btn-sm" onclick="versionClose()" style="flex-shrink:0">Kapat ✕</button>
     </div>
@@ -79,6 +85,46 @@ if (is_staff()) {
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Proje
         </button>
         <?php endif; ?>
+    </div>
+</div>
+
+<?php
+// "Şimdi": the one thing to do now, what comes after it and the shape of the day
+require_once __DIR__ . '/includes/now.php';
+$nowSteps = now_my_steps($u, 4);
+$nowPlain = now_my_plain_tasks($u, 4);
+$nowPool = now_pool($u, 30);
+$nowShoots = now_shoots_today($u);
+$nowPublish = array_filter(now_publish_today(), fn($p) => $p['status'] !== 'published');
+$nowUnread = count(now_recent($u, 50));
+$nowQueue = array_merge(array_map(fn($s) => ['id' => $s['task_id'], 'head' => $s['step_name'], 'title' => $s['title'], 'where' => $s['client_name'], 'row' => $s, 'waiting' => now_waiting($s['activated_at'])], $nowSteps),
+    array_map(fn($t) => ['id' => $t['task_id'], 'head' => TASK_STATUSES[$t['status']] ?? '', 'title' => $t['title'], 'where' => $t['project_name'], 'row' => $t, 'waiting' => ''], $nowPlain));
+$nowHead = $nowQueue[0] ?? null;
+?>
+<div class="now-card mb-3">
+    <div class="now-eyebrow">Şimdi</div>
+    <?php if ($nowHead): ?>
+    <a href="task.php?id=<?= $nowHead['id'] ?>" class="now-head">
+        <span class="now-step"><?= e($nowHead['head']) ?></span>
+        <span class="now-title"><?= e($nowHead['title']) ?></span>
+        <span class="cell-bottom"><?= e($nowHead['where']) ?><?= ($due = now_due($nowHead['row'])) ? ' · ' . $due : '' ?><?= $nowHead['waiting'] ? ' · ' . $nowHead['waiting'] : '' ?></span>
+    </a>
+    <?php elseif ($nowPool): ?>
+    <a href="today.php" class="now-head"><span class="now-title">Sende bekleyen adım yok.</span><span class="cell-bottom"><?= e($nowPool[0]['skill_name']) ?> havuzunda sahipsiz <?= count($nowPool) ?> adım var — birini alabilirsin.</span></a>
+    <?php else: ?>
+    <div class="now-head"><span class="now-title">Sende bekleyen iş yok.</span><span class="cell-bottom">Bugün sakin görünüyor. Yarım kalmış bir fikir için Fikir Panosu orada.</span></div>
+    <?php endif; ?>
+    <?php if ($after = array_slice($nowQueue, 1, 3)): ?>
+    <div class="now-next"><span class="cell-bottom">Sonra</span>
+        <?php foreach ($after as $n): ?><a href="task.php?id=<?= $n['id'] ?>" class="now-next-item"><b><?= e($n['head']) ?></b> <?= e($n['title']) ?></a><?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+    <div class="now-chips">
+        <?php if ($nowPool): ?><a href="today.php" class="now-chip"><?= count($nowPool) ?> havuzda</a><?php endif; ?>
+        <?php if ($nowShoots): ?><a href="shoot-list.php" class="now-chip"><?= count($nowShoots) ?> çekim bugün</a><?php endif; ?>
+        <?php if ($nowPublish): ?><a href="content-calendar.php" class="now-chip"><?= count($nowPublish) ?> yayın bugün</a><?php endif; ?>
+        <?php if ($nowUnread): ?><a href="today.php" class="now-chip"><?= $nowUnread ?> yeni gelişme</a><?php endif; ?>
+        <a href="today.php" class="now-more">Bugün'ün tamamı →</a>
     </div>
 </div>
 

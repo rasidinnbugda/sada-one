@@ -157,6 +157,8 @@ function migration_commands(): array {
         "ALTER TABLE approvals ADD COLUMN reply_name VARCHAR(100) DEFAULT NULL",
         "ALTER TABLE approvals ADD COLUMN reminded_at DATETIME DEFAULT NULL",
         "CREATE TABLE IF NOT EXISTS event_tasks (event_id INT NOT NULL, task_id INT NOT NULL, PRIMARY KEY (event_id, task_id), INDEX(task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
+        // 7.5: when a step became active — how long work has been waiting on it
+        "ALTER TABLE task_steps ADD COLUMN activated_at DATETIME DEFAULT NULL",
     ];
 }
 
@@ -274,5 +276,16 @@ function run_migrations(PDO $pdo): array {
     } catch (Throwable $e) {
         $results[] = ['error', 'steps: ' . $e->getMessage()];
     }
+    // 7.5: when did each waiting step become active? Runs after the step engine, which settles the active steps:
+    // the last finished step of the work, else the work's creation
+    try {
+        if ($pdo->query("SELECT setting_value FROM settings WHERE setting_key='step_engine'")->fetchColumn() === '1'
+            && (int)$pdo->query("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='task_steps' AND column_name='activated_at'")->fetchColumn()) {
+            $n = $pdo->exec("UPDATE task_steps s JOIN (SELECT task_id, MAX(done_date) d FROM task_steps WHERE status='done' AND done_date IS NOT NULL GROUP BY task_id) x ON x.task_id=s.task_id
+                    SET s.activated_at=x.d WHERE s.status='active' AND s.activated_at IS NULL")
+                + $pdo->exec("UPDATE task_steps s JOIN tasks t ON t.id=s.task_id SET s.activated_at=t.created WHERE s.status='active' AND s.activated_at IS NULL");
+            if ($n) $results[] = ['ok', "steps: waiting time known for $n active steps"];
+        }
+    } catch (PDOException $e) { $results[] = ['error', 'activated_at — ' . $e->getMessage()]; }
     return $results;
 }

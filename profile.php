@@ -48,6 +48,12 @@ page_start('Profil', '');
                         <span class="small">Adımlarım'da <b>yalnızca sorumlusu olduğum</b> adımlar görünsün</span>
                         <span class="key"><input type="checkbox" name="t_only_step" value="1" <?= only_own_steps() ? 'checked' : '' ?>></span>
                     </label>
+                    <?php if (is_staff()): ?>
+                    <label class="row-flex between" style="padding:11px 14px;background:var(--surface-2);border-radius:11px;cursor:pointer">
+                        <span class="small"><b><?= e(setting('mikasa_name', 'Mikasa') ?: 'Mikasa') ?></b> köşede dursun — günde birkaç kısa hatırlatma, gece uyur</span>
+                        <span class="key"><input type="checkbox" name="t_mikasa" value="1" <?= !isset($preferences['mikasa']) || $preferences['mikasa'] ? 'checked' : '' ?>></span>
+                    </label>
+                    <?php endif; ?>
                     <label class="row-flex between" style="padding:11px 14px;background:var(--bright);border-radius:11px;cursor:pointer;border:1px solid var(--border-2)">
                         <span class="small"><b>E-posta ile de gönder</b> — açık bildirimler e-postanıza da düşer</span>
                         <span class="key"><input type="checkbox" name="t_email" value="1" <?= $tOpen('email') ? 'checked' : '' ?>></span>

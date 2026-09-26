@@ -895,7 +895,72 @@ table.table { width: 100%; border-collapse: collapse; }
 .approve-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .approve-actions .btn { justify-content: center; }
 .approve-result { padding: 14px 16px; border-radius: 12px; background: var(--surface-2); font-size: 14px; }
-@media (max-width: 520px) { .approve-actions { grid-template-columns: 1fr; } }/* ============================================================
+@media (max-width: 520px) { .approve-actions { grid-template-columns: 1fr; } }
+
+/* ============================================================
+   NOW / TODAY / TOWER
+   ============================================================ */
+.now-card { position: relative; padding: 22px 24px 18px; border-radius: var(--r-radius); background: linear-gradient(135deg, var(--surface), var(--bright)); border: 1px solid var(--border-2); }
+.now-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brand); margin-bottom: 8px; }
+.now-head { display: flex; flex-direction: column; gap: 3px; color: inherit; }
+.now-step { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.now-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.2; }
+a.now-head:hover .now-title { color: var(--brand); }
+.now-next { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.now-next-item { font-size: 13px; color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-next-item:hover { color: var(--brand); }
+.now-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.now-chip { font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 99px; background: var(--surface-2); color: var(--text-2); }
+.now-chip:hover { color: var(--brand); }
+.now-more { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--brand); }
+.today-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; }
+.now-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 6px; border-bottom: 1px solid var(--border); color: inherit; border-radius: 8px; }
+.now-row:last-child { border-bottom: 0; }
+a.now-row:hover, .now-row:hover { background: var(--surface-2); }
+.now-kind { font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-main { display: flex; flex-direction: column; min-width: 0; color: inherit; }
+.now-main .cell-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-when { text-align: right; white-space: nowrap; }
+.tower-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.tower-skill { padding: 9px 0; border-bottom: 1px solid var(--border); }
+.tower-skill:last-child { border-bottom: 0; }
+.tower-row { display: flex; flex-direction: column; padding: 7px 0; border-bottom: 1px solid var(--border); color: inherit; }
+.tower-row:hover .cell-main { color: var(--brand); }
+.health-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+.health-dot.is-green { background: var(--success); }
+.health-dot.is-amber { background: var(--warning); }
+.health-dot.is-red { background: var(--danger); box-shadow: 0 0 0 3px rgba(240,79,79,.18); }
+@media (max-width: 900px) { .today-layout, .tower-grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .now-row { grid-template-columns: minmax(0, 1fr) auto; } .now-kind { display: none; } .now-title { font-size: 19px; } }
+
+/* ============================================================
+   MIKASA (team assistant, bottom right)
+   ============================================================ */
+.mikasa { position: fixed; right: 22px; bottom: 86px; z-index: 89; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.mikasa > * { pointer-events: auto; }
+.mikasa[hidden], .mk-bubble[hidden], .mk-menu[hidden], .mk-link[hidden] { display: none; }
+.dock-panel.open ~ .mikasa { opacity: 0; visibility: hidden; }
+.mk-face { position: relative; width: 52px; height: 52px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; filter: drop-shadow(0 8px 16px rgba(0,0,0,.28)); }
+.mk-face:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.mk-face svg, .mk-img { display: block; width: 52px; height: 52px; border-radius: 50%; }
+.mk-img { object-fit: cover; border: 2px solid var(--brand); }
+.mk-head { fill: var(--brand); }
+.mk-ink { fill: var(--brand-ink); }
+.mk-line { fill: none; stroke: var(--brand-ink); stroke-width: 2; stroke-linecap: round; }
+.mk-eyes { transform-box: fill-box; transform-origin: center; }
+.mk-eye-closed { display: none; }
+.mikasa.is-sleeping .mk-eyes { display: none; }
+.mikasa.is-sleeping .mk-eye-closed { display: inline; }
+.mk-zzz { position: absolute; top: -8px; right: -2px; font: 700 13px/1 'Space Grotesk', sans-serif; color: var(--muted); opacity: 0; pointer-events: none; }
+.mk-bubble { max-width: 290px; padding: 11px 14px; border-radius: 16px 16px 4px 16px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 16px 40px -18px rgba(0,0,0,.5); font-size: 13px; line-height: 1.45; cursor: pointer; }
+.mk-link { font-weight: 600; color: var(--brand); white-space: nowrap; }
+.mk-menu { display: flex; flex-direction: column; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border-2); box-shadow: 0 16px 40px -18px rgba(0,0,0,.5); }
+.mk-menu button { padding: 8px 12px; border-radius: 8px; font-size: 13px; text-align: left; color: var(--text); }
+.mk-menu button:hover, .mk-menu button:focus-visible { background: var(--surface-2); outline: none; }
+@media (max-width: 640px) { .mikasa { right: 16px; bottom: 84px; } .mk-bubble { max-width: 230px; } }
+@media print { .mikasa { display: none; } }
+
+/* ============================================================
    SEKMELER
    ============================================================ */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; overflow-x: auto; }

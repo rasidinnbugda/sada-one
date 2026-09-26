@@ -1681,6 +1681,20 @@ case 'appointment_accept':
     json_out(['ok' => true, 'message' => 'Yeni saat kabul edildi; ajans onayı bekleniyor.']);
 
 /* ==================== RELEASE NOTES ==================== */
+case 'mikasa_lines':
+    // The day's lines of the corner assistant, built from the person's own work
+    require_staff();
+    require_once __DIR__ . '/includes/mikasa.php';
+    if (!mikasa_on($u)) json_out(['ok' => false]);
+    json_out(['ok' => true, 'lines' => mikasa_lines($u)]);
+
+case 'mikasa_off':
+    require_staff();
+    $preferences = json_decode((string)($u['notification_preferences'] ?? ''), true) ?: [];
+    $preferences['mikasa'] = 0;
+    update_row('users', ['notification_preferences' => json_encode($preferences)], 'id=?', [$u['id']]);
+    json_out(['ok' => true]);
+
 case 'version_close':
     require_login();
     update_row('users', ['seen_version' => APP_VERSION], 'id=?', [$u['id']]);
@@ -1805,6 +1819,7 @@ case 'preference_save':
     foreach (array_keys(NOTIFICATION_CATEGORIES) as $k) $preferences[$k] = (int)(bool)$g('t_' . $k);
     $preferences['email'] = (int)(bool)$g('t_email');
     $preferences['only_own_steps'] = (int)(bool)$g('t_only_step');
+    $preferences['mikasa'] = (int)(bool)$g('t_mikasa');
     update_row('users', ['notification_preferences' => json_encode($preferences)], 'id=?', [$u['id']]);
     json_out(['ok' => true, 'message' => 'Bildirim tercihleri kaydedildi.']);
 
@@ -2263,7 +2278,7 @@ case 'setting_save':
         'smtp_host' => 'smtp_host', 'smtp_port' => 'smtp_port', 'smtp_user' => 'smtp_user',
         'smtp_sender' => 'smtp_sender', 'email_notification' => 'email_notifications',
         'ai_model' => 'ai_model', 'ai_provider' => 'ai_provider', 'gemini_model' => 'gemini_model',
-        'mail_aliases' => 'mail_aliases'];
+        'mail_aliases' => 'mail_aliases', 'mikasa_enabled' => 'mikasa_enabled', 'mikasa_name' => 'mikasa_name'];
     // Google OAuth client: id is plain, the secret only overwrites on a fresh value
     if (isset($_POST['google_client_id'])) {
         q("INSERT INTO settings (setting_key,setting_value) VALUES ('google_client_id',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['google_client_id']), trim($_POST['google_client_id'])]);
@@ -2302,10 +2317,11 @@ case 'setting_save':
     }
     // Logo & favicon upload
     foreach (['site_logo' => ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'site_favicon' => ['png', 'ico', 'jpg', 'jpeg', 'gif', 'webp'],
-              'site_logo_dark' => ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'site_favicon_dark' => ['png', 'ico', 'jpg', 'jpeg', 'gif', 'webp']] as $fieldName => $allowed_ones) {
+              'site_logo_dark' => ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'site_favicon_dark' => ['png', 'ico', 'jpg', 'jpeg', 'gif', 'webp'],
+              'mikasa_avatar' => ['jpg', 'jpeg', 'png', 'gif', 'webp']] as $fieldName => $allowed_ones) {
         $new = file_upload($fieldName);
         if ($new) {
-            if (!in_array($new['extension'], $allowed_ones)) json_out(['ok' => false, 'error' => ($fieldName === 'site_logo' ? 'Logo' : 'Favicon') . ' için görsel dosyası seçin.']);
+            if (!in_array($new['extension'], $allowed_ones)) json_out(['ok' => false, 'error' => (['site_logo' => 'Logo', 'site_logo_dark' => 'Logo', 'mikasa_avatar' => 'Asistan görseli'][$fieldName] ?? 'Favicon') . ' için görsel dosyası seçin.']);
             $old = setting($fieldName);
             if ($old) @unlink(ROOT . '/uploads/' . $old);
             q("INSERT INTO settings (setting_key,setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?", [$fieldName, $new['path'], $new['path']]);
@@ -2315,7 +2331,7 @@ case 'setting_save':
 
 case 'setting_image_delete':
     require_admin();
-    $key = in_array($g('setting_key'), ['site_logo', 'site_favicon', 'site_logo_dark', 'site_favicon_dark']) ? $g('setting_key') : '';
+    $key = in_array($g('setting_key'), ['site_logo', 'site_favicon', 'site_logo_dark', 'site_favicon_dark', 'mikasa_avatar']) ? $g('setting_key') : '';
     if (!$key) json_out(['ok' => false, 'error' => 'Geçersiz.']);
     $old = setting($key);
     if ($old) @unlink(ROOT . '/uploads/' . $old);

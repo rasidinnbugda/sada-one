@@ -16,6 +16,7 @@ function page_start(string $title, string $activePage = ''): void {
     if (is_staff()) {
         $nav = [
             ['index.php', 'panel', 'Panel', 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10'],
+            ['today.php', 'today', 'Bugün', 'M12 3v2m0 14v2m9-9h-2M5 12H3m15.4-6.4L17 7M7 17l-1.4 1.4m12.8 0L17 17M7 7L5.6 5.6M16 12a4 4 0 11-8 0 4 4 0 018 0z'],
             ['my-space.php', 'my_space', 'Alanım', 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z'],
             ['clients.php', 'clients', 'Dosyalar', 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z'],
             ['projects.php', 'projects', 'Projeler', 'M9 12h6m-6 4h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z'],
@@ -56,7 +57,7 @@ function page_start(string $title, string $activePage = ''): void {
             $opItems[] = ['talent-pool.php', 'pool', 'Çalışan Havuzu', 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z'];
             $opItems[] = ['monthly-reports.php', 'mreports', 'Aylık Raporlar', 'M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'];
         }
-        if (is_admin() || ($u && $u['role'] === 'pm')) $opItems[] = ['manager-tracking.php', 'manager_tracking', 'Yönetici Takip', 'M9 12l2 2 4-4M7.8 21L12 17l4.2 4V5a2 2 0 00-2-2H9.8a2 2 0 00-2 2v16z'];
+        if (is_admin() || ($u && $u['role'] === 'pm')) $opItems[] = ['tower.php', 'tower', 'Kule', 'M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7zM12 15a3 3 0 100-6 3 3 0 000 6z'];
         $navGroups[] = ['operations', 'Operasyon', 'M4 6h16M4 12h16M4 18h10', $opItems];
     } else {
         $nav = [
@@ -340,9 +341,33 @@ if (new URLSearchParams(location.search).get('create') === '1') {
 }
 </script>
 <?php endif; ?>
+<?php require_once __DIR__ . '/mikasa.php';
+if (mikasa_on($u)): $mkName = setting('mikasa_name', 'Mikasa') ?: 'Mikasa'; $mkAvatar = setting('mikasa_avatar'); ?>
+<!-- Mikasa: the team's assistant (never shown to customers) -->
+<div class="mikasa" id="mikasa" data-name="<?= e($mkName) ?>" hidden>
+    <div class="mk-bubble" role="status" aria-live="polite" hidden><span class="mk-text"></span> <a class="mk-link" hidden>Aç →</a></div>
+    <div class="mk-menu" hidden><button type="button" data-mk="next">Başka ne var?</button><button type="button" data-mk="mute">Bugün sus</button><button type="button" data-mk="off">Kapat</button></div>
+    <button type="button" class="mk-face" aria-label="<?= e($mkName) ?>" title="<?= e($mkName) ?>">
+        <?php if ($mkAvatar): ?><img src="uploads/<?= e($mkAvatar) ?>" alt="" class="mk-img">
+        <?php else: ?>
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+            <circle cx="32" cy="35" r="24" class="mk-head"/>
+            <ellipse cx="24" cy="24" rx="8" ry="4.5" fill="#fff" opacity=".22"/>
+            <path d="M42 15.5l4-7" class="mk-line"/><circle cx="47.5" cy="7.5" r="4.5" class="mk-head"/><circle cx="47.5" cy="7.5" r="1.8" class="mk-ink"/>
+            <g class="mk-eyes"><ellipse cx="24.5" cy="35" rx="3.3" ry="4.3" class="mk-ink"/><ellipse cx="39.5" cy="35" rx="3.3" ry="4.3" class="mk-ink"/><circle cx="25.6" cy="33.4" r="1.1" fill="#fff"/><circle cx="40.6" cy="33.4" r="1.1" fill="#fff"/></g>
+            <g class="mk-eye-closed"><path d="M20.5 36q4 3.2 8 0" class="mk-line"/><path d="M35.5 36q4 3.2 8 0" class="mk-line"/></g>
+            <circle cx="18" cy="43" r="3" fill="#ff7a8a" opacity=".35"/><circle cx="46" cy="43" r="3" fill="#ff7a8a" opacity=".35"/>
+            <path d="M29 44.5q3 2.6 6 0" class="mk-line"/>
+        </svg>
+        <?php endif; ?>
+        <span class="mk-zzz" aria-hidden="true">z</span>
+    </button>
+</div>
+<?php endif; ?>
 <div class="backdrop" data-backdrop></div>
 <div class="toast-area" id="toastField"></div>
 <script src="assets/js/app.js?v=<?= APP_VERSION ?>"></script>
+<?php if (mikasa_on($u)): ?><script src="assets/js/mikasa.js?v=<?= APP_VERSION ?>"></script><?php endif; ?>
 </body>
 </html>
 <?php

@@ -21,9 +21,16 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 2. **Adım motoru** — 7.2 ✅: iş türü tarifleri, adımlarda uzmanlık etiketi (Tasarım, Kurgu, Metin, Çekim, Koordinasyon), atanmayan adım uzmanlık havuzuna düşer, İş'in durumu adımlardan kendiliğinden hesaplanır.
 3. **Ay ve Proje** — 7.3 ✅: aylık projelerde "Ay" plan → üretim → kapanış; planlı/gündem ayrımı; ay sonu raporu aya bağlanır; kapsam sinyali; dosya bazlı onay kuralları.
 4. **Eylemden durum** — 7.4 ✅: dosya yüklenince adım ilerler; müşteri hesapsız linkten onaylar, revize üretime döner.
-5. **Yardım eden ekran:** "Şimdi" kartı ve Bugün; işi izleyen Kule (Yönetici Takip'in yerine).
+5. **Yardım eden ekran** — 7.5 ✅: "Şimdi" kartı ve Bugün; işi izleyen Kule (Yönetici Takip'in yerine).
 6. **Sadeleştirme:** menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm:** açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
+
+## 5. aşama — Yardım eden ekran (7.5)
+
+- **Şimdi** (Panel'in başı) ve **Bugün** (`today.php`) aynı kaynaktan beslenir (`includes/now.php`): kişinin aktif adımları (gecikmiş olan önce, sonra öncelik ve tarih), adımsız işleri, uzmanlıklarının havuzu, bugünün çekimleri ve yayınları, okunmamış gelişmeleri.
+- **Bekleme süresi:** her adım aktif olduğu anı `task_steps.activated_at`'te taşır (kurulumda, bitirince, geri gönderince, yeniden açınca, tekrarlayan kopyada). Güncellemede aktif adımlar için son biten adımın tarihi, yoksa işin oluşturulma tarihi yazılır.
+- **Kule** (`tower.php`, yalnızca yönetici): uzmanlık başına aktif adım / kişi ve havuz; 3 gündür aynı adımda duran (müşteri onayı hariç), gecikmiş, 3 gündür müşteride bekleyen (güncel) onaylar, Drive'a aktarılmamış çekimler; dosya sağlığı (kırmızı: 3+ geciken, 5+ gün bekleyen onay ya da son 60 günde cevapların yarısından fazlası revize; sarı: daha hafifi); bu ayın evreleri. "Yönetici notları" sekmesi eski Yönetici Takip tablosudur; `manager-tracking.php` oraya yönlenir. Kişi bazlı performans sıralaması yoktur.
+- **Mikasa:** yalnızca ekip görür (yönetici genel olarak kapatabilir, herkes kendisi için kapatabilir — `notification_preferences.mikasa`). Cümleler sunucuda kişinin kendi işinden kurulur (`includes/mikasa.php`), en fazla 6; sayfa ilk açılışta birini, sonra görünür kaldıkça 25 dakikada bir diğerini söyler, günlük sayaç tarayıcıda tutulur. 23:00–07:00 arası uyur. Hareketler Web Animations API ile, azaltılmış hareket tercihinde durağan. Varsayılan görsel panelin kendi çizimidir; yönetici kullanım hakkı olan bir görsel yükleyebilir.
 
 ## 4. aşama — Eylemden durum (7.4)
 

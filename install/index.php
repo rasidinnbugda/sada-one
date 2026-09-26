@@ -268,6 +268,7 @@ CREATE TABLE IF NOT EXISTS task_steps (
     skill_id INT DEFAULT NULL,
     kind ENUM('work','review','client_approval','publish') NOT NULL DEFAULT 'work',
     done_by INT DEFAULT NULL,
+    activated_at DATETIME DEFAULT NULL,
     INDEX(task_id), INDEX pool (status, owner_id, skill_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 

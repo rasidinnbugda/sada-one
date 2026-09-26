@@ -451,8 +451,15 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.4';
+const APP_VERSION = '7.5';
 const VERSION_NOTES = [
+    '7.5' => [
+        '"Şimdi" kartı: Panel\'in başında şu an yapman gereken tek iş, ardından gelenler ve günün özeti (havuz, bugünkü çekim ve yayınlar, yeni gelişmeler)',
+        'Bugün sayfası (menüde Panel\'in altında): sırası sende olan adımlar ne kadar süredir beklediğiyle, uzmanlık havuzun ("Ben alıyorum"), bugünün çekimleri ve yayınları, yapılacakların ve işlerindeki son gelişmeler',
+        'Kule, Yönetici Takip\'in yerini aldı: kişileri değil işi izler — uzmanlık başına yük ve havuz baskısı, 3 gündür aynı adımda duran, gecikmiş, müşteride bekleyen işler, Drive\'a aktarılmamış çekimler, dosyaların sağlığı ve bu ayın durumu. Yönetici notları tablosu Kule\'nin sekmesinde',
+        'Mikasa: sağ altta ekibin asistanı. Güne selamla başlar, günde en fazla 6 kısa cümleyle sıradaki işi, havuzu, çekimi ve yayını hatırlatır; gece uyur. Bugün susturulabilir, Profil\'den kapatılabilir; müşteriler görmez. Yönetici adını ve görselini Ayarlar\'dan değiştirebilir',
+        'Yenilikler kartı birden çok sürüm atlandığında hepsinin notlarını gösterir',
+    ],
     '7.4' => [
         'Teslim et: sıradaki üretim adımının sahibi dosyalarını ya da bağlantısını yükleyince adım biter ve iş sıradaki adıma geçer; teslim notu işin yorumlarına yazılır',
         'Hesapsız onay linki: her gönderimin kendine ait bir linki var. Müşteri hesap açmadan linkten onaylar, revize ister ya da reddeder; revize işi üretime döndürür. Link İş sayfasından ve Onaylar\'dan kopyalanır ya da WhatsApp\'a aktarılır, isteğe bağlı olarak dosya kişisine e-postayla gider',
@@ -1127,7 +1134,7 @@ function run_recurring_jobs(bool $force = false): int {
         foreach ($steps as $i => $a) {
             insert('task_steps', [
                 'task_id' => $newId, 'sort_order' => $a['sort_order'], 'name' => $a['name'], 'skill_id' => $a['skill_id'], 'kind' => $a['kind'],
-                'owner_id' => $a['owner_id'], 'status' => $i === 0 ? 'active' : 'pending',
+                'owner_id' => $a['owner_id'], 'status' => $i === 0 ? 'active' : 'pending', 'activated_at' => $i === 0 ? date('Y-m-d H:i:s') : null,
             ]);
         }
         if ($steps) { if ($first = task_active_step($newId)) step_announce($first); task_sync_from_steps($newId); }
@@ -1506,7 +1513,7 @@ function task_steps_setup(int $taskId, int $typeId, array $owners = []): void {
         insert('task_steps', [
             'task_id' => $taskId, 'sort_order' => $st['sort_order'], 'name' => $st['name'],
             'skill_id' => $st['skill_id'], 'kind' => $st['kind'], 'owner_id' => $owner ? (int)$owner : null,
-            'status' => $placed++ === 0 ? 'active' : 'pending',
+            'status' => $placed === 0 ? 'active' : 'pending', 'activated_at' => $placed++ === 0 ? date('Y-m-d H:i:s') : null,
         ]);
         if ($owner) q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$taskId, (int)$owner]);
     }
@@ -1555,7 +1562,7 @@ function step_finish(array $step, int $userId): ?string {
     if ($step['status'] !== 'active') return 'Yalnızca sıradaki adım bitirilebilir.';
     update_row('task_steps', ['status' => 'done', 'done_date' => date('Y-m-d H:i:s'), 'done_by' => $userId, 'owner_id' => $step['owner_id'] ?: $userId], 'id=?', [$step['id']]);
     $next = row("SELECT * FROM task_steps WHERE task_id=? AND status!='done' AND (sort_order>? OR (sort_order=? AND id>?)) ORDER BY sort_order, id LIMIT 1", [$step['task_id'], $step['sort_order'], $step['sort_order'], $step['id']]);
-    if ($next) { update_row('task_steps', ['status' => 'active'], 'id=?', [$next['id']]); $next['status'] = 'active'; step_announce($next); }
+    if ($next) { update_row('task_steps', ['status' => 'active', 'activated_at' => date('Y-m-d H:i:s')], 'id=?', [$next['id']]); $next['status'] = 'active'; step_announce($next); }
     task_sync_from_steps((int)$step['task_id']);
     return null;
 }
@@ -1567,7 +1574,7 @@ function step_send_back(array $step, string $note, int $userId, string $who = ''
         ?: row("SELECT * FROM task_steps WHERE task_id=? ORDER BY sort_order, id LIMIT 1", [$step['task_id']]);
     if (!$target || (int)$target['id'] === (int)$step['id']) return 'Geri gönderilecek bir üretim adımı yok.';
     q("UPDATE task_steps SET status='pending', done_date=NULL, done_by=NULL WHERE task_id=? AND sort_order>? AND sort_order<=?", [$step['task_id'], $target['sort_order'], $step['sort_order']]);
-    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null], 'id=?', [$target['id']]);
+    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null, 'activated_at' => date('Y-m-d H:i:s')], 'id=?', [$target['id']]);
     // The reason lands in the task's discussion, so the maker sees it next to the work
     insert('comments', ['ref_type' => 'task', 'ref_id' => $step['task_id'], 'user_id' => $userId, 'created' => date('Y-m-d H:i:s'),
         'message' => '↩ ' . ($who !== '' ? $who . ' — ' : '') . $step['name'] . ' adımından "' . $target['name'] . '" adımına geri gönderildi' . (trim($note) !== '' ? ': ' . trim($note) : '')]);
@@ -1581,7 +1588,7 @@ function step_send_back(array $step, string $note, int $userId, string $who = ''
 function step_reopen(array $step): ?string {
     if ($step['status'] !== 'done') return 'Bu adım zaten açık.';
     q("UPDATE task_steps SET status='pending', done_date=NULL, done_by=NULL WHERE task_id=? AND status IN ('done','active') AND (sort_order>? OR (sort_order=? AND id>?))", [$step['task_id'], $step['sort_order'], $step['sort_order'], $step['id']]);
-    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null], 'id=?', [$step['id']]);
+    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null, 'activated_at' => date('Y-m-d H:i:s')], 'id=?', [$step['id']]);
     $task = row("SELECT * FROM tasks WHERE id=?", [$step['task_id']]);
     if ($task && in_array($task['status'], ['completed', 'published'], true)) task_set_status($task, 'in_progress', false);
     task_sync_from_steps((int)$step['task_id']);

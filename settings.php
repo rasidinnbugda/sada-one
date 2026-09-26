@@ -72,6 +72,26 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
     </div>
 
     <div class="card">
+        <div class="card-title mb-3">Ekip asistanı</div>
+        <form data-ajax="setting_save" data-refresh="yes">
+            <div class="form-group"><label class="form-label">Durum</label><select name="mikasa_enabled" class="select"><option value="1" <?= setting('mikasa_enabled', '1') !== '0' ? 'selected' : '' ?>>Açık — ekip görür</option><option value="0" <?= setting('mikasa_enabled', '1') === '0' ? 'selected' : '' ?>>Kapalı</option></select><div class="form-hint">Sağ altta, yalnızca ekibe görünür; müşteriler görmez. Günde en fazla 6 kısa cümle kurar, gece uyur; herkes kendisi için susturabilir ya da kapatabilir.</div></div>
+            <div class="form-group"><label class="form-label">Adı</label><input name="mikasa_name" class="input" maxlength="24" value="<?= e(setting('mikasa_name', 'Mikasa')) ?>"></div>
+            <div class="form-group">
+                <label class="form-label">Görsel <span class="text-muted" style="font-weight:400">(opsiyonel)</span></label>
+                <?php if (setting('mikasa_avatar')): ?>
+                <div class="row-flex mb-2" style="gap:12px;padding:10px;background:var(--surface-2);border-radius:10px">
+                    <img src="uploads/<?= e(setting('mikasa_avatar')) ?>" style="width:44px;height:44px;border-radius:50%;object-fit:cover">
+                    <button type="button" class="mini-btn" style="color:var(--danger)" data-action="setting_image_delete" data-setting_key="mikasa_avatar" data-confirm="Asistan görseli kaldırılsın mı? (panelin kendi çizimine dönülür)">Kaldır</button>
+                </div>
+                <?php endif; ?>
+                <input type="file" name="mikasa_avatar" class="input" accept="image/*">
+                <div class="form-hint">Kare görsel (en az 128×128). Yalnızca kullanım hakkına sahip olduğunuz bir görsel yükleyin; boşsa panelin kendi çizimi kullanılır.</div>
+            </div>
+            <button type="submit" class="btn btn-brand mt-2">Kaydet</button>
+        </form>
+    </div>
+
+    <div class="card">
         <div class="card-title mb-3">E-posta Bildirimleri (SMTP)</div>
         <form data-ajax="setting_save" data-refresh="no" id="smtpForm">
             <div class="form-group">
