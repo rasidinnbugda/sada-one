@@ -20,10 +20,19 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 1. **İş'i tekleştirme** — 7.1 ✅
 2. **Adım motoru** — 7.2 ✅: iş türü tarifleri, adımlarda uzmanlık etiketi (Tasarım, Kurgu, Metin, Çekim, Koordinasyon), atanmayan adım uzmanlık havuzuna düşer, İş'in durumu adımlardan kendiliğinden hesaplanır.
 3. **Ay ve Proje** — 7.3 ✅: aylık projelerde "Ay" plan → üretim → kapanış; planlı/gündem ayrımı; ay sonu raporu aya bağlanır; kapsam sinyali; dosya bazlı onay kuralları.
-4. **Eylemden durum:** dosya yüklenince adım ilerler; müşteri hesapsız linkten onaylar, revize üretime döner.
+4. **Eylemden durum** — 7.4 ✅: dosya yüklenince adım ilerler; müşteri hesapsız linkten onaylar, revize üretime döner.
 5. **Yardım eden ekran:** "Şimdi" kartı ve Bugün; işi izleyen Kule (Yönetici Takip'in yerine).
 6. **Sadeleştirme:** menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm:** açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
+
+## 4. aşama — Eylemden durum (7.4)
+
+Durum, yapılan işin kendisinden çıkar:
+
+- **Teslim et:** sıradaki üretim adımını yapabilen kişi dosya ve/veya bağlantı yükleyerek adımı bitirir (`step_deliver`). Dosyalar işin eklerine, teslim notu tartışmaya düşer. Dosyasız "Bitir" de durur.
+- **Hesapsız onay:** her onayın gizli bir `token`'ı vardır; `approve.php?t=…` hesap istemeden onay / revize / ret alır. Cevap, paneldeki cevapla aynı yoldan işler (`approval_apply_reply`): müşteri onayı adımı biter ya da iş son üretim adımına döner; aylık planda ay üretime geçer. Yalnızca işin (ya da ayın) **güncel** onayı cevaplanabilir; eski linkler durumu gösterir. Linkten gelen cevapta yazılan ad `reply_name`'de tutulur.
+- **Çekim ↔ İş:** `event_tasks` bir çekim gününü birden çok işe bağlar. Çekim Drive'a aktarıldı sayılınca (elle, SD kart aktarımıyla ya da elle eklenen Drive linkiyle) bağlı işlerde sırada bekleyen çekim adımı (uzmanlığı Çekim ya da adında "çekim" geçen üretim adımı) biter (`shoot_transferred`).
+- **Hatırlatma:** 3 gün cevapsız kalan güncel onay için müşteriye bir kez hatırlatma, gönderene bilgi gider (`reminded_at`).
 
 ## 3. aşama — Ay ve Proje (7.3)
 

@@ -511,6 +511,13 @@ CREATE TABLE IF NOT EXISTS events (
     INDEX(start)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
+CREATE TABLE IF NOT EXISTS event_tasks (
+    event_id INT NOT NULL,
+    task_id INT NOT NULL,
+    PRIMARY KEY (event_id, task_id),
+    INDEX(task_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
+
 CREATE TABLE IF NOT EXISTS event_participants (
     event_id INT NOT NULL,
     user_id INT NOT NULL,
@@ -591,6 +598,9 @@ CREATE TABLE IF NOT EXISTS approvals (
     content_id INT DEFAULT NULL,
     task_id INT DEFAULT NULL,
     period_id INT DEFAULT NULL,
+    token CHAR(32) DEFAULT NULL,
+    reply_name VARCHAR(100) DEFAULT NULL,
+    reminded_at DATETIME DEFAULT NULL,
     status ENUM('pending','approved','revision','rejected') NOT NULL DEFAULT 'pending',
     sender_id INT NOT NULL,
     reply_note TEXT,

@@ -36,6 +36,16 @@
         } finally { clearTimeout(timer); }
     };
 
+    /* ---------- Approval link: copy it or hand it to WhatsApp ---------- */
+    window.approvalShare = async function (id, mode) {
+        const win = mode === 'whatsapp' ? window.open('', '_blank') : null; // opened now, before the await, so it is not blocked
+        const j = await api('approval_link', { id });
+        if (!j.ok) { win?.close(); return; }
+        if (mode === 'whatsapp') { win.location = 'https://wa.me/?text=' + encodeURIComponent(`"${j.title}" onayınızı bekliyor: ${j.link}`); return; }
+        try { await navigator.clipboard.writeText(j.link); toast('Onay linki kopyalandı.', 'success'); }
+        catch { window.prompt('Onay linki:', j.link); }
+    };
+
     /* ---------- Toast ---------- */
     window.toast = function (message, type = 'info', duration = 3800) {
         const field = $('#toastField');

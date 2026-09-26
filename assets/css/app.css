@@ -887,7 +887,15 @@ table.table { width: 100%; border-collapse: collapse; }
 .r-agenda { background: rgba(232,116,60,.14); color: #e8743c; }
 @media (max-width: 900px) { .month-layout { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .month-row { grid-template-columns: 52px minmax(0, 1fr) 28px; } .month-state { display: none; } }
-/* ============================================================
+
+/* Account-free approval page */
+.approve-box { max-width: 560px; }
+.approve-text { font-size: 14px; line-height: 1.6; color: var(--text-2); padding: 12px 14px; background: var(--surface-2); border-radius: 12px; }
+.approve-image { display: block; max-width: 100%; max-height: 420px; border-radius: 12px; border: 1px solid var(--border); }
+.approve-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.approve-actions .btn { justify-content: center; }
+.approve-result { padding: 14px 16px; border-radius: 12px; background: var(--surface-2); font-size: 14px; }
+@media (max-width: 520px) { .approve-actions { grid-template-columns: 1fr; } }/* ============================================================
    SEKMELER
    ============================================================ */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; overflow-x: auto; }

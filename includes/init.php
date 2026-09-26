@@ -451,8 +451,15 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.3';
+const APP_VERSION = '7.4';
 const VERSION_NOTES = [
+    '7.4' => [
+        'Teslim et: sıradaki üretim adımının sahibi dosyalarını ya da bağlantısını yükleyince adım biter ve iş sıradaki adıma geçer; teslim notu işin yorumlarına yazılır',
+        'Hesapsız onay linki: her gönderimin kendine ait bir linki var. Müşteri hesap açmadan linkten onaylar, revize ister ya da reddeder; revize işi üretime döndürür. Link İş sayfasından ve Onaylar\'dan kopyalanır ya da WhatsApp\'a aktarılır, isteğe bağlı olarak dosya kişisine e-postayla gider',
+        'Eski linkler işi oynatamaz: aynı iş için yeni bir gönderim yapılınca önceki link yalnızca durumu gösterir',
+        'Çekim ↔ İş: İş sayfasından çekim planlanır ya da mevcut çekime bağlanır; Çekim Listesi her çekimin işlerini gösterir. Çekim Drive\'a aktarılınca bağlı işlerin çekim adımı kendiliğinden biter',
+        '3 gündür cevaplanmayan onaylar için müşteriye bir kez hatırlatma gider, gönderen de haberdar edilir',
+    ],
     '7.3' => [
         'Aylar: aylık projenin her ayı artık Planlama → Üretim → Kapanış → Kapandı yolundan geçer. Yeni "Ay" sayfası ayın işlerini, ilerlemesini, plan onayını ve aylık raporunu tek yerde gösterir',
         'Planlı ve Gündem işler: ayın planındaki işler "Planlı", ay içinde çıkan işler (haber, trend) "Gündem" olarak işaretlenir; gündem işleri plana ve plan onayına girmez',
@@ -942,6 +949,80 @@ function get_or_create_period(int $projectId, int $year, int $month, ?string $ph
     return insert('periods', ['project_id' => $projectId, 'year' => $year, 'month' => $month, 'status' => 'open', 'phase' => $phase, 'created' => date('Y-m-d H:i:s')]);
 }
 
+/** Is this the approval that counts for its work / month? A newer sending replaces the older one. */
+function approval_is_current(array $approval): bool {
+    if ($approval['task_id']) return (int)val("SELECT MAX(id) FROM approvals WHERE task_id=?", [$approval['task_id']]) === (int)$approval['id'];
+    if ($approval['period_id']) return (int)val("SELECT MAX(id) FROM approvals WHERE period_id=?", [$approval['period_id']]) === (int)$approval['id'];
+    return true;
+}
+
+/** The account-free answer link of an approval (the token is created on first use) */
+function approval_link(array $approval): string {
+    $token = $approval['token'] ?? '';
+    if (!$token) { $token = bin2hex(random_bytes(16)); update_row('approvals', ['token' => $token], 'id=?', [$approval['id']]); }
+    return full_url('approve.php?t=' . $token);
+}
+
+/** E-mails the client file's contact person the answer link of an approval */
+function approval_mail_contact(int $clientId, string $title, string $description, string $token): bool {
+    $to = trim((string)val("SELECT contact_email FROM clients WHERE id=?", [$clientId]));
+    if ($to === '') return false;
+    require_once __DIR__ . '/mailer.php';
+    $body = "Merhaba,\n\n\"$title\" onayınızı bekliyor." . (trim($description) !== '' ? "\n\n" . trim($description) : '')
+        . "\n\nİncelemek ve yanıtlamak için (hesap gerekmez):\n" . full_url('approve.php?t=' . $token) . "\n\n" . setting('site_name', 'SADA One');
+    return send_email($to, 'Onayınız bekleniyor: ' . $title, $body);
+}
+
+/** Records the client's answer and moves the work or month it belongs to. $userId is null for an answer given through
+ *  the account-free link ($name is what the person typed there). Only the current approval moves anything. */
+function approval_apply_reply(array $approval, string $status, string $note, ?int $userId, string $name = ''): void {
+    $id = (int)$approval['id'];
+    update_row('approvals', ['status' => $status, 'reply_note' => $note, 'reply_date' => date('Y-m-d H:i:s'), 'responder_id' => $userId,
+        'reply_name' => $name !== '' ? mb_substr($name, 0, 100) : null], 'id=?', [$id]);
+    $actor = $userId ?: (int)$approval['sender_id']; // link answers are recorded on the sender's behalf
+    $who = $userId ? 'Müşteri' : ($name !== '' ? $name . ' (link)' : 'Müşteri (link)');
+    $current = approval_is_current($approval);
+    // The work: approved → the client step finishes (or the work is done), revision / rejected → back to production
+    $task = $approval['task_id'] ? row("SELECT * FROM tasks WHERE id=?", [$approval['task_id']]) : null;
+    if ($task && $current && task_is_open($task['status'])) {
+        $activeStep = task_active_step((int)$task['id']);
+        if ($activeStep && $activeStep['kind'] === 'client_approval') {
+            if ($status === 'approved') step_finish($activeStep, $actor);
+            else step_send_back($activeStep, $note, $actor, $who . ' ' . ($status === 'rejected' ? 'reddetti' : 'revize istedi'));
+        } elseif (!task_has_steps((int)$task['id'])) {
+            task_set_status($task, $status === 'approved' ? 'completed' : 'in_progress', false);
+        }
+    }
+    // A month's plan: the answer sets the plan status; approval moves a month still in planning on to production
+    if ($approval['period_id'] && $current && ($planMonth = row("SELECT * FROM periods WHERE id=?", [$approval['period_id']]))) {
+        $fields = ['plan_status' => $status === 'approved' ? 'approved' : 'revision'];
+        if ($status === 'approved' && $planMonth['phase'] === 'planning') $fields['phase'] = 'production';
+        update_row('periods', $fields, 'id=?', [$planMonth['id']]);
+    }
+    notify((int)$approval['sender_id'], 'Onay yanıtlandı: ' . APPROVAL_STATUSES[$status], ($userId ? '' : $who . ': ') . $approval['title'] . ($note !== '' ? ' — ' . $note : ''),
+        $task ? 'task.php?id=' . $task['id'] : ($approval['period_id'] ? 'month.php?id=' . $approval['period_id'] : 'approvals.php'), 'approval');
+    insert('activities', ['user_id' => $actor, 'ref_type' => 'project', 'ref_id' => (int)$approval['project_id'], 'created' => date('Y-m-d H:i:s'),
+        'description' => '"' . $approval['title'] . '" onayı ' . ($userId ? '' : 'linkten' . ($name !== '' ? ' (' . $name . ')' : '') . ' ') . APPROVAL_STATUSES[$status] . ' olarak yanıtlandı']);
+}
+
+/** A shoot's footage is in Drive: mark it, and finish the waiting shoot step of the work linked to it.
+ *  Returns how many steps moved on. */
+function shoot_transferred(int $eventId, int $userId, ?string $link = null): int {
+    update_row('events', $link ? ['drive_status' => 'transferred', 'drive_link' => $link] : ['drive_status' => 'transferred'], 'id=?', [$eventId]);
+    $shootSkill = (int)val("SELECT id FROM skills WHERE name='Çekim'");
+    $title = (string)val("SELECT title FROM events WHERE id=?", [$eventId]);
+    $moved = 0;
+    foreach (rows("SELECT s.* FROM event_tasks et JOIN tasks t ON t.id=et.task_id AND t.status!='cancelled'
+        JOIN task_steps s ON s.task_id=et.task_id AND s.status='active' AND s.kind='work' WHERE et.event_id=?", [$eventId]) as $step) {
+        if ((int)$step['skill_id'] !== $shootSkill && !str_contains(step_tr_lower($step['name']), 'çekim')) continue;
+        if (step_finish($step, $userId) !== null) continue;
+        insert('comments', ['ref_type' => 'task', 'ref_id' => $step['task_id'], 'user_id' => $userId, 'created' => date('Y-m-d H:i:s'),
+            'message' => '🎬 "' . $title . '" çekiminin görüntüleri Drive\'a aktarıldı; ' . $step['name'] . ' adımı bitti.']);
+        $moved++;
+    }
+    return $moved;
+}
+
 /** Active customer accounts that see a client file (primary file or an extra file assignment) */
 function client_customer_ids(int $clientId): array {
     return array_map('intval', array_column(rows("SELECT DISTINCT us.id FROM users us LEFT JOIN customer_clients md ON md.user_id=us.id
@@ -1169,6 +1250,18 @@ function run_recurring_jobs(bool $force = false): int {
         }
     }
 
+    /* --- Client approvals unanswered for 3 days: remind the client once and tell the sender --- */
+    if (claim_once('last_approval_reminder', date('Y-m-d'))) {
+        foreach (rows("SELECT o.*, p.client_id FROM approvals o JOIN projects p ON p.id=o.project_id
+            WHERE o.status='pending' AND o.reminded_at IS NULL AND o.created < DATE_SUB(NOW(), INTERVAL 3 DAY)") as $ap) {
+            update_row('approvals', ['reminded_at' => date('Y-m-d H:i:s')], 'id=?', [$ap['id']]);
+            if (!approval_is_current($ap)) continue; // replaced by a newer sending
+            foreach (client_customer_ids((int)$ap['client_id']) as $cid) notify($cid, '⏰ Onayınız bekleniyor', $ap['title'], 'approvals.php', 'approval');
+            notify((int)$ap['sender_id'], '⏰ 3 gündür cevap yok: ' . $ap['title'], 'Müşteriye hatırlatma gitti. Gerekirse onay linkini WhatsApp\'tan yeniden paylaşın.',
+                $ap['task_id'] ? 'task.php?id=' . $ap['task_id'] : ($ap['period_id'] ? 'month.php?id=' . $ap['period_id'] : 'approvals.php'), 'approval');
+        }
+    }
+
     require_once __DIR__ . '/mailer.php'; // due/digest/drive mails below need it
 
     /* --- Task due-date chain: notification (+ e-mail via notify's preferences), max once per day --- */
@@ -1241,7 +1334,7 @@ function run_recurring_jobs(bool $force = false): int {
             // auto-created folders store their own URL in drive_link, that must not count
             $autoLink = $sh['drive_folder_id'] ? 'https://drive.google.com/drive/folders/' . $sh['drive_folder_id'] : null;
             if ($sh['drive_link'] && $sh['drive_link'] !== $autoLink) {
-                update_row('events', ['drive_status' => 'transferred'], 'id=?', [$sh['id']]);
+                shoot_transferred((int)$sh['id'], (int)$sh['created_by']);
                 continue;
             }
             // Files in the folder are a signal, not proof of completeness: the panel ASKS

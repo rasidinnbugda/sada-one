@@ -88,6 +88,11 @@ page_start('Çekim Listesi', 'shoots');
                 <div class="cell-bottom mb-1">📋 İhtiyaç Listesi</div>
                 <div class="small" style="white-space:pre-wrap"><?= $c['needs_list'] ? e($c['needs_list']) : '<span class="text-muted">—</span>' ?></div>
             </div>
+            <?php $linkedWork = rows("SELECT t.id, t.title FROM event_tasks et JOIN tasks t ON t.id=et.task_id WHERE et.event_id=? ORDER BY t.title", [$c['id']]); ?>
+            <div style="padding:11px 13px;background:var(--surface-2);border-radius:11px">
+                <div class="cell-bottom mb-1">🎯 Bu çekimin işleri</div>
+                <div class="small"><?php if ($linkedWork): foreach ($linkedWork as $wi => $lw): ?><?= $wi ? ', ' : '' ?><a href="task.php?id=<?= $lw['id'] ?>"><?= e($lw['title']) ?></a><?php endforeach; else: ?><span class="text-muted">Bağlı iş yok — işin sayfasındaki Çekim kartından bağlanır</span><?php endif; ?></div>
+            </div>
         </div>
         <?php if ($c['drive_folder_id'] && $driveReady): ?>
         <div class="drive-section" data-drive-event="<?= $c['id'] ?>" data-drive-status="<?= $c['drive_status'] ?>" data-drive-folder="<?= e($c['drive_link'] ?: 'https://drive.google.com/drive/folders/' . $c['drive_folder_id']) ?>" style="display:none"></div>

@@ -54,7 +54,7 @@ page_start('Onaylar', 'approvals');
                 <?php else: ?><a href="uploads/<?= e($ar['file_path']) ?>" target="_blank" class="btn btn-sm"><?= icon('paperclip', 13) ?> <?= e($ar['name']) ?></a><?php endif; ?>
             </div>
             <?php endif; ?>
-            <?php if ($o['reply_note']): ?><div class="mt-2" style="padding:10px 14px;background:var(--surface-2);border-radius:10px;font-size:13px"><b>Not:</b> <?= nl2br(e($o['reply_note'])) ?> <span class="cell-bottom">— <?= format_date($o['reply_date']) ?></span></div><?php endif; ?>
+            <?php if ($o['reply_note']): ?><div class="mt-2" style="padding:10px 14px;background:var(--surface-2);border-radius:10px;font-size:13px"><b><?= $o['reply_name'] ? e($o['reply_name']) . ' (link)' : 'Not' ?>:</b> <?= nl2br(e($o['reply_note'])) ?> <span class="cell-bottom">— <?= format_date($o['reply_date']) ?></span></div><?php endif; ?>
         </div>
         <?php if ($o['status'] === 'pending' && (is_customer() || is_admin())): ?>
         <div class="vertical" style="gap:8px;flex-shrink:0;min-width:130px">
@@ -63,7 +63,7 @@ page_start('Onaylar', 'approvals');
             <button class="btn btn-danger btn-sm btn-block" onclick="approvalNot(<?= $o['id'] ?>,'rejected')">✕ Reddet</button>
         </div>
         <?php elseif ($o['status'] === 'pending' && is_staff()): ?>
-        <span class="badge r-pending" style="flex-shrink:0">Müşteri onayı bekleniyor</span>
+        <div class="vertical" style="gap:6px;flex-shrink:0;align-items:flex-end"><span class="badge r-pending">Müşteri onayı bekleniyor</span><?php if (permission('approval_send') && approval_is_current($o)): ?><div class="row-flex" style="gap:6px"><button class="mini-btn" onclick="approvalShare(<?= $o['id'] ?>, 'copy')">Linki kopyala</button><button class="mini-btn" onclick="approvalShare(<?= $o['id'] ?>, 'whatsapp')">WhatsApp</button></div><?php endif; ?></div>
         <?php elseif ($o['status'] === 'approved' && is_customer()): ?>
         <div style="flex-shrink:0">
             <?php if (isset($givenRatings[$o['id']])): ?>

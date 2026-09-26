@@ -10,7 +10,7 @@ require_once __DIR__ . '/includes/components.php';
 $u = require_staff();
 
 $id = (int)($_GET['id'] ?? 0);
-$month = row("SELECT d.*, p.name project_name, p.client_id, p.pm_id, c.name client_name, c.plan_approval, c.strategy, pm.name pm_name
+$month = row("SELECT d.*, p.name project_name, p.client_id, p.pm_id, c.name client_name, c.plan_approval, c.strategy, c.contact_email client_email, pm.name pm_name
     FROM periods d JOIN projects p ON p.id=d.project_id JOIN clients c ON c.id=p.client_id LEFT JOIN users pm ON pm.id=p.pm_id WHERE d.id=?", [$id]);
 if (!$month || !project_access((int)$month['project_id'])) { header('Location: projects.php'); exit; }
 $projectId = (int)$month['project_id'];
@@ -172,10 +172,11 @@ page_start(period_name($month) . ' — ' . $month['project_name'], 'projects');
             <div class="card-title mb-2" style="font-size:14px"><?= icon('approval', 15) ?> Plan Onayı</div>
             <?php if (!$planApprovals): ?>
             <div class="text-muted small"><?= $month['plan_approval'] ? 'Bu dosyada aylık plan müşteri onayına gider; henüz gönderilmedi.' : 'Bu dosyada plan onayı istenmiyor. Yine de "Planı müşteriye gönder" ile sorabilirsiniz.' ?></div>
-            <?php else: foreach ($planApprovals as $o): ?>
+            <?php else: foreach ($planApprovals as $pi => $o): ?>
             <div style="padding:8px 0;border-bottom:1px solid var(--border)">
                 <div class="row-flex between" style="gap:8px"><span class="small bold"><?= format_date($o['created']) ?></span><?= badge($o['status'], APPROVAL_STATUSES) ?></div>
-                <div class="cell-bottom mt-1"><?= e($o['sender_name'] ?? '—') ?> gönderdi</div>
+                <div class="cell-bottom mt-1"><?= e($o['sender_name'] ?? '—') ?> gönderdi<?= $o['reply_name'] ? ' · ' . e($o['reply_name']) . ' linkten yanıtladı' : '' ?></div>
+                <?php if ($o['status'] === 'pending' && $pi === 0 && permission('approval_send')): ?><div class="row-flex mt-1" style="gap:6px"><button class="mini-btn" onclick="approvalShare(<?= $o['id'] ?>, 'copy')">Linki kopyala</button><button class="mini-btn" onclick="approvalShare(<?= $o['id'] ?>, 'whatsapp')">WhatsApp</button></div><?php endif; ?>
                 <?php if ($o['reply_note']): ?><div class="small text-2 mt-1" style="white-space:pre-wrap"><b>Müşteri:</b> <?= e($o['reply_note']) ?></div><?php endif; ?>
             </div>
             <?php endforeach; endif; ?>
@@ -207,6 +208,7 @@ page_start(period_name($month) . ' — ' . $month['project_name'], 'projects');
         <div class="modal-body">
             <div class="small text-2 mb-2">Müşteri <?= count(array_filter($groups['planned'], fn($g) => $g['status'] !== 'cancelled')) ?> planlı işin listesini (yayın tarihi ve platformlarıyla) onay olarak görür. Onaylarsa ay kendiliğinden üretime geçer.</div>
             <div class="form-group"><label class="form-label">Müşteriye not</label><textarea name="description" class="text-area" placeholder="Bu ayın ana teması, öne çıkan günler..."></textarea></div>
+            <?php if ($month['client_email']): ?><div class="form-group"><label class="row-flex small" style="gap:8px;cursor:pointer"><input type="checkbox" name="send_email" value="1"> Onay linkini dosya kişisine e-postayla da gönder (<?= e($month['client_email']) ?>)</label></div><?php endif; ?>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Planı Gönder</button></div>
     </form></div>

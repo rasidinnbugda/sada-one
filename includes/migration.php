@@ -151,6 +151,12 @@ function migration_commands(): array {
         "ALTER TABLE clients ADD COLUMN plan_approval TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE clients ADD COLUMN no_approval_types VARCHAR(255) DEFAULT NULL",
         "ALTER TABLE approvals ADD COLUMN period_id INT DEFAULT NULL",
+        // 7.4: account-free answer link, the name typed there, reminder stamp; shoots linked to work
+        "ALTER TABLE approvals ADD COLUMN token CHAR(32) DEFAULT NULL",
+        "ALTER TABLE approvals ADD UNIQUE KEY approval_token (token)",
+        "ALTER TABLE approvals ADD COLUMN reply_name VARCHAR(100) DEFAULT NULL",
+        "ALTER TABLE approvals ADD COLUMN reminded_at DATETIME DEFAULT NULL",
+        "CREATE TABLE IF NOT EXISTS event_tasks (event_id INT NOT NULL, task_id INT NOT NULL, PRIMARY KEY (event_id, task_id), INDEX(task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
     ];
 }
 

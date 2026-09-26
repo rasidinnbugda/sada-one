@@ -199,11 +199,9 @@ case 'drive_mark':
     // Manually mark a shoot as transferred (with an optional Drive link)
     if (!is_staff()) deny();
     $eventId = (int)$g('id');
-    // Only touch the link when a new one is supplied — a bare confirm keeps the folder link
-    $set = ['drive_status' => 'transferred'];
-    if (trim($g('drive_link')) !== '') $set['drive_link'] = trim($g('drive_link'));
-    update_row('events', $set, 'id=?', [$eventId]);
-    json_out(['ok' => true, 'message' => 'Çekim "Drive\'a aktarıldı" olarak işaretlendi.', 'refresh' => true]);
+    // Only touch the link when a new one is supplied — a bare confirm keeps the folder link. Linked work moves on.
+    $moved = shoot_transferred($eventId, (int)$u['id'], trim($g('drive_link')) !== '' ? trim($g('drive_link')) : null);
+    json_out(['ok' => true, 'message' => 'Çekim "Drive\'a aktarıldı" olarak işaretlendi.' . ($moved ? " Bağlı $moved işin çekim adımı bitti." : ''), 'refresh' => true]);
 
 case 'ai_test':
     if (!is_admin()) deny();
@@ -639,14 +637,54 @@ case 'month_plan_send':
     insert('approvals', [
         'project_id' => (int)$month['project_id'], 'period_id' => (int)$month['id'], 'title' => $title,
         'description' => ($note !== '' ? $note . "\n\n" : '') . count($plan) . " iş:\n" . implode("\n", $lines),
-        'sender_id' => $u['id'], 'status' => 'pending', 'created' => $now,
+        'sender_id' => $u['id'], 'status' => 'pending', 'created' => $now, 'token' => ($token = bin2hex(random_bytes(16))),
     ]);
     update_row('periods', ['plan_status' => 'pending'], 'id=?', [$month['id']]);
+    if ($g('send_email')) approval_mail_contact((int)$month['client_id'], $title, $note, $token);
     foreach (client_customer_ids((int)$month['client_id']) as $cid) notify($cid, 'Aylık plan onayınızı bekliyor', $title, 'approvals.php', 'approval');
     log_activity(period_name($month) . ' planını müşteriye gönderdi', 'project', (int)$month['project_id']);
     json_out(['ok' => true, 'message' => 'Plan müşteriye gönderildi.']);
 
 /* ==================== TASKS ==================== */
+case 'step_deliver':
+    // The maker hands in the work: files and / or a link go on the work and its step finishes in one go
+    require_staff();
+    $step = row("SELECT * FROM task_steps WHERE id=?", [(int)$g('id')]);
+    if (!$step || $step['status'] !== 'active' || $step['kind'] !== 'work') json_out(['ok' => false, 'error' => 'Teslim, sıradaki üretim adımına yapılır.']);
+    $task = row("SELECT * FROM tasks WHERE id=?", [$step['task_id']]);
+    if ($task['status'] === 'cancelled') json_out(['ok' => false, 'error' => 'İptal edilmiş işe teslim yapılmaz.']);
+    if (!step_can_act($step, $u)) json_out(['ok' => false, 'error' => 'Bu adım size ait değil. Havuzdaysa önce "Ben alıyorum" deyin.']);
+    $names = [];
+    foreach (array_merge(['file'], array_map(fn($i) => "file__$i", range(0, 19))) as $field) {
+        if (!($uploaded = file_upload($field))) continue;
+        insert('archive', ['project_id' => $task['project_id'], 'task_id' => $task['id'], 'name' => $uploaded['name'], 'file_path' => $uploaded['path'],
+            'size' => $uploaded['size'], 'extension' => $uploaded['extension'], 'uploader_id' => $u['id'], 'created' => $now]);
+        $names[] = $uploaded['name'];
+    }
+    $link = trim($g('drive_link'));
+    if ($link !== '') {
+        if (!preg_match('#^https?://#i', $link)) $link = 'https://' . $link;
+        insert('archive', ['project_id' => $task['project_id'], 'task_id' => $task['id'], 'name' => $step['name'] . ' — teslim bağlantısı', 'file_path' => '',
+            'size' => 0, 'extension' => 'link', 'url' => mb_substr($link, 0, 500), 'uploader_id' => $u['id'], 'created' => $now]);
+        $names[] = 'bağlantı';
+    }
+    if (!$names) json_out(['ok' => false, 'error' => $_FILES ? 'Dosya yüklenemedi. Boyut (max 50MB) veya tür uygun değil.' : 'Teslim için dosya ya da bağlantı ekleyin.']);
+    $note = trim($g('note'));
+    insert('comments', ['ref_type' => 'task', 'ref_id' => $task['id'], 'user_id' => $u['id'], 'created' => $now,
+        'message' => '📎 ' . $step['name'] . ' teslim edildi: ' . implode(', ', $names) . ($note !== '' ? "\n" . $note : '')]);
+    if ($error = step_finish($step, (int)$u['id'])) json_out(['ok' => false, 'error' => $error]);
+    $next = task_active_step((int)$task['id']);
+    json_out(['ok' => true, 'message' => 'Teslim edildi' . ($next ? '; sıra: ' . $next['name'] . '.' : '; tüm adımlar bitti.')]);
+
+case 'event_task_link':
+case 'event_task_unlink':
+    // A shoot day can feed several pieces of work; linking lets the Drive transfer move their shoot step
+    require_staff();
+    $eventId = (int)$g('event_id'); $taskId = (int)$g('task_id');
+    if (!val("SELECT id FROM events WHERE id=? AND type='shoot'", [$eventId]) || !val("SELECT id FROM tasks WHERE id=?", [$taskId])) json_out(['ok' => false, 'error' => 'Çekim ya da iş bulunamadı.']);
+    if ($action === 'event_task_unlink') { q("DELETE FROM event_tasks WHERE event_id=? AND task_id=?", [$eventId, $taskId]); json_out(['ok' => true, 'message' => 'Çekim bağlantısı kaldırıldı.']); }
+    q("INSERT IGNORE INTO event_tasks (event_id, task_id) VALUES (?,?)", [$eventId, $taskId]);
+    json_out(['ok' => true, 'message' => 'İş çekime bağlandı.']);
 case 'task_save':
     require_staff();
     $id = (int)$g('id');
@@ -752,7 +790,7 @@ case 'task_sort':
 case 'task_delete':
     require_permission('task_delete');
     $id = (int)$g('id');
-    foreach (['task_steps', 'time_entries', 'task_checklist'] as $t) q("DELETE FROM $t WHERE task_id=?", [$id]);
+    foreach (['task_steps', 'time_entries', 'task_checklist', 'event_tasks'] as $t) q("DELETE FROM $t WHERE task_id=?", [$id]);
     q("UPDATE tasks SET depends_on_id=NULL WHERE depends_on_id=?", [$id]);
     q("DELETE FROM tasks WHERE id=?", [$id]);
     json_out(['ok' => true, 'message' => 'İş silindi.', 'redirect' => 'tasks.php']);
@@ -1091,7 +1129,7 @@ case 'approval_send':
     $data = [
         'project_id' => (int)$task['project_id'], 'task_id' => (int)$task['id'],
         'title' => trim($g('title')) ?: $task['title'], 'description' => $g('description'),
-        'sender_id' => $u['id'], 'status' => 'pending', 'created' => $now,
+        'sender_id' => $u['id'], 'status' => 'pending', 'created' => $now, 'token' => bin2hex(random_bytes(16)),
     ];
     // File attachment or Drive link (the file also appears among the task's attachments)
     $uploaded = file_upload('file');
@@ -1110,10 +1148,12 @@ case 'approval_send':
     // Notify the customer (primary client file + extra file assignments)
     $clientId = (int)val("SELECT client_id FROM projects WHERE id=?", [$data['project_id']]);
     foreach (client_customer_ids($clientId) as $cid) notify($cid, 'Onayınız bekleniyor', $data['title'], 'approvals.php', 'approval');
+    // Clients without an account answer through the link; it can go to the file's contact by e-mail
+    $mailed = $g('send_email') && approval_mail_contact($clientId, $data['title'], (string)$data['description'], $data['token']);
     // The work now waits on the client
     if (task_is_open($task['status'])) task_set_status($task, 'awaiting_approval', false);
     log_activity('"' . $data['title'] . '" için onay gönderdi', 'project', $data['project_id']);
-    json_out(['ok' => true, 'message' => 'Müşteriye gönderildi.']);
+    json_out(['ok' => true, 'message' => 'Müşteriye gönderildi.' . ($mailed ? ' Onay linki e-postayla da iletildi.' : ''), 'link' => full_url('approve.php?t=' . $data['token'])]);
 
 case 'approval_reply':
     require_login();
@@ -1122,31 +1162,17 @@ case 'approval_reply':
     if (!$approval || !project_access($approval['project_id'])) json_out(['ok' => false, 'error' => 'Yetkisiz.']);
     $status = $g('status');
     if (!in_array($status, ['approved', 'revision', 'rejected'])) json_out(['ok' => false, 'error' => 'Geçersiz.']);
-    update_row('approvals', [
-        'status' => $status, 'reply_note' => $g('note'), 'reply_date' => $now, 'responder_id' => $u['id'],
-    ], 'id=?', [$id]);
-    // The answer moves the work: approved → done (or on to its remaining steps), revision / rejected → back to production.
-    // Only the task's latest approval counts — a late answer to an older one must not move it.
-    $task = $approval['task_id'] ? row("SELECT * FROM tasks WHERE id=?", [$approval['task_id']]) : null;
-    if ($task && task_is_open($task['status']) && (int)val("SELECT MAX(id) FROM approvals WHERE task_id=?", [$task['id']]) === $id) {
-        $activeStep = task_active_step((int)$task['id']);
-        if ($activeStep && $activeStep['kind'] === 'client_approval') {
-            // With steps: approved finishes the client step, anything else sends the work back to production
-            if ($status === 'approved') step_finish($activeStep, (int)$u['id']);
-            else step_send_back($activeStep, (string)$g('note'), (int)$u['id'], 'Müşteri ' . ($status === 'rejected' ? 'reddetti' : 'revize istedi'));
-        } elseif (!task_has_steps((int)$task['id'])) {
-            task_set_status($task, $status === 'approved' ? 'completed' : 'in_progress', false);
-        }
-    }
-    // A month's plan: the latest plan approval sets the plan status; approval moves a month still in planning on to production
-    if ($approval['period_id'] && (int)val("SELECT MAX(id) FROM approvals WHERE period_id=?", [$approval['period_id']]) === $id && ($planMonth = row("SELECT * FROM periods WHERE id=?", [$approval['period_id']]))) {
-        $fields = ['plan_status' => $status === 'approved' ? 'approved' : 'revision'];
-        if ($status === 'approved' && $planMonth['phase'] === 'planning') $fields['phase'] = 'production';
-        update_row('periods', $fields, 'id=?', [$planMonth['id']]);
-    }
-    notify($approval['sender_id'], 'Onay yanıtlandı: ' . APPROVAL_STATUSES[$status], $approval['title'] . ($g('note') ? ' — ' . $g('note') : ''), $task ? 'task.php?id=' . $task['id'] : ($approval['period_id'] ? 'month.php?id=' . $approval['period_id'] : 'approvals.php'), 'approval');
-    log_activity('"' . $approval['title'] . '" onayını ' . APPROVAL_STATUSES[$status] . ' olarak yanıtladı', 'project', $approval['project_id']);
+    // Moves the work / month; only the current approval of the work counts (shared with the account-free link page)
+    approval_apply_reply($approval, $status, (string)$g('note'), (int)$u['id']);
     json_out(['ok' => true, 'message' => 'Yanıtınız kaydedildi.']);
+
+case 'approval_link':
+    // The account-free answer link, to share on WhatsApp or by e-mail
+    require_permission('approval_send');
+    $approval = row("SELECT * FROM approvals WHERE id=?", [(int)$g('id')]);
+    if (!$approval || !project_access((int)$approval['project_id'])) json_out(['ok' => false, 'error' => 'Onay bulunamadı.']);
+    if ($approval['status'] !== 'pending' || !approval_is_current($approval)) json_out(['ok' => false, 'error' => 'Bu onay artık cevap beklemiyor.']);
+    json_out(['ok' => true, 'link' => approval_link($approval), 'title' => $approval['title']]);
 /* ==================== SOCIAL MEDIA TRACKING ==================== */
 case 'social_account_add':
     require_permission('content_manage');
@@ -1243,6 +1269,8 @@ case 'event_save':
     }
     $data['created_by'] = $u['id']; $data['created'] = $now;
     $eventId = insert('events', $data);
+    // Planned from a piece of work: the shoot is linked to it
+    if ($data['type'] === 'shoot' && $g('task_id') && val("SELECT id FROM tasks WHERE id=?", [(int)$g('task_id')])) q("INSERT IGNORE INTO event_tasks (event_id, task_id) VALUES (?,?)", [$eventId, (int)$g('task_id')]);
     $syncEventExpense($eventId);
     // Shoot planned → its Drive upload folder is created right away (best effort)
     $folderMessage = '';
@@ -1279,6 +1307,7 @@ case 'event_save':
 
 case 'event_delete':
     require_staff();
+    q("DELETE FROM event_tasks WHERE event_id=?", [(int)$g('id')]);
     q("DELETE FROM events WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'message' => 'Etkinlik silindi.']);
 
@@ -1526,7 +1555,7 @@ case 'sd_update':
         // The linked shoot inherits the transfer: mark it too (manual link = transferred)
         $shoot = sd_last_shoot((int)$ek['id']);
         if ($shoot) {
-            update_row('events', $link ? ['drive_status' => 'transferred', 'drive_link' => $link] : ['drive_status' => 'transferred'], 'id=?', [$shoot['id']]);
+            shoot_transferred((int)$shoot['id'], (int)$u['id'], $link ?: null);
         }
         json_out(['ok' => true, 'message' => "Drive'a aktarıldı olarak işaretlendi." . ($shoot ? ' Bağlı çekim de aktarıldı sayıldı: ' . $shoot['title'] : '')]);
     }

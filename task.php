@@ -5,7 +5,7 @@ require_once __DIR__ . '/includes/components.php';
 $u = require_staff();
 
 $id = (int)($_GET['id'] ?? 0);
-$task = row("SELECT g.*, p.name project_name, p.client_id, d.name client_name, d.brand_kit client_brand_kit, uu.name assignee_name, uu.color assignee_color, ol.name creator_name, tt.name type_name,
+$task = row("SELECT g.*, p.name project_name, p.client_id, d.name client_name, d.brand_kit client_brand_kit, d.contact_email client_email, uu.name assignee_name, uu.color assignee_color, ol.name creator_name, tt.name type_name,
     pd.year period_year, pd.month period_month
     FROM tasks g JOIN projects p ON p.id=g.project_id JOIN clients d ON d.id=p.client_id
     LEFT JOIN users uu ON uu.id=g.assignee_id LEFT JOIN users ol ON ol.id=g.created_by LEFT JOIN task_types tt ON tt.id=g.type_id
@@ -30,6 +30,11 @@ $assigneeIds = array_column($assignees, 'id');
 $watchers = rows("SELECT us.id, us.name, us.color, us.avatar FROM task_watchers gi JOIN users us ON us.id=gi.user_id WHERE gi.task_id=? ORDER BY us.name", [$id]);
 $watcherIds = array_column($watchers, 'id');
 $projectPeriods = rows("SELECT id, year, month FROM periods WHERE project_id=? ORDER BY year DESC, month DESC", [$task['project_id']]);
+// Shoots feeding this work, and the client's shoots around now it could be linked to
+$shoots = rows("SELECT e.id, e.title, e.start, e.place, e.drive_status FROM event_tasks et JOIN events e ON e.id=et.event_id WHERE et.task_id=? ORDER BY e.start", [$id]);
+$linkableShoots = $task['kind'] === 'client' ? rows("SELECT e.id, e.title, e.start FROM events e LEFT JOIN projects p ON p.id=e.project_id
+    WHERE e.type='shoot' AND (e.client_id=? OR p.client_id=?) AND e.start BETWEEN DATE_SUB(NOW(), INTERVAL 30 DAY) AND DATE_ADD(NOW(), INTERVAL 90 DAY)
+    AND e.id NOT IN (SELECT event_id FROM event_tasks WHERE task_id=?) ORDER BY e.start", [$task['client_id'], $task['client_id'], $id]) : [];
 
 $activeStepIndex = -1;
 foreach ($steps as $i => $a) { if ($a['status'] === 'active') { $activeStepIndex = $i; break; } }
@@ -104,7 +109,7 @@ page_start($task['title'], 'tasks');
         </div>
         <div class="row-flex wrap" style="gap:6px">
             <?php if ($canClaim): ?><button class="btn btn-sm btn-brand" data-action="step_claim" data-id="<?= $activeStep['id'] ?>" data-refresh="yes">Ben alıyorum</button><?php endif; ?>
-            <?php if ($canAct && $activeStep['kind'] === 'work'): ?><button class="btn btn-sm btn-brand" onclick="stepComplete(<?= $activeStep['id'] ?>)">Bitir</button><?php endif; ?>
+            <?php if ($canAct && $activeStep['kind'] === 'work'): ?><button class="btn btn-sm btn-brand" data-modal="modalDeliver">Teslim et</button><button class="btn btn-sm" onclick="stepComplete(<?= $activeStep['id'] ?>)" title="Dosya eklemeden bitir">Bitir</button><?php endif; ?>
             <?php if ($canAct && $activeStep['kind'] === 'review'): ?>
             <button class="btn btn-sm btn-brand" onclick="stepComplete(<?= $activeStep['id'] ?>)">Onayla</button>
             <button class="btn btn-sm" onclick="stepReturn(<?= $activeStep['id'] ?>)">Geri gönder</button>
@@ -221,6 +226,23 @@ page_start($task['title'], 'tasks');
         <?php endif; ?>
 
         <?php if ($task['kind'] === 'client'): ?>
+        <!-- Shoots feeding this work -->
+        <div class="card mb-2">
+            <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px"><?= icon('camera', 15) ?> Çekim</div><?php if (permission('calendar_manage')): ?><button class="mini-btn" data-modal="modalShoot">+ Planla</button><?php endif; ?></div>
+            <?php if (!$shoots): ?><div class="text-muted small">Bağlı çekim yok. Bağlanan çekimin görüntüleri Drive'a aktarılınca işin çekim adımı kendiliğinden biter.</div>
+            <?php else: foreach ($shoots as $sh): ?>
+            <div class="row-flex between" style="padding:6px 0;border-bottom:1px solid var(--border);gap:8px">
+                <div style="min-width:0"><div class="small bold"><?= e($sh['title']) ?></div><div class="cell-bottom"><?= format_date($sh['start'], true) ?><?= $sh['place'] ? ' · ' . e($sh['place']) : '' ?></div></div>
+                <div class="row-flex" style="gap:6px;flex-shrink:0"><?= $sh['drive_status'] === 'transferred' ? '<span class="badge r-completed">Drive\'da</span>' : '<span class="badge r-pending">Aktarılmadı</span>' ?><button class="icon-action danger" style="width:24px;height:24px" data-action="event_task_unlink" data-event_id="<?= $sh['id'] ?>" data-task_id="<?= $id ?>" data-confirm="Bu çekimle bağlantı kaldırılsın mı?" title="Bağlantıyı kaldır">✕</button></div>
+            </div>
+            <?php endforeach; endif; ?>
+            <?php if ($linkableShoots): ?>
+            <form class="row-flex mt-2" style="gap:6px" data-ajax="event_task_link"><input type="hidden" name="task_id" value="<?= $id ?>"><select name="event_id" class="select" style="flex:1;min-width:0"><?php foreach ($linkableShoots as $ls): ?><option value="<?= $ls['id'] ?>"><?= format_date($ls['start']) ?> — <?= e($ls['title']) ?></option><?php endforeach; ?></select><button type="submit" class="btn btn-sm">Bağla</button></form>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($task['kind'] === 'client'): ?>
         <!-- Publish plan -->
         <div class="card mb-2">
             <div class="card-title mb-2" style="font-size:14px"><?= icon('calendar', 15) ?> Yayın Planı</div>
@@ -243,11 +265,12 @@ page_start($task['title'], 'tasks');
                 <?php if (permission('approval_send') && task_is_open($task['status']) && (!$steps || ($activeStep['kind'] ?? '') === 'client_approval')): ?><button class="mini-btn" data-modal="modalSendApproval">Müşteriye gönder</button><?php endif; ?>
             </div>
             <?php if (!$approvals): ?><div class="text-muted small">Henüz müşteriye gönderilmedi.</div>
-            <?php else: foreach ($approvals as $o): ?>
+            <?php else: foreach ($approvals as $ai => $o): ?>
             <div style="padding:8px 0;border-bottom:1px solid var(--border)">
                 <div class="row-flex between" style="gap:8px"><span class="small bold" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($o['title']) ?></span><?= badge($o['status'], APPROVAL_STATUSES) ?></div>
                 <div class="cell-bottom mt-1"><?= e($o['sender_name'] ?? '—') ?> · <?= time_ago($o['created']) ?><?php if ($o['drive_link']): ?> · <a href="<?= e($o['drive_link']) ?>" target="_blank">Drive</a><?php endif; ?></div>
-                <?php if ($o['reply_note']): ?><div class="small text-2 mt-1" style="white-space:pre-wrap"><b>Müşteri:</b> <?= e($o['reply_note']) ?></div><?php endif; ?>
+                <?php if ($o['status'] === 'pending' && $ai === 0 && permission('approval_send')): ?><div class="row-flex mt-1" style="gap:6px"><button class="mini-btn" onclick="approvalShare(<?= $o['id'] ?>, 'copy')">Linki kopyala</button><button class="mini-btn" onclick="approvalShare(<?= $o['id'] ?>, 'whatsapp')">WhatsApp</button></div><?php endif; ?>
+                <?php if ($o['reply_note']): ?><div class="small text-2 mt-1" style="white-space:pre-wrap"><b><?= $o['reply_name'] ? e($o['reply_name']) . ' (link)' : 'Müşteri' ?>:</b> <?= e($o['reply_note']) ?></div><?php endif; ?>
             </div>
             <?php endforeach; endif; ?>
         </div>
@@ -301,6 +324,43 @@ page_start($task['title'], 'tasks');
     </form></div>
 </div>
 
+<?php if (!empty($canAct) && $activeStep['kind'] === 'work'): ?>
+<!-- Hand in the work: files / a link, and the step finishes -->
+<div class="modal-overlay" id="modalDeliver">
+    <div class="modal"><div class="modal-top"><div class="modal-title">Teslim et — <?= e($activeStep['name']) ?></div><button class="modal-close" data-modal-close>✕</button></div>
+    <form data-ajax="step_deliver" data-refresh="yes">
+        <input type="hidden" name="id" value="<?= $activeStep['id'] ?>">
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Dosyalar</label><input type="file" name="file" class="input" multiple><div class="form-hint">Birden fazla dosya seçebilirsiniz (her biri en fazla 50MB); işin eklerine eklenir.</div></div>
+            <div class="form-group"><label class="form-label">veya Bağlantı</label><input name="drive_link" class="input" placeholder="https://drive.google.com/..."></div>
+            <div class="form-group"><label class="form-label">Not</label><textarea name="note" class="text-area" rows="2" placeholder="Sonraki adıma iletmek istedikleriniz..."></textarea></div>
+            <div class="form-hint">Teslim edince "<?= e($activeStep['name']) ?>" adımı biter, iş sıradaki adıma geçer; teslim işin yorumlarına yazılır.</div>
+        </div>
+        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Teslim et</button></div>
+    </form></div>
+</div>
+<?php endif; ?>
+
+<?php if ($task['kind'] === 'client' && permission('calendar_manage')): ?>
+<!-- Plan a shoot for this work -->
+<div class="modal-overlay" id="modalShoot">
+    <div class="modal"><div class="modal-top"><div class="modal-title">Çekim Planla</div><button class="modal-close" data-modal-close>✕</button></div>
+    <form data-ajax="event_save" data-refresh="yes">
+        <input type="hidden" name="type" value="shoot"><input type="hidden" name="project_id" value="<?= $task['project_id'] ?>"><input type="hidden" name="client_id" value="<?= $task['client_id'] ?>"><input type="hidden" name="task_id" value="<?= $id ?>">
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Başlık</label><input name="title" class="input" required value="Çekim: <?= e($task['title']) ?>"></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Başlangıç</label><input type="datetime-local" name="start" class="input" required></div>
+                <div class="form-group"><label class="form-label">Bitiş</label><input type="datetime-local" name="end" class="input"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Yer</label><input name="place" class="input"></div>
+            <div class="form-hint">Çekim takvimde görünür ve bu işe bağlanır; görüntüler Drive'a aktarılınca işin çekim adımı biter.</div>
+        </div>
+        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Planla</button></div>
+    </form></div>
+</div>
+<?php endif; ?>
+
 <!-- Send to the client for approval -->
 <div class="modal-overlay" id="modalSendApproval">
     <div class="modal"><div class="modal-top"><div class="modal-title">Müşteriye Gönder</div><button class="modal-close" data-modal-close>✕</button></div>
@@ -311,7 +371,8 @@ page_start($task['title'], 'tasks');
             <div class="form-group"><label class="form-label">Müşteriye not</label><textarea name="description" class="text-area" placeholder="Müşteriye iletmek istedikleriniz..."></textarea></div>
             <div class="form-group"><label class="form-label">Dosya Eki</label><input type="file" name="file" class="input"><div class="form-hint">Görsel, PDF, video vb. (max 50MB) — işin eklerine de eklenir.</div></div>
             <div class="form-group"><label class="form-label">veya Drive Linki</label><input name="drive_link" class="input" placeholder="https://drive.google.com/..."></div>
-            <div class="form-hint">Gönderince iş "Müşteride" durumuna geçer; müşteri onaylarsa tamamlanır, revize isterse üretime döner.</div>
+            <?php if ($task['client_email']): ?><div class="form-group"><label class="row-flex small" style="gap:8px;cursor:pointer"><input type="checkbox" name="send_email" value="1"> Onay linkini dosya kişisine e-postayla da gönder (<?= e($task['client_email']) ?>)</label></div><?php endif; ?>
+            <div class="form-hint">Gönderince iş "Müşteride" durumuna geçer; müşteri onaylarsa tamamlanır, revize isterse üretime döner. Hesabı olmayan müşteri, onay linkinden (Müşteri Onayı kartında kopyala / WhatsApp) cevap verir.</div>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Gönder</button></div>
     </form></div>
