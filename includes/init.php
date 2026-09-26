@@ -132,11 +132,11 @@ function legacy_schema_check(): void {
             require_once __DIR__ . '/migration.php';
             $t0 = microtime(true); $fresh = 0; $failed = false;
             foreach (run_migrations(db()) as $mr) {
-                if (($mr[0] ?? '') === 'error') { error_log('[SADA] migration error: ' . ($mr[1] ?? '?')); $failed = $failed || str_starts_with((string)($mr[1] ?? ''), 'english:'); }
+                if (($mr[0] ?? '') === 'error') { error_log('[SADA] migration error: ' . ($mr[1] ?? '?')); $failed = $failed || preg_match('~^(english|work):~', (string)($mr[1] ?? '')); }
                 if (($mr[0] ?? '') === 'ok') $fresh++;
             }
             if ($failed) {
-                // the 7.0 value conversion did not finish: do not mark the schema as current
+                // a one-time data conversion did not finish: do not mark the schema as current
                 db()->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('schema_retry_after', ?) ON DUPLICATE KEY UPDATE setting_value=?")
                     ->execute([time() + 600, time() + 600]);
                 return;
@@ -258,8 +258,8 @@ const PERMISSION_KEYS = [
     'report' => 'Raporlar sayfası',
     'capacity' => 'Kapasite takibi',
     'client_manage' => 'Dosya/Proje oluştur-düzenle',
-    'task_create' => 'Görev oluşturma',
-    'task_delete' => 'Görev silme',
+    'task_create' => 'İş oluşturma',
+    'task_delete' => 'İş silme',
     'content_manage' => 'İçerik takvimi yönetimi',
     'equipment_manage' => 'Ekipman envanteri yönetimi',
     'approval_send' => 'Müşteri onayına gönderme',
@@ -418,12 +418,14 @@ function client_logo(array $d, int $size = 40, int $fontPx = 15): string {
 
 const PROJECT_TYPES = ['monthly' => 'Aylık Düzenli', 'periodic' => 'Dönemsel', 'one_off' => 'Tek Seferlik'];
 const CLIENT_TYPES = ['brand' => 'Marka', 'company' => 'Şirket', 'ngo' => 'STK'];
-const TASK_STATUSES = ['todo' => 'Yapılacak', 'in_progress' => 'Devam Ediyor', 'in_review' => 'İncelemede', 'awaiting_approval' => 'Onayda', 'completed' => 'Tamamlandı'];
+const TASK_STATUSES = ['todo' => 'Yapılacak', 'in_progress' => 'Devam Ediyor', 'in_review' => 'İç Onayda', 'awaiting_approval' => 'Müşteride', 'completed' => 'Tamamlandı', 'published' => 'Yayınlandı', 'cancelled' => 'İptal'];
+// Completed, published and cancelled work is closed: it no longer counts as open, late or pending
+const TASK_CLOSED = ['completed', 'published', 'cancelled'];
+const TASK_KINDS = ['client' => 'Müşteri işi', 'internal' => 'İç iş'];
 const PRIORITIES = ['low' => 'Düşük', 'normal' => 'Normal', 'high' => 'Yüksek', 'urgent' => 'Acil'];
 const PROJECT_STATUSES = ['active' => 'Aktif', 'on_hold' => 'Beklemede', 'completed' => 'Tamamlandı', 'cancelled' => 'İptal'];
-const CONTENT_STATUSES = ['draft' => 'Taslak', 'internal_approval' => 'İç Onayda', 'customer_approval' => 'Müşteri Onayında', 'revision' => 'Revize', 'approved' => 'Onaylandı', 'published' => 'Yayınlandı'];
 const APPROVAL_STATUSES = ['pending' => 'Bekliyor', 'approved' => 'Onaylandı', 'revision' => 'Revize İstendi', 'rejected' => 'Reddedildi'];
-const REQUEST_STATUSES = ['new' => 'Yeni', 'reviewing' => 'İnceleniyor', 'task_created' => 'Göreve Dönüştürüldü', 'completed' => 'Tamamlandı', 'rejected' => 'Reddedildi'];
+const REQUEST_STATUSES = ['new' => 'Yeni', 'reviewing' => 'İnceleniyor', 'task_created' => 'İşe Dönüştürüldü', 'completed' => 'Tamamlandı', 'rejected' => 'Reddedildi'];
 const PLATFORMS = ['instagram' => 'Instagram', 'facebook' => 'Facebook', 'x' => 'X (Twitter)', 'linkedin' => 'LinkedIn', 'youtube' => 'YouTube', 'tiktok' => 'TikTok', 'web' => 'Web Sitesi', 'other' => 'Diğer'];
 const EVENT_TYPES = ['shoot' => 'Çekim', 'meeting' => 'Toplantı', 'delivery' => 'Teslim', 'other' => 'Diğer'];
 const ROLES = ['admin' => 'Yönetici', 'pm' => 'Proje Yöneticisi', 'team' => 'Ekip Üyesi', 'finance' => 'Finans', 'intern' => 'Stajyer', 'customer' => 'Müşteri'];
@@ -442,12 +444,21 @@ const IDEA_STATUSES = ['new' => 'Yeni', 'liked' => 'Beğenildi', 'implemented' =
 const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'access' => 'Erişim Bilgileri', 'audience' => 'Hedef Kitle', 'process' => 'Süreç'];
 
 // Status colours shared by kanban, reports and the content calendar
-const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)'];
-const CONTENT_STATUS_COLORS = ['draft' => 'var(--muted)', 'internal_approval' => 'var(--info)', 'customer_approval' => 'var(--warning)', 'revision' => 'var(--info)', 'approved' => 'var(--success)', 'published' => 'var(--brand)'];
+const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.0.1';
+const APP_VERSION = '7.1';
 const VERSION_NOTES = [
+    '7.1' => [
+        'Bir çıktı, tek kayıt: görev, içerik ve onay artık tek bir İş\'te birleşti. Menüde "Görevler" artık "İşler"',
+        'İşin sayfasında yayın planı (tarih, saat, platformlar) ve müşteri onay geçmişi var. "Müşteriye gönder" ile onaya yollanır; müşteri onaylarsa iş tamamlanır, revize isterse üretime döner',
+        'Yeni durumlar: Yayınlandı ve İptal. "İncelemede" artık "İç Onayda", "Onayda" artık "Müşteride". İptal edilen işler panoda görünmez, "İptal" filtresinde durur',
+        'İç iş türü: müşteriye gitmeyen işler müşteri ekranlarında görünmez ve yayın planı taşımaz',
+        'İçerik takvimi işlerin yayın planını gösteriyor: takvimden iş planlanır, sürükleyerek yayın tarihi değişir',
+        'Talep işe dönüşünce müşterinin form cevapları işin açıklamasına yazılır',
+        'Güncellemede veritabanının tam yedeği alınır; mevcut içerikler ve onaylar kayıpsız olarak ilgili işlere taşınır',
+        'Düzeltildi: takvimde bir güne tıklayıp planlanan içerik bugünün tarihine kaydediliyordu; çok platformlu içeriklerde "Yaklaşanlar" kartında platform boş görünüyordu; proje sayfasındaki "Takvim Görünümü" projeye süzmüyordu; müşteriler takvimden içerik durumunu değiştirebiliyordu',
+    ],
     '7.0.1' => [
         'Düzeltildi: dosya yüklemeleri çalışmıyordu — projeye/göreve dosya ekleme, onaya dosya ekleme, yorum eki ve sözleşme belgesi (6.11\'den beri)',
     ],
@@ -792,7 +803,7 @@ const THEMES = [
 
 /* Notification categories (subject to user preference) */
 const NOTIFICATION_CATEGORIES = [
-    'task' => 'Görev atama ve durum değişiklikleri',
+    'task' => 'İş atama ve durum değişiklikleri',
     'approval' => 'Onay talepleri ve yanıtları',
     'request' => 'Yeni talepler',
     'message' => 'Mesajlar',
@@ -977,7 +988,7 @@ function run_recurring_jobs(bool $force = false): int {
     $count = 0;
     // Housekeeping: the login log only matters for the 15-minute lockout window
     q("DELETE FROM login_attempts WHERE created < DATE_SUB(NOW(), INTERVAL 30 DAY)");
-    foreach (rows("SELECT * FROM tasks WHERE `repeat`!='none'") as $g) {
+    foreach (rows("SELECT * FROM tasks WHERE `repeat`!='none' AND status!='cancelled'") as $g) {
         $periodKey = $g['repeat'] === 'weekly' ? date('o-W') : date('Y-m');
         if ($g['last_repeat'] === $periodKey) continue;
         if ($g['last_repeat'] === null) {
@@ -995,7 +1006,7 @@ function run_recurring_jobs(bool $force = false): int {
             'title' => $g['title'],
             'description' => $g['description'],
             'assignee_id' => $g['assignee_id'], 'created_by' => $g['created_by'],
-            'priority' => $g['priority'], 'status' => 'todo',
+            'priority' => $g['priority'], 'status' => 'todo', 'kind' => $g['kind'], 'platforms' => $g['platforms'],
             'due_date' => $newLastDate, 'repeat' => 'none',
             'created' => date('Y-m-d H:i:s'),
         ]);
@@ -1012,33 +1023,33 @@ function run_recurring_jobs(bool $force = false): int {
             insert('task_checklist', ['task_id' => $newId, 'name' => $k['name'], 'is_done' => 0, 'sort_order' => $k['sort_order']]);
         }
         update_row('tasks', ['last_repeat' => $periodKey], 'id=?', [$g['id']]);
-        if ($g['assignee_id']) notify((int)$g['assignee_id'], 'Tekrarlayan görev oluşturuldu', $g['title'], 'task.php?id=' . $newId, 'task');
+        if ($g['assignee_id']) notify((int)$g['assignee_id'], 'Tekrarlayan iş oluşturuldu', $g['title'], 'task.php?id=' . $newId, 'task');
         $count++;
     }
 
     /* --- Monthly salary expenses: auto-created at the start of each month --- */
-    $buMonth = date('Y-m');
+    $thisMonth = date('Y-m');
     foreach (rows("SELECT id, name, salary FROM users WHERE salary>0 AND is_active=1") as $person) {
-        $var = val("SELECT COUNT(*) FROM expenses WHERE type='salary' AND user_id=? AND last_repeat=?", [$person['id'], $buMonth]);
+        $var = val("SELECT COUNT(*) FROM expenses WHERE type='salary' AND user_id=? AND last_repeat=?", [$person['id'], $thisMonth]);
         if (!$var) {
             insert('expenses', [
                 'type' => 'salary', 'title' => $person['name'] . ' — ' . MONTHS[(int)date('n')] . ' maaşı',
                 'amount' => $person['salary'], 'date' => date('Y-m-01'), 'status' => 'pending',
-                'repeat' => 'none', 'last_repeat' => $buMonth, 'user_id' => $person['id'], 'created' => date('Y-m-d H:i:s'),
+                'repeat' => 'none', 'last_repeat' => $thisMonth, 'user_id' => $person['id'], 'created' => date('Y-m-d H:i:s'),
             ]);
         }
     }
     /* --- Monthly recurring expenses (rent, subscriptions, etc.) --- */
     foreach (rows("SELECT * FROM expenses WHERE `repeat`='monthly'") as $gd) {
-        if ($gd['last_repeat'] === $buMonth) continue;
-        if ($gd['last_repeat'] === null) { update_row('expenses', ['last_repeat' => $buMonth], 'id=?', [$gd['id']]); continue; }
+        if ($gd['last_repeat'] === $thisMonth) continue;
+        if ($gd['last_repeat'] === null) { update_row('expenses', ['last_repeat' => $thisMonth], 'id=?', [$gd['id']]); continue; }
         insert('expenses', [
             'type' => $gd['type'], 'title' => $gd['title'], 'amount' => $gd['amount'],
             'date' => date('Y-m-01'), 'status' => 'pending', 'repeat' => 'none',
-            'last_repeat' => $buMonth, 'user_id' => $gd['user_id'], 'description' => $gd['description'],
+            'last_repeat' => $thisMonth, 'user_id' => $gd['user_id'], 'description' => $gd['description'],
             'created' => date('Y-m-d H:i:s'),
         ]);
-        update_row('expenses', ['last_repeat' => $buMonth], 'id=?', [$gd['id']]);
+        update_row('expenses', ['last_repeat' => $thisMonth], 'id=?', [$gd['id']]);
     }
 
     /* --- Meeting reminder: notify participants ~1 hour ahead --- */
@@ -1061,15 +1072,15 @@ function run_recurring_jobs(bool $force = false): int {
         foreach (rows("SELECT id FROM users WHERE is_active=1 AND role!='customer'") as $person) {
             $kid = (int)$person['id'];
             $parts = [];
-            $taskCount = (int)val("SELECT COUNT(*) FROM tasks g WHERE g.is_archived=0 AND g.status!='completed' AND g.due_date=?
+            $taskCount = (int)val("SELECT COUNT(*) FROM tasks g WHERE g.is_archived=0 AND " . task_open_sql('g') . " AND g.due_date=?
                 AND (g.assignee_id=? OR EXISTS(SELECT 1 FROM task_assignees ga WHERE ga.task_id=g.id AND ga.user_id=?))", [$today, $kid, $kid]);
-            if ($taskCount) $parts[] = $taskCount . ' görev teslimi';
+            if ($taskCount) $parts[] = $taskCount . ' iş teslimi';
             $topCount = (int)val("SELECT COUNT(*) FROM events e WHERE e.type='meeting' AND DATE(e.start)=?
                 AND (e.created_by=? OR EXISTS(SELECT 1 FROM event_participants ek WHERE ek.event_id=e.id AND ek.user_id=?))", [$today, $kid, $kid]);
             if ($topCount) $parts[] = $topCount . ' toplantı';
             $shootCount = (int)val("SELECT COUNT(*) FROM events WHERE type!='meeting' AND DATE(start)<=? AND DATE(COALESCE(`end`,start))>=?", [$today, $today]);
             if ($shootCount) $parts[] = $shootCount . ' etkinlik';
-            $contentCount = (int)val("SELECT COUNT(*) FROM contents WHERE date=? AND status NOT IN ('published')", [$today]);
+            $contentCount = (int)val("SELECT COUNT(*) FROM tasks WHERE is_archived=0 AND publish_date=? AND " . task_open_sql(), [$today]);
             if ($contentCount) $parts[] = $contentCount . ' içerik yayını';
             if ($parts) {
                 notify($kid, '🌅 Bugün seni bekleyenler', implode(' · ', $parts), 'index.php', 'task', false);
@@ -1082,10 +1093,10 @@ function run_recurring_jobs(bool $force = false): int {
     if (date('N') == 1 && claim_once('last_user_weekly_digest', $buWeek)) {
         $hb = date('Y-m-d', strtotime('-7 days'));
         $summary = [];
-        $t1 = (int)val("SELECT COUNT(*) FROM tasks WHERE status='completed' AND completion>=?", [$hb]);
-        if ($t1) $summary[] = $t1 . ' görev tamamlandı';
-        $t2 = (int)val("SELECT COUNT(*) FROM tasks WHERE is_archived=0 AND status!='completed' AND due_date<CURDATE()");
-        if ($t2) $summary[] = $t2 . ' görev gecikmede';
+        $t1 = (int)val("SELECT COUNT(*) FROM tasks WHERE " . task_done_sql() . " AND completion>=?", [$hb]);
+        if ($t1) $summary[] = $t1 . ' iş tamamlandı';
+        $t2 = (int)val("SELECT COUNT(*) FROM tasks WHERE is_archived=0 AND " . task_open_sql() . " AND due_date<CURDATE()");
+        if ($t2) $summary[] = $t2 . ' iş gecikmede';
         $t3 = (int)val("SELECT COUNT(*) FROM requests WHERE created>=?", [$hb]);
         if ($t3) $summary[] = $t3 . ' yeni talep';
         $t4 = val("SELECT ROUND(AVG(rating),1) FROM ratings WHERE created>=?", [$hb]);
@@ -1114,17 +1125,17 @@ function run_recurring_jobs(bool $force = false): int {
     if (claim_once('last_due_check', date('Y-m-d'))) {
         $dueTasks = rows("SELECT g.id, g.title, g.due_date, g.assignee_id,
             (SELECT GROUP_CONCAT(ga.user_id) FROM task_assignees ga WHERE ga.task_id=g.id) assignee_ids
-            FROM tasks g WHERE g.is_archived=0 AND g.status!='completed' AND g.due_date IS NOT NULL
+            FROM tasks g WHERE g.is_archived=0 AND " . task_open_sql('g') . " AND g.due_date IS NOT NULL
             AND g.due_date <= DATE_ADD(CURDATE(), INTERVAL 1 DAY)");
         foreach ($dueTasks as $dt) {
             if (sada_deadline_passed()) break;
             $who = array_filter(array_unique(array_merge([(int)$dt['assignee_id']], array_map('intval', explode(',', (string)$dt['assignee_ids'])))));
             $overdue = $dt['due_date'] < date('Y-m-d');
             foreach ($who as $uid) {
-                $title = $overdue ? '🔴 Görev gecikti: ' . $dt['title'] : '⏳ Son gün yarın: ' . $dt['title'];
+                $title = $overdue ? '🔴 İş gecikti: ' . $dt['title'] : '⏳ Son gün yarın: ' . $dt['title'];
                 $body = $overdue
-                    ? 'Son tarihi ' . format_date($dt['due_date']) . ' olan görev hâlâ tamamlanmadı.'
-                    : 'Görevin son tarihi yarın (' . format_date($dt['due_date']) . ').';
+                    ? 'Son tarihi ' . format_date($dt['due_date']) . ' olan iş hâlâ tamamlanmadı.'
+                    : 'İşin son tarihi yarın (' . format_date($dt['due_date']) . ').';
                 // notify() mails too (when e-mail notifications are on) — a second explicit
                 // send here used to double every reminder and double the SMTP time
                 notify($uid, $title, $body, 'task.php?id=' . $dt['id'], 'task');
@@ -1134,7 +1145,7 @@ function run_recurring_jobs(bool $force = false): int {
 
     /* --- Daily manager digest e-mail (first run of the day after 07:00) --- */
     if ((int)date('G') >= 7 && claim_once('last_daily_digest', date('Y-m-d'))) {
-        $overdueList = rows("SELECT g.title, g.due_date, u.name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id WHERE g.is_archived=0 AND g.status!='completed' AND g.due_date < CURDATE() ORDER BY g.due_date LIMIT 15");
+        $overdueList = rows("SELECT g.title, g.due_date, u.name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id WHERE g.is_archived=0 AND " . task_open_sql('g') . " AND g.due_date < CURDATE() ORDER BY g.due_date LIMIT 15");
         $todayShoots = rows("SELECT title, start FROM events WHERE type='shoot' AND DATE(start)=CURDATE()");
         $pendingApprovals = (int)val("SELECT COUNT(*) FROM approvals WHERE status='pending'");
         $missingDrive = (int)val("SELECT COUNT(*) FROM events WHERE type='shoot' AND drive_status='pending' AND COALESCE(`end`, start) < DATE_SUB(NOW(), INTERVAL 24 HOUR) AND start > DATE_SUB(NOW(), INTERVAL 30 DAY)");
@@ -1284,10 +1295,43 @@ function only_own_steps(): bool {
     return is_array($t) && !empty($t['only_own_steps']);
 }
 
-/** When a task is completed, moves the linked content to 'approved' (unless already published) */
-function task_content_sync(int $taskId): void {
-    $contentId = (int)val("SELECT content_id FROM tasks WHERE id=?", [$taskId]);
-    if ($contentId) q("UPDATE contents SET status='approved' WHERE id=? AND status NOT IN ('published','approved')", [$contentId]);
+/* ---------------- Task (İş) status ---------------- */
+
+/** Is the task still open? Completed, published and cancelled work is closed. */
+function task_is_open(string $status): bool { return !in_array($status, TASK_CLOSED, true); }
+
+/** SQL condition for open tasks, e.g. task_open_sql('g') → g.status NOT IN (…) */
+function task_open_sql(string $alias = ''): string {
+    return ($alias !== '' ? "$alias." : '') . "status NOT IN ('" . implode("','", TASK_CLOSED) . "')";
+}
+
+/** SQL condition for delivered tasks (completed or published; cancelled work is not delivered) */
+function task_done_sql(string $alias = ''): string {
+    return ($alias !== '' ? "$alias." : '') . "status IN ('completed','published')";
+}
+
+/**
+ * Moves a task to a new status: lock rules, completion stamp, activity log and notifications to the
+ * assignee and watchers. Every status change (page, board, table, approvals, steps) goes through here.
+ * Returns an error message, or null when done.
+ */
+function task_set_status(array $task, string $status, bool $checkLock = true): ?string {
+    if (!isset(TASK_STATUSES[$status])) return 'Geçersiz durum.';
+    if ($task['status'] === $status) return null;
+    if ($checkLock && ($block = task_lock_reason($task, $status))) return '🔒 ' . $block;
+    $data = ['status' => $status];
+    if (in_array($status, ['completed', 'published'], true)) {
+        if (!in_array($task['status'], ['completed', 'published'], true)) $data['completion'] = date('Y-m-d H:i:s');
+    } else {
+        $data['completion'] = null;
+    }
+    update_row('tasks', $data, 'id=?', [$task['id']]);
+    log_activity('"' . $task['title'] . '" işini ' . TASK_STATUSES[$status] . ' durumuna aldı', 'task', (int)$task['id']);
+    $recipients = array_column(rows("SELECT user_id FROM task_watchers WHERE task_id=?", [$task['id']]), 'user_id');
+    if (!empty($task['assignee_id'])) $recipients[] = (int)$task['assignee_id'];
+    foreach (array_unique(array_map('intval', $recipients)) as $aid)
+        notify($aid, 'İşin durumu değişti', $task['title'] . ' → ' . TASK_STATUSES[$status], 'task.php?id=' . $task['id'], 'task');
+    return null;
 }
 
 /* ---------------- Task lock checks ---------------- */
@@ -1295,15 +1339,15 @@ function task_content_sync(int $taskId): void {
 /** Returns the reason blocking the task from progressing; null if there is none. */
 function task_lock_reason(array $task, string $targetStatus): ?string {
     if (!empty($task['lock_bypassed'])) return null; // an admin has bypassed the lock
-    // Dependency: cannot move past 'todo' until the linked task is finished
-    if ($task['depends_on_id'] && $targetStatus !== 'todo') {
+    // Dependency: cannot move past 'todo' until the linked task is closed (cancelling is always allowed)
+    if ($task['depends_on_id'] && !in_array($targetStatus, ['todo', 'cancelled'], true)) {
         $dependent = row("SELECT title, status FROM tasks WHERE id=?", [$task['depends_on_id']]);
-        if ($dependent && $dependent['status'] !== 'completed') {
-            return '"' . $dependent['title'] . '" görevi tamamlanmadan bu görev ilerleyemez.';
+        if ($dependent && task_is_open($dependent['status'])) {
+            return '"' . $dependent['title'] . '" işi tamamlanmadan bu iş ilerleyemez.';
         }
     }
-    // Status lock: cannot be marked completed until the workflow steps are done
-    if ($targetStatus === 'completed') {
+    // Status lock: cannot be marked completed or published until the workflow steps are done
+    if (in_array($targetStatus, ['completed', 'published'], true)) {
         $missing = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND status!='done'", [$task['id']]);
         if ($missing > 0) return "Akışta $missing tamamlanmamış adım var. Önce adımları bitirin.";
     }

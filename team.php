@@ -57,7 +57,7 @@ page_start('Ekip', 'team');
 
         <?php if ($idle): ?>
         <div class="text-muted small" style="padding:10px 0">
-            Devam eden işi yok<?= $member['pending'] ? " — sırada {$member['pending']} bekleyen görev var" : '. Yeni görev atanabilir.' ?>
+            Devam eden işi yok<?= $member['pending'] ? " — sırada {$member['pending']} bekleyen iş var" : '. Yeni iş atanabilir.' ?>
         </div>
         <?php else: ?>
         <div class="vertical mt-1" style="gap:6px">

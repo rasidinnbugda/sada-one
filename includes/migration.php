@@ -120,6 +120,13 @@ function migration_commands(): array {
         "ALTER TABLE client_notes ADD COLUMN category VARCHAR(30) NOT NULL DEFAULT 'general'",
         "ALTER TABLE client_notes ADD COLUMN pinned TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE form_fields MODIFY type VARCHAR(20) NOT NULL DEFAULT 'text'",
+        // 7.1: a task (İş) is one deliverable — it carries its publish plan; published / cancelled close it
+        "ALTER TABLE tasks ADD COLUMN kind ENUM('client','internal') NOT NULL DEFAULT 'client' AFTER project_id",
+        "ALTER TABLE tasks ADD COLUMN publish_date DATE DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN publish_time TIME DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN platforms VARCHAR(120) DEFAULT NULL",
+        "ALTER TABLE tasks MODIFY status ENUM('todo','in_progress','in_review','awaiting_approval','completed','published','cancelled') NOT NULL DEFAULT 'todo'",
+        "ALTER TABLE tasks ADD INDEX publish_date (publish_date)",
     ];
 }
 
@@ -195,5 +202,23 @@ function run_migrations(PDO $pdo): array {
         $st = $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('migration_done', ?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)");
         $st->execute([json_encode(array_keys($done))]);
     } catch (PDOException $e) { /* not fatal: the next run simply re-checks */ }
+    // 7.1: contents and loose approvals become part of their task. It needs the columns added by
+    // the list above, so it runs last; like the English step it is backed up, runs once and a
+    // failure keeps the schema version unmarked so it is retried.
+    require_once __DIR__ . '/migration-work.php';
+    try {
+        $workDone = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='unified_work'")->fetchColumn() === '1';
+        if (!$workDone) {
+            if (!work_items_schema_ready($pdo)) throw new RuntimeException('tasks table is missing the 7.1 columns');
+            if (work_items_needed($pdo)) {
+                require_once __DIR__ . '/migration-backup.php';
+                $results[] = ['ok', 'work: backup ' . migration_db_backup($pdo, 'v7.1-work', '7.1 one-record-per-deliverable migration')];
+                foreach (work_items_migration($pdo) as $l) $results[] = ['ok', 'work: ' . $l];
+            }
+            $pdo->exec("INSERT INTO settings (setting_key, setting_value) VALUES ('unified_work', '1') ON DUPLICATE KEY UPDATE setting_value='1'");
+        }
+    } catch (Throwable $e) {
+        $results[] = ['error', 'work: ' . $e->getMessage()];
+    }
     return $results;
 }

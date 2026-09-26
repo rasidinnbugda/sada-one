@@ -10,7 +10,7 @@ unset($s);
 page_start('Akış Şablonları', 'workflows');
 ?>
 <div class="page-top">
-    <div><div class="page-title">Akış Şablonları</div><div class="page-bottom">Görevlerin izleyeceği iş akışı adımlarını tanımlayın</div></div>
+    <div><div class="page-title">Akış Şablonları</div><div class="page-bottom">İşlerin izleyeceği adımları tanımlayın</div></div>
     <div class="page-top-action"><button class="btn btn-brand" data-modal="modalWorkflow" onclick="workflowReset()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Şablon</button></div>
 </div>
 

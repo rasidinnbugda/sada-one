@@ -11,8 +11,8 @@ $customerView = is_customer();
 $clientMembers = rows("SELECT u.id, u.name, u.color, u.avatar, u.job_title FROM client_members du JOIN users u ON u.id=du.user_id WHERE du.client_id=? AND u.is_active=1 ORDER BY u.name", [$id]);
 
 $projects = rows("SELECT p.*, u.name pm_name,
-    (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id) task_count,
-    (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND g.status='completed') is_done_count
+    (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND g.status!='cancelled') task_count,
+    (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND " . task_done_sql('g') . ") is_done_count
     FROM projects p LEFT JOIN users u ON u.id=p.pm_id WHERE p.client_id=? ORDER BY p.created DESC", [$id]);
 $customers = rows("SELECT * FROM users WHERE client_id=? AND role='customer'", [$id]);
 $archiveCount = (int)val("SELECT COUNT(*) FROM archive WHERE client_id=?", [$id]);
@@ -71,7 +71,7 @@ page_start($client['name'], 'clients');
                 </div>
                 <?php if ($p['pm_name']): ?><div class="cell-bottom">PM: <?= e($p['pm_name']) ?></div><?php endif; ?>
                 <div class="progress mt-2"><div class="progress-full" data-rate="<?= $rate ?>" style="width:0"></div></div>
-                <div class="cell-bottom mt-1"><?= $p['is_done_count'] ?>/<?= $p['task_count'] ?> görev · %<?= $rate ?></div>
+                <div class="cell-bottom mt-1"><?= $p['is_done_count'] ?>/<?= $p['task_count'] ?> iş · %<?= $rate ?></div>
             </a>
             <?php endforeach; ?>
         </div>
@@ -352,7 +352,7 @@ if (permission('client_manage')):
                     <div class="form-group"><label class="form-label">Başlangıç</label><input type="date" name="start" class="input"></div>
                     <div class="form-group"><label class="form-label">Sözleşme Tutarı (₺)</label><input name="contract_amount" class="input" placeholder="0,00"></div>
                 </div>
-                <div class="form-group"><label class="form-label">Proje Şablonu (opsiyonel)</label><select name="ptemplate_id" class="select"><option value="">— Boş proje</option><?php foreach (rows("SELECT id, name FROM project_templates ORDER BY name") as $templateRow): ?><option value="<?= $templateRow['id'] ?>"><?= e($templateRow['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse şablondaki görevler akışlarıyla birlikte kurulur.</div></div>
+                <div class="form-group"><label class="form-label">Proje Şablonu (opsiyonel)</label><select name="ptemplate_id" class="select"><option value="">— Boş proje</option><?php foreach (rows("SELECT id, name FROM project_templates ORDER BY name") as $templateRow): ?><option value="<?= $templateRow['id'] ?>"><?= e($templateRow['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse şablondaki işler akışlarıyla birlikte kurulur.</div></div>
                 <?php member_picker(array_column($clientMembers, 'id')); ?>
                 <div class="form-group"><label class="form-label">Açıklama</label><textarea name="description" class="text-area"></textarea></div>
             </div>

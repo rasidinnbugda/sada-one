@@ -8,7 +8,7 @@ $weekHead = date('Y-m-d', strtotime('monday this week'));
 $weekEnd = date('Y-m-d', strtotime('sunday this week'));
 $capacities = permission('capacity') ? rows("SELECT us.id, us.name, us.color, us.avatar, us.job_title, us.weekly_capacity,
     (SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z WHERE z.user_id=us.id AND z.date BETWEEN ? AND ?) week_minutes,
-    (SELECT COUNT(*) FROM tasks g WHERE g.is_archived=0 AND g.status!='completed' AND (g.assignee_id=us.id OR EXISTS(SELECT 1 FROM task_assignees ga WHERE ga.task_id=g.id AND ga.user_id=us.id))) open_task
+    (SELECT COUNT(*) FROM tasks g WHERE g.is_archived=0 AND " . task_open_sql('g') . " AND (g.assignee_id=us.id OR EXISTS(SELECT 1 FROM task_assignees ga WHERE ga.task_id=g.id AND ga.user_id=us.id))) open_task
     FROM users us WHERE us.role IN ('admin','pm','team','finance') AND us.is_active=1 ORDER BY us.name", [$weekHead, $weekEnd]) : [];
 
 // Expenses
@@ -321,7 +321,7 @@ page_start('Finans', 'finance');
             <?= avatar($kp, 38) ?>
             <div style="min-width:150px">
                 <div class="cell-main small"><?= e($kp['name']) ?></div>
-                <div class="cell-bottom"><?= $kp['open_task'] ?> açık görev · hedef <?= $kp['weekly_capacity'] ?> sa/hafta</div>
+                <div class="cell-bottom"><?= $kp['open_task'] ?> açık iş · hedef <?= $kp['weekly_capacity'] ?> sa/hafta</div>
             </div>
             <div class="capacity-bar">
                 <div class="progress"><div class="progress-full <?= $class ?>" data-rate="<?= min(100, $rate) ?>" style="width:0"></div></div>

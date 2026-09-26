@@ -35,7 +35,7 @@ if (time() >= $start && time() <= $end + 86400) {
 page_start('Zaman Çizelgesi', 'timeline');
 ?>
 <div class="page-top">
-    <div><div class="page-title">Zaman Çizelgesi</div><div class="page-bottom"><?= format_date($initial) ?> — <?= format_date($last) ?> · projeler ve son tarihli görevler</div></div>
+    <div><div class="page-title">Zaman Çizelgesi</div><div class="page-bottom"><?= format_date($initial) ?> — <?= format_date($last) ?> · projeler ve son tarihli işler</div></div>
     <div class="page-top-action">
         <a href="?scroll=<?= $scroll - 2 ?>" class="btn btn-sm">← Geri</a>
         <a href="?scroll=0" class="btn btn-sm <?= $scroll === 0 ? 'btn-brand' : '' ?>">Bugün</a>
@@ -47,7 +47,7 @@ page_start('Zaman Çizelgesi', 'timeline');
     <div class="gantt">
         <!-- Day headers (per week) -->
         <div class="gantt-days">
-            <div class="gantt-label bold" style="padding:10px 14px">Proje / Görev</div>
+            <div class="gantt-label bold" style="padding:10px 14px">Proje / İş</div>
             <div class="gantt-day-grid" style="grid-template-columns:repeat(<?= intdiv($dayCount, 7) ?>, 1fr)">
                 <?php for ($h = 0; $h < intdiv($dayCount, 7); $h++):
                     $hStart = $start + $h * 7 * 86400;
@@ -84,7 +84,7 @@ page_start('Zaman Çizelgesi', 'timeline');
             $startDate = max($gr['created'] ? substr($gr['created'], 0, 10) : $gr['due_date'], $initial);
             $location = gantt_location($start, $dayCount, $startDate, $gr['due_date']);
             if (!$location) continue;
-            $class = $gr['status'] === 'completed' ? 'completed' : ($gr['due_date'] < date('Y-m-d') ? 'overdue' : ''); ?>
+            $class = !task_is_open($gr['status']) ? 'completed' : ($gr['due_date'] < date('Y-m-d') ? 'overdue' : ''); ?>
         <div class="gantt-row">
             <div class="gantt-label" style="padding-left:32px">└ <?= e($gr['title']) ?></div>
             <div class="gantt-area">
@@ -98,7 +98,7 @@ page_start('Zaman Çizelgesi', 'timeline');
         <div class="empty-state">
             <div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 6h6m-6 6h10M4 18h14M20 6v12"/></svg></div>
             <div class="empty-title">Bu pencerede planlı iş yok</div>
-            <div class="empty-text">Projelere başlangıç/bitiş tarihi, görevlere son tarih ekleyin — burada otomatik görünürler.</div>
+            <div class="empty-text">Projelere başlangıç/bitiş tarihi, işlere son tarih ekleyin — burada otomatik görünürler.</div>
         </div>
         <?php endif; ?>
     </div>

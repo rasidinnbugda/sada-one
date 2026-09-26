@@ -19,7 +19,7 @@ function page_start(string $title, string $activePage = ''): void {
             ['my-space.php', 'my_space', 'Alanım', 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z'],
             ['clients.php', 'clients', 'Dosyalar', 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z'],
             ['projects.php', 'projects', 'Projeler', 'M9 12h6m-6 4h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z'],
-            ['tasks.php', 'tasks', 'Görevler', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'],
+            ['tasks.php', 'tasks', 'İşler', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'],
         ];
         // Groups: [key, label, icon, items]
         $navGroups[] = ['calendars', 'Takvimler', 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', [
@@ -178,12 +178,12 @@ function page_start(string $title, string $activePage = ''): void {
                     <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" width="16"><path d="M12 5v14M5 12h14"/></svg> Hızlı Oluştur
                 </button>
                 <div class="dropdown-panel quick-create-panel">
-                    <?php if (permission('task_create')): ?><a class="dropdown-item" href="tasks.php?create=1">Görev</a><?php endif; ?>
+                    <?php if (permission('task_create')): ?><a class="dropdown-item" href="tasks.php?create=1">İş</a><?php endif; ?>
                     <?php if (permission('calendar_manage')): ?>
                     <a class="dropdown-item" href="calendar.php?create=1">Etkinlik / Çekim</a>
                     <a class="dropdown-item" href="meetings.php?create=1">Toplantı</a>
                     <?php endif; ?>
-                    <?php if (permission('content_manage')): ?><a class="dropdown-item" href="content-calendar.php?create=1">İçerik</a><?php endif; ?>
+                    <?php if (permission('content_manage')): ?><a class="dropdown-item" href="content-calendar.php?create=1">Yayın planı</a><?php endif; ?>
                     <a class="dropdown-item" href="my-space.php?create=1">Kişisel Not</a>
                     <?php if (permission('announcement_publish')): ?><a class="dropdown-item" href="announcements.php?create=1">Duyuru</a><?php endif; ?>
                 </div>
@@ -198,7 +198,7 @@ function page_start(string $title, string $activePage = ''): void {
             <div class="topbar-title"><?= e($title) ?></div>
             <div class="search-global">
                 <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
-                <input class="input" id="globalSearch" placeholder="Ara: dosya, proje, görev..." autocomplete="off">
+                <input class="input" id="globalSearch" placeholder="Ara: dosya, proje, iş..." autocomplete="off">
                 <div class="search-result" id="searchResult"></div>
             </div>
             <div class="topbar-right">
@@ -335,7 +335,7 @@ document.getElementById('dockScratchpad').addEventListener('input', function () 
 });
 // ?create=1 → open the page's create modal
 if (new URLSearchParams(location.search).get('create') === '1') {
-    const target = ['modalTask', 'modalEvent', 'modalMeeting', 'modalContent', 'modalNote', 'modalAnnouncement'].find(m => document.getElementById(m));
+    const target = ['modalTask', 'modalEvent', 'modalMeeting', 'modalPlan', 'modalNote', 'modalAnnouncement'].find(m => document.getElementById(m));
     if (target) setTimeout(() => { if (target === 'modalNote' && typeof noteReset === 'function') noteReset(); modalOpen(target); }, 250);
 }
 </script>

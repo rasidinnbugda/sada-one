@@ -4,27 +4,29 @@
  * Render functions used across multiple pages.
  */
 
-/** Renders the kanban board */
+/** Renders the kanban board (cancelled work is not on the board) */
 function task_kanban(array $tasks, int $projectId = 0): void {
 ?>
 <div class="kanban">
-    <?php foreach (TASK_STATUSES as $status => $label):
+    <?php foreach (TASK_STATUSES as $status => $label): if ($status === 'cancelled') continue;
         $group = array_filter($tasks, fn($g) => $g['status'] === $status); ?>
     <div class="kanban-column" data-status="<?= $status ?>">
         <div class="kanban-column-top"><span class="kanban-dot" style="background:<?= TASK_STATUS_COLORS[$status] ?>"></span><span class="kanban-title"><?= $label ?></span><span class="kanban-count"><?= count($group) ?></span></div>
         <div class="kanban-list">
             <?php foreach ($group as $gr):
-                // Locked? (dependency task unfinished and no admin has bypassed the lock)
-                $locked = !empty($gr['dependency_status']) && $gr['dependency_status'] !== 'completed' && empty($gr['lock_bypassed']);
+                // Locked? (dependency still open and no admin has bypassed the lock)
+                $locked = !empty($gr['dependency_status']) && task_is_open($gr['dependency_status']) && empty($gr['lock_bypassed']);
                 $drag = is_staff() ? 'draggable="true"' : ''; ?>
-            <div class="kanban-card <?= $locked ? 'locked' : '' ?>" <?= $drag ?> data-task="<?= $gr['id'] ?>" data-status="<?= $status ?>" <?= $locked && !empty($gr['dependency_title']) ? 'title="Kilitli — bağlı olduğu görev: ' . e($gr['dependency_title']) . '"' : '' ?> onclick="if(!event.defaultPrevented)location.href='task.php?id=<?= $gr['id'] ?>'">
+            <div class="kanban-card <?= $locked ? 'locked' : '' ?>" <?= $drag ?> data-task="<?= $gr['id'] ?>" data-status="<?= $status ?>" <?= $locked && !empty($gr['dependency_title']) ? 'title="Kilitli — bağlı olduğu iş: ' . e($gr['dependency_title']) . '"' : '' ?> onclick="if(!event.defaultPrevented)location.href='task.php?id=<?= $gr['id'] ?>'">
                 <div class="kanban-card-title"><?= e($gr['title']) ?></div>
                 <?php if (!empty($gr['project_name'])): ?><div class="kanban-label" style="margin-bottom:6px"><span class="label-dot" style="width:7px;height:7px;background:<?= e($gr['client_color'] ?? 'var(--brand)') ?>"></span><?= e($gr['project_name']) ?></div><?php endif; ?>
                 <?php if (!empty($gr['tags'])): ?><div class="row-flex wrap" style="gap:4px;margin-bottom:7px"><?= tag_chips($gr['tags']) ?></div><?php endif; ?>
                 <div class="kanban-card-meta">
+                    <?php if (($gr['kind'] ?? 'client') === 'internal'): ?><span class="badge badge-type" style="padding:1px 7px">İç iş</span><?php endif; ?>
                     <?php if ($gr['priority'] !== 'normal'): ?><?= badge($gr['priority'], PRIORITIES) ?><?php endif; ?>
                     <?php if (!empty($gr['repeat']) && $gr['repeat'] !== 'none'): ?><span class="kanban-label" title="<?= REPEAT_OPTIONS[$gr['repeat']] ?>"><?= icon('repeat', 12) ?></span><?php endif; ?>
-                    <?php if ($gr['due_date']): $overdue = $gr['due_date'] < date('Y-m-d') && $status !== 'completed'; ?><span class="kanban-label" style="<?= $overdue ? 'color:var(--danger)' : '' ?>"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><?= date('j.n', strtotime($gr['due_date'])) ?></span><?php endif; ?>
+                    <?php if (!empty($gr['publish_date'])): ?><span class="kanban-label" style="color:var(--brand)" title="Yayın tarihi"><?= platform_badges($gr['platforms'] ?? '', true) ?><?= date('j.n', strtotime($gr['publish_date'])) ?></span><?php endif; ?>
+                    <?php if ($gr['due_date']): $overdue = $gr['due_date'] < date('Y-m-d') && task_is_open($status); ?><span class="kanban-label" style="<?= $overdue ? 'color:var(--danger)' : '' ?>" title="Son tarih"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><?= date('j.n', strtotime($gr['due_date'])) ?></span><?php endif; ?>
                     <?php if (!empty($gr['check_total'])): ?><span class="kanban-label" style="<?= $gr['check_is_done'] == $gr['check_total'] ? 'color:var(--success)' : '' ?>"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2m-6 9l2 2 4-4"/></svg><?= $gr['check_is_done'] ?>/<?= $gr['check_total'] ?></span><?php endif; ?>
                 </div>
                 <?php if (!empty($gr['assignee_name'])): ?><div class="kanban-card-bottom" <?= !empty($gr['assignee_names']) ? 'title="' . e($gr['assignee_names']) . '"' : '' ?>><?= avatar(['name' => $gr['assignee_name'], 'color' => $gr['assignee_color'], 'avatar' => $gr['assignee_avatar'] ?? null], 26) ?><span class="kanban-label"><?= e(explode(' ', $gr['assignee_name'])[0]) ?><?= !empty($gr['assignee_count']) && $gr['assignee_count'] > 1 ? ' +' . ($gr['assignee_count'] - 1) : '' ?></span></div><?php endif; ?>
@@ -36,19 +38,56 @@ function task_kanban(array $tasks, int $projectId = 0): void {
 </div>
 <?php }
 
+/** Kind (client / internal) and publish plan fields, shared by the new-task, edit and calendar forms */
+function task_publish_fields(?array $task = null, bool $withKind = true): void {
+    $kind = $task['kind'] ?? 'client';
+    $selected = array_filter(explode(',', (string)($task['platforms'] ?? '')));
+?>
+    <?php if ($withKind): ?>
+    <div class="form-group">
+        <label class="form-label">Tür</label>
+        <div class="row-flex wrap" style="gap:8px">
+            <?php foreach (TASK_KINDS as $k => $v): ?>
+            <label class="row-flex small" style="gap:7px;padding:7px 12px;background:var(--surface-2);border-radius:9px;cursor:pointer"><input type="radio" name="kind" value="<?= $k ?>" <?= $kind === $k ? 'checked' : '' ?>> <?= $v ?></label>
+            <?php endforeach; ?>
+        </div>
+        <div class="form-hint">İç işler müşteriye gönderilmez ve yayın planı olmaz; ay planı sayımlarına girmez.</div>
+    </div>
+    <?php else: ?><input type="hidden" name="kind" value="client"><?php endif; ?>
+    <div class="publish-fields" <?= $kind === 'client' ? '' : 'hidden' ?>>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">Yayın Tarihi</label><input type="date" name="publish_date" class="input" value="<?= e($task['publish_date'] ?? '') ?>"></div>
+            <div class="form-group"><label class="form-label">Yayın Saati</label><input type="time" name="publish_time" class="input" value="<?= e(substr((string)($task['publish_time'] ?? ''), 0, 5)) ?>"></div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Platformlar <span class="text-muted" style="font-weight:400">(birden fazla seçilebilir)</span></label>
+            <input type="hidden" name="platforms" class="platforms-json">
+            <div class="row-flex wrap" style="gap:6px">
+                <?php foreach (PLATFORMS as $k => $v): ?>
+                <label class="row-flex small" style="gap:7px;padding:7px 12px;background:var(--surface-2);border-radius:9px;cursor:pointer">
+                    <input type="checkbox" class="platform-box" value="<?= $k ?>" <?= in_array($k, $selected, true) ? 'checked' : '' ?>> <?= icon(isset(ICONS[$k]) ? $k : 'other', 14) ?> <?= $v ?>
+                </label>
+                <?php endforeach; ?>
+            </div>
+            <div class="form-hint">Yayın tarihi olan işler içerik takviminde görünür.</div>
+        </div>
+    </div>
+<?php }
+
 /** Renders the task creation modal */
 function task_modal(int $projectId, array $team, array $templates, array $periods = []): void {
 ?>
 <div class="modal-overlay" id="modalTask">
-    <div class="modal"><div class="modal-top"><div class="modal-title">Yeni Görev</div><button class="modal-close" data-modal-close>✕</button></div>
+    <div class="modal"><div class="modal-top"><div class="modal-title">Yeni İş</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="task_save">
         <input type="hidden" name="project_id" value="<?= $projectId ?>" <?= $projectId ? '' : 'disabled' ?> id="taskProjectId">
         <div class="modal-body">
             <?php if (!$projectId): ?>
             <div class="form-group"><label class="form-label">Proje <span class="required">*</span></label><select name="project_id" class="select" required id="taskProjectSelect"><option value="">Seçin...</option><?php foreach (rows("SELECT id, name FROM projects WHERE status='active' ORDER BY name") as $pr): ?><option value="<?= $pr['id'] ?>"><?= e($pr['name']) ?></option><?php endforeach; ?></select></div>
             <?php endif; ?>
-            <div class="form-group"><label class="form-label">Görev Başlığı <span class="required">*</span></label><input name="title" class="input" required></div>
+            <div class="form-group"><label class="form-label">İş Başlığı <span class="required">*</span></label><input name="title" class="input" required></div>
             <div class="form-group"><label class="form-label">Açıklama</label><textarea name="description" class="text-area"></textarea></div>
+            <?php task_publish_fields(); ?>
             <div class="form-group">
                 <label class="form-label">Atanan Kişiler <span class="text-muted" style="font-weight:400">(birden fazla seçilebilir)</span></label>
                 <input type="hidden" name="assignees" class="assignees-json">
@@ -74,34 +113,16 @@ function task_modal(int $projectId, array $team, array $templates, array $period
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Tekrar</label><select name="repeat" class="select"><?php foreach (REPEAT_OPTIONS as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select><div class="form-hint">Her hafta/ay başında taze kopyası oluşturulur.</div></div>
-                <?php if ($projectId): $projectTasks = rows("SELECT id, title FROM tasks WHERE project_id=? AND status!='completed' ORDER BY title", [$projectId]); ?>
-                <div class="form-group"><label class="form-label">Bağlı Olduğu Görev</label><select name="depends_on_id" class="select"><option value="">— Bağımsız</option><?php foreach ($projectTasks as $pg): ?><option value="<?= $pg['id'] ?>"><?= e($pg['title']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen görev bitmeden bu görev ilerleyemez.</div></div>
+                <?php if ($projectId): $projectTasks = rows("SELECT id, title FROM tasks WHERE project_id=? AND " . task_open_sql() . " ORDER BY title", [$projectId]); ?>
+                <div class="form-group"><label class="form-label">Bağlı Olduğu İş</label><select name="depends_on_id" class="select"><option value="">— Bağımsız</option><?php foreach ($projectTasks as $pg): ?><option value="<?= $pg['id'] ?>"><?= e($pg['title']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen iş bitmeden bu iş ilerleyemez.</div></div>
                 <?php endif; ?>
             </div>
-            <div class="form-group"><label class="form-label">Akış Şablonu (opsiyonel)</label><select name="template_id" class="select"><option value="">Akışsız görev</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse görev, şablondaki adımlar üzerinden ilerler.</div></div>
-            <?php if ($projectId):
-                $projectClientId = (int)val("SELECT client_id FROM projects WHERE id=?", [$projectId]);
-                $plannedContents = rows("SELECT i.id, i.title, i.date FROM contents i WHERE COALESCE(i.client_id, (SELECT client_id FROM projects p2 WHERE p2.id=i.project_id))=? AND i.status!='published' AND i.date>=CURDATE() AND NOT EXISTS(SELECT 1 FROM tasks g2 WHERE g2.content_id=i.id) ORDER BY i.date LIMIT 30", [$projectClientId]); ?>
-            <div class="form-group">
-                <label class="form-label">İçerik Görevi <span class="text-muted" style="font-weight:400">(sosyal medya içeriğine bağla)</span></label>
-                <select name="content_select" class="select" onchange="document.getElementById('yeniIcerikAlan-<?= $projectId ?>').style.display=this.value==='new'?'grid':'none'">
-                    <option value="">— İçerik görevi değil</option>
-                    <option value="new">+ Yeni içerik oluştur ve bağla</option>
-                    <?php foreach ($plannedContents as $pi): ?><option value="<?= $pi['id'] ?>"><?= e($pi['title']) ?> (<?= format_date($pi['date']) ?>)</option><?php endforeach; ?>
-                </select>
-                <div class="form-row mt-2" id="yeniIcerikAlan-<?= $projectId ?>" style="display:none">
-                    <div><label class="form-label">Yayın Tarihi</label><input type="date" name="content_date" class="input"></div>
-                    <div><label class="form-label">Platform</label><select name="content_platform" class="select"><?php foreach (PLATFORMS as $pk => $pv): ?><option value="<?= $pk ?>"><?= $pv ?></option><?php endforeach; ?></select></div>
-                </div>
-                <div class="form-hint">Görev tamamlanınca içerik onaylanır; içerik yayınlanınca görev tamamlanır.</div>
-            </div>
-            <?php endif; ?>
+            <div class="form-group"><label class="form-label">Akış Şablonu (opsiyonel)</label><select name="template_id" class="select"><option value="">Akışsız iş</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse iş, şablondaki adımlar üzerinden ilerler.</div></div>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Oluştur</button></div>
     </form></div>
 </div>
 <?php }
-
 /** Multi-member picker: checkbox list + hidden JSON field (app.js serializes automatically) */
 function member_picker(array $selectedIds = [], string $label = 'Atanan Ekip Üyeleri'): void {
     $team = rows("SELECT id, name, color, avatar FROM users WHERE role IN ('admin','pm','team','finance') AND is_active=1 ORDER BY name");

@@ -10,7 +10,7 @@ $givenRatings = is_customer()
     : [];
 
 if (is_staff()) {
-    $approvals = rows("SELECT o.*, p.name project_name, d.name client_name, ug.name sender_name FROM approvals o JOIN projects p ON p.id=o.project_id JOIN clients d ON d.id=p.client_id LEFT JOIN users ug ON ug.id=o.sender_id ORDER BY FIELD(o.status,'pending','revision','approved','rejected'), o.id DESC");
+    $approvals = rows("SELECT o.*, p.name project_name, d.name client_name, ug.name sender_name, g.title task_title FROM approvals o JOIN projects p ON p.id=o.project_id JOIN clients d ON d.id=p.client_id LEFT JOIN users ug ON ug.id=o.sender_id LEFT JOIN tasks g ON g.id=o.task_id ORDER BY FIELD(o.status,'pending','revision','approved','rejected'), o.id DESC");
 } else {
     [$in, $p] = in_clause(customer_client_ids());
     $approvals = rows("SELECT o.*, p.name project_name, d.name client_name, ug.name sender_name FROM approvals o JOIN projects p ON p.id=o.project_id JOIN clients d ON d.id=p.client_id LEFT JOIN users ug ON ug.id=o.sender_id WHERE p.client_id IN $in ORDER BY FIELD(o.status,'pending','revision','approved','rejected'), o.id DESC", $p);
@@ -21,7 +21,7 @@ page_start('Onaylar', 'approvals');
 <div class="page-top">
     <div>
         <div class="page-title">Onay Süreçleri</div>
-        <div class="page-bottom"><?= is_customer() ? 'Onayınızı bekleyen içerikler' : 'Tüm projelerdeki onay süreçleri' ?></div>
+        <div class="page-bottom"><?= is_customer() ? 'Onayınızı bekleyen işler' : 'Müşteriye gönderilen işler ve cevapları' ?></div>
     </div>
 </div>
 
@@ -33,7 +33,7 @@ page_start('Onaylar', 'approvals');
 </div>
 
 <?php if (!$approvals): ?>
-<div class="empty-state"><div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><div class="empty-title">Onay süreci yok</div><div class="empty-text"><?= is_customer() ? 'Şu an onayınızı bekleyen bir içerik bulunmuyor.' : 'Henüz onaya gönderilmiş bir içerik yok.' ?></div></div>
+<div class="empty-state"><div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><div class="empty-title">Onay süreci yok</div><div class="empty-text"><?= is_customer() ? 'Şu an onayınızı bekleyen bir iş bulunmuyor.' : 'Henüz müşteriye gönderilmiş bir iş yok. İşin sayfasından "Müşteriye gönder" ile başlatılır.' ?></div></div>
 <?php else: ?>
 <div id="approvalList">
 <?php foreach ($approvals as $o):
@@ -44,6 +44,7 @@ page_start('Onaylar', 'approvals');
         <div style="flex:1;min-width:0">
             <div class="row-flex wrap" style="gap:9px"><span class="bold"><?= e($o['title']) ?></span><?= badge($o['status'], APPROVAL_STATUSES) ?></div>
             <div class="cell-bottom mt-1"><?= e($o['client_name']) ?> · <?= e($o['project_name']) ?> · <?= e($o['sender_name']) ?> tarafından <?= time_ago($o['created']) ?></div>
+            <?php if (is_staff() && !empty($o['task_title'])): ?><div class="cell-bottom mt-1">İş: <a href="task.php?id=<?= $o['task_id'] ?>"><?= e($o['task_title']) ?> →</a></div><?php endif; ?>
             <?php if ($o['description']): ?><div class="text-2 small mt-2"><?= nl2br(e($o['description'])) ?></div><?php endif; ?>
             <?php if ($o['drive_link']): ?><a href="<?= e($o['drive_link']) ?>" target="_blank" class="btn btn-sm mt-2" style="margin-right:6px"><?= icon('web', 13) ?> Drive'da Görüntüle</a><?php endif; ?>
             <?php if ($ar): ?>

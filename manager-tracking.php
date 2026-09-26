@@ -14,7 +14,7 @@ $tasks = rows("SELECT g.id, g.title, g.status, g.due_date, p.name project_name, 
     (SELECT GROUP_CONCAT(u3.name SEPARATOR ', ') FROM task_assignees ga JOIN users u3 ON u3.id=ga.user_id WHERE ga.task_id=g.id) assignees
     FROM tasks g JOIN projects p ON p.id=g.project_id JOIN clients d ON d.id=p.client_id
     LEFT JOIN users uu ON uu.id=g.assignee_id
-    WHERE g.is_archived=0 ORDER BY g.status='completed', g.due_date IS NULL, g.due_date");
+    WHERE g.is_archived=0 AND g.status!='cancelled' ORDER BY " . task_open_sql('g') . " DESC, g.due_date IS NULL, g.due_date");
 
 // Fetch all notes in a single query: [task_id][user_id] => note
 $notes = [];
@@ -23,7 +23,7 @@ foreach (rows("SELECT * FROM task_manager_notes") as $n) $notes[$n['task_id']][$
 page_start('Yönetici Takip', 'manager_tracking');
 ?>
 <div class="page-top">
-    <div><div class="page-title">Yönetici Takip Sistemi</div><div class="page-bottom">Tüm görevler tek tabloda — her yönetici kendi not kolonunu doldurur</div></div>
+    <div><div class="page-title">Yönetici Takip Sistemi</div><div class="page-bottom">Tüm işler tek tabloda — her yönetici kendi not kolonunu doldurur</div></div>
 </div>
 
 <div class="filter-bar">
@@ -31,12 +31,12 @@ page_start('Yönetici Takip', 'manager_tracking');
         <button class="pill active" data-value="">Tümü</button>
         <?php foreach (TASK_STATUSES as $min => $dv): ?><button class="pill" data-value="<?= $min ?>"><?= $dv ?></button><?php endforeach; ?>
     </div>
-    <div class="search-box"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="input" placeholder="Görev ara..." data-search="#trackTable tbody tr"></div>
+    <div class="search-box"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="input" placeholder="İş ara..." data-search="#trackTable tbody tr"></div>
 </div>
 
 <div class="table-wrap"><table class="table" id="trackTable">
     <thead><tr>
-        <th>Görev</th><th>Sahibi</th><th>Durum</th><th>Dosya</th>
+        <th>İş</th><th>Sahibi</th><th>Durum</th><th>Dosya</th>
         <?php foreach ($managers as $y): ?><th><?= e(explode(' ', $y['name'])[0]) ?> Not</th><?php endforeach; ?>
     </tr></thead>
     <tbody>

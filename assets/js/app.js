@@ -228,6 +228,12 @@
         });
     });
 
+    /* ---------- Task kind: internal work has no publish plan ---------- */
+    document.addEventListener('change', e => {
+        if (!e.target.matches('input[type="radio"][name="kind"]')) return;
+        e.target.form?.querySelectorAll('.publish-fields').forEach(b => { b.hidden = e.target.value !== 'client'; });
+    });
+
     /* ---------- AJAX form submission ---------- */
     document.addEventListener('submit', async e => {
         const form = e.target;
@@ -239,6 +245,9 @@
         // Serialize task assignees
         const assigneeJson = form.querySelector('.assignees-json');
         if (assigneeJson) assigneeJson.value = JSON.stringify($$('.assigned-box:checked', form).map(c => c.value));
+        // Serialize publish platforms
+        const platformJson = form.querySelector('.platforms-json');
+        if (platformJson) platformJson.value = JSON.stringify($$('.platform-box:checked', form).map(c => c.value));
         const btn = form.querySelector('[type="submit"]');
         const oldText = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.innerHTML = 'İşleniyor...'; }
@@ -348,7 +357,7 @@
             const ids = Array.from(list.querySelectorAll('.kanban-card')).map(k => k.dataset.task);
             const j = await api('task_sort', { id: taskId, status: newStatus, ids });
             if (j.ok) {
-                if (newStatus !== oldStatus) toast('Görev "' + column.querySelector('.kanban-title').textContent + '" durumuna taşındı', 'success', 2200);
+                if (newStatus !== oldStatus) toast('İş "' + column.querySelector('.kanban-title').textContent + '" durumuna taşındı', 'success', 2200);
             } else {
                 // Rejected by the lock etc.: put the card back into its old column
                 card.dataset.status = oldStatus;
@@ -378,7 +387,7 @@
                 const j = await api('search', { q });
                 if (!j.ok) return;
                 let h = '';
-                const icons = { 'Dosyalar': '📁', 'Projeler': '📋', 'Görevler': '✅', 'İçerikler': '📅', 'Talepler': '💬' };
+                const icons = { 'Dosyalar': '📁', 'Projeler': '📋', 'İşler': '✅', 'İçerikler': '📅', 'Talepler': '💬' };
                 for (const group in j.results) {
                     if (!j.results[group].length) continue;
                     h += `<div class="search-group">${icons[group] || ''} ${group}</div>`;
@@ -785,6 +794,7 @@
                 else inp.value = dateWrite(v.slice(0, 10)) + ', ' + v.slice(11, 16);
             };
             show();
+            realInput.pickerShow = show; // lets formFieldSet() refresh the visible trigger
             inp.addEventListener('click', () => {
                 const min = inp.getAttribute('min') || '';
                 if (type === 'time') {
@@ -818,6 +828,14 @@
     };
     try { customSelectSetup(); customDateSetup(); } catch (e) { console.error('Seçici hatası:', e); }
     window.customPickerRefresh = () => { customSelectSetup(); customDateSetup(); };
+    /** Sets a form field by name, including fields behind the custom date/time picker */
+    window.formFieldSet = (form, name, value) => {
+        const el = form && form.querySelector(`[name="${name}"]`);
+        if (!el) return;
+        el.value = value;
+        if (el.pickerShow) el.pickerShow();
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
 
 })();
 

@@ -13,7 +13,7 @@ $workflows = rows("SELECT id, name FROM workflow_templates ORDER BY name");
 page_start('Proje Şablonları', 'ptemplates');
 ?>
 <div class="page-top">
-    <div><div class="page-title">Proje Şablonları</div><div class="page-bottom">Yeni proje açarken tek tıkla kurulan hazır görev setleri</div></div>
+    <div><div class="page-title">Proje Şablonları</div><div class="page-bottom">Yeni proje açarken tek tıkla kurulan hazır iş setleri</div></div>
     <div class="page-top-action"><button class="btn btn-brand" data-modal="modalPS" onclick="ptReset()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Şablon</button></div>
 </div>
 
@@ -21,7 +21,7 @@ page_start('Proje Şablonları', 'ptemplates');
 <div class="empty-state">
     <div class="empty-icon"><?= icon('document', 36) ?></div>
     <div class="empty-title">Şablon yok</div>
-    <div class="empty-text">Örn. "Aylık Sosyal Medya Paketi" şablonu: içerik üretimi, çekim, raporlama görevleri akışlarıyla hazır kurulsun.</div>
+    <div class="empty-text">Örn. "Aylık Sosyal Medya Paketi" şablonu: içerik üretimi, çekim, raporlama işleri akışlarıyla hazır kurulsun.</div>
     <button class="btn btn-brand" data-modal="modalPS" onclick="ptReset()">İlk Şablonu Oluştur</button>
 </div>
 <?php else: ?>
@@ -64,9 +64,9 @@ page_start('Proje Şablonları', 'ptemplates');
                 <div class="form-group"><label class="form-label">Açıklama</label><input name="description" id="pt_description" class="input"></div>
             </div>
             <div class="form-group">
-                <label class="form-label">Görevler</label>
+                <label class="form-label">İşler</label>
                 <div class="vertical" id="ptTaskList" style="gap:8px"></div>
-                <button type="button" class="btn btn-sm btn-ghost mt-2" onclick="ptTaskAdd()">+ Görev Ekle</button>
+                <button type="button" class="btn btn-sm btn-ghost mt-2" onclick="ptTaskAdd()">+ İş Ekle</button>
             </div>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button></div>
@@ -84,7 +84,7 @@ function ptTaskAdd(g = {}) {
     ptWorkflows.forEach(a => workflowOps += `<option value="${a.id}" ${g.workflow_id == a.id ? 'selected' : ''}>${esc(a.name)}</option>`);
     let priorityOptions = '';
     for (const k in ptPriorities) priorityOptions += `<option value="${k}" ${(g.priority || 'normal') === k ? 'selected' : ''}>${ptPriorities[k]}</option>`;
-    div.innerHTML = `<input class="input pt-title" placeholder="Görev başlığı" style="flex:2" value="${(g.title || '').replace(/"/g, '&quot;')}">
+    div.innerHTML = `<input class="input pt-title" placeholder="İş başlığı" style="flex:2" value="${(g.title || '').replace(/"/g, '&quot;')}">
         <select class="select pt-flow" style="flex:1">${workflowOps}</select>
         <select class="select pt-priority" style="width:110px">${priorityOptions}</select>
         <button type="button" class="icon-action danger" onclick="this.parentElement.remove()">✕</button>`;

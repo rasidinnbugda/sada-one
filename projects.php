@@ -6,14 +6,14 @@ $u = require_login();
 
 if (is_staff()) {
     $projects = rows("SELECT p.*, d.name client_name, d.color client_color, uu.name pm_name,
-        (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id) task_count,
-        (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND g.status='completed') is_done_count
+        (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND g.status!='cancelled') task_count,
+        (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND " . task_done_sql('g') . ") is_done_count
         FROM projects p JOIN clients d ON d.id=p.client_id LEFT JOIN users uu ON uu.id=p.pm_id
         ORDER BY p.status='active' DESC, p.created DESC");
 } else {
     $projects = rows("SELECT p.*, d.name client_name, d.color client_color, uu.name pm_name,
-        (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id) task_count,
-        (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND g.status='completed') is_done_count
+        (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND g.status!='cancelled') task_count,
+        (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND " . task_done_sql('g') . ") is_done_count
         FROM projects p JOIN clients d ON d.id=p.client_id LEFT JOIN users uu ON uu.id=p.pm_id
         WHERE p.client_id IN " . in_clause(customer_client_ids())[0] . " ORDER BY d.name, p.created DESC", in_clause(customer_client_ids())[1]);
 }
@@ -59,7 +59,7 @@ page_start(is_staff() ? 'Projeler' : 'Projelerim', 'projects');
             <span class="cell-bottom"><?= e($p['client_name']) ?></span>
         </div>
         <div class="progress mt-2"><div class="progress-full" data-rate="<?= $rate ?>" style="width:0"></div></div>
-        <div class="row-flex between mt-1"><span class="cell-bottom"><?= $p['is_done_count'] ?>/<?= $p['task_count'] ?> görev</span><span class="cell-bottom bold">%<?= $rate ?></span></div>
+        <div class="row-flex between mt-1"><span class="cell-bottom"><?= $p['is_done_count'] ?>/<?= $p['task_count'] ?> iş</span><span class="cell-bottom bold">%<?= $rate ?></span></div>
     </a>
     <?php endforeach; ?>
 </div>
@@ -87,7 +87,7 @@ if (permission('client_manage')) {
                     <div class="form-group"><label class="form-label">Proje Yöneticisi</label><select name="pm_id" class="select"><option value="">—</option><?php foreach ($pms as $pm): ?><option value="<?= $pm['id'] ?>"><?= e($pm['name']) ?></option><?php endforeach; ?></select></div>
                     <div class="form-group"><label class="form-label">Sözleşme Tutarı (₺)</label><input name="contract_amount" class="input" placeholder="0,00"></div>
                 </div>
-                <div class="form-group"><label class="form-label">Proje Şablonu (opsiyonel)</label><select name="ptemplate_id" class="select"><option value="">— Boş proje</option><?php foreach (rows("SELECT id, name FROM project_templates ORDER BY name") as $templateRow): ?><option value="<?= $templateRow['id'] ?>"><?= e($templateRow['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse şablondaki görevler akışlarıyla birlikte kurulur.</div></div>
+                <div class="form-group"><label class="form-label">Proje Şablonu (opsiyonel)</label><select name="ptemplate_id" class="select"><option value="">— Boş proje</option><?php foreach (rows("SELECT id, name FROM project_templates ORDER BY name") as $templateRow): ?><option value="<?= $templateRow['id'] ?>"><?= e($templateRow['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse şablondaki işler akışlarıyla birlikte kurulur.</div></div>
                 <?php member_picker(); ?>
                 <div class="form-group"><label class="form-label">Açıklama</label><textarea name="description" class="text-area"></textarea></div>
             </div>

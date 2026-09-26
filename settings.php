@@ -89,7 +89,7 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
                 <input name="mail_aliases" class="input" value="<?= e(setting('mail_aliases')) ?>" placeholder="rapor@ajans.com, info@ajans.com">
                 <div class="form-hint">Rapor mailleri bu adreslerden gönderilebilir. Şart: her adres, Gmail'de bağlı hesabın <b>Ayarlar → Hesaplar → Şu adres olarak gönder</b> listesine eklenmiş olmalı; yoksa Google göndereni ana adrese çevirir.</div>
             </div>
-            <div class="form-group"><label class="row-flex" style="gap:9px;cursor:pointer"><input type="checkbox" name="email_notification" value="1" <?= setting('email_notifications') === '1' ? 'checked' : '' ?>> Görev/onay bildirimlerini e-posta ile de gönder</label></div>
+            <div class="form-group"><label class="row-flex" style="gap:9px;cursor:pointer"><input type="checkbox" name="email_notification" value="1" <?= setting('email_notifications') === '1' ? 'checked' : '' ?>> İş/onay bildirimlerini e-posta ile de gönder</label></div>
             <div class="row-flex mt-2" style="gap:10px">
                 <button type="submit" class="btn btn-brand">Kaydet</button>
                 <button type="button" class="btn" data-action="test_email" data-refresh="no">Test E-postası Gönder</button>
@@ -157,7 +157,7 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
 <!-- AI integration -->
     <div class="card">
         <div class="card-title mb-2">🪄 Yapay Zeka</div>
-        <div class="cell-bottom mb-3">Aylık rapor taslağı, içerik fikri üretimi ve görev özetleme için kullanılır. Claude anahtarı <a href="https://console.anthropic.com" target="_blank" style="color:var(--brand)">console.anthropic.com</a>'dan, Gemini anahtarı <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--brand)">aistudio.google.com</a>'dan alınır (Gemini Flash'ın günlük kotalı ücretsiz katmanı vardır).</div>
+        <div class="cell-bottom mb-3">Aylık rapor taslağı, içerik fikri üretimi ve iş özetleme için kullanılır. Claude anahtarı <a href="https://console.anthropic.com" target="_blank" style="color:var(--brand)">console.anthropic.com</a>'dan, Gemini anahtarı <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--brand)">aistudio.google.com</a>'dan alınır (Gemini Flash'ın günlük kotalı ücretsiz katmanı vardır).</div>
         <form data-ajax="setting_save" data-refresh="yes">
             <div class="form-group"><label class="form-label">Sağlayıcı</label>
                 <select name="ai_provider" class="select" onchange="aiProviderChanged(this.value)">

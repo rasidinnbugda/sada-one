@@ -59,10 +59,10 @@ page_start('Talep Detayı', 'requests');
             </div>
             <?php endif; ?>
             <?php if ($request['status'] !== 'task_created' && $request['task_id'] === null): ?>
-            <button class="btn btn-brand btn-block mt-2" data-action="request_to_task" data-id="<?= $id ?>" data-confirm="Bu talep bir göreve dönüştürülsün mü?">Göreve Dönüştür</button>
+            <button class="btn btn-brand btn-block mt-2" data-action="request_to_task" data-id="<?= $id ?>" data-confirm="Bu talep bir işe dönüştürülsün mü?">İşe Dönüştür</button>
             <div class="form-hint">Not: Önce bir proje bağlamanız gerekir.</div>
             <?php elseif ($request['task_id']): ?>
-            <a href="task.php?id=<?= $request['task_id'] ?>" class="btn btn-block mt-2">Oluşturulan Görevi Aç →</a>
+            <a href="task.php?id=<?= $request['task_id'] ?>" class="btn btn-block mt-2">Oluşturulan İşi Aç →</a>
             <?php endif; ?>
         </div>
         <?php endif; ?>

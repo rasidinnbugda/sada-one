@@ -5,7 +5,7 @@ require_once __DIR__ . '/includes/components.php';
 $u = require_login();
 
 // Widget personalization: sections chosen by the user (all enabled by default)
-const PANEL_WIDGETS = ['announcements' => 'Duyurular', 'upcoming' => 'Yaklaşanlar (7 gün)', 'stats' => 'İstatistik kartları', 'team' => 'Ekip durumu', 'my_tasks' => 'Görevlerim', 'activity' => 'Son hareketler', 'warnings' => 'Uyarılar (geciken/talep)'];
+const PANEL_WIDGETS = ['announcements' => 'Duyurular', 'upcoming' => 'Yaklaşanlar (7 gün)', 'stats' => 'İstatistik kartları', 'team' => 'Ekip durumu', 'my_tasks' => 'İşlerim', 'activity' => 'Son hareketler', 'warnings' => 'Uyarılar (geciken/talep)'];
 $openWidgets = json_decode($u['widgets'] ?? '', true);
 if (!is_array($openWidgets)) $openWidgets = array_keys(PANEL_WIDGETS);
 $wOpen = fn($k) => in_array($k, $openWidgets);
@@ -60,9 +60,9 @@ if (is_staff()) {
     /* ---------- TEAM DASHBOARD ---------- */
     $clientCount = (int)val("SELECT COUNT(*) FROM clients WHERE status='active'");
     $projectCount = (int)val("SELECT COUNT(*) FROM projects WHERE status='active'");
-    $mineTask = (int)val("SELECT COUNT(*) FROM tasks WHERE assignee_id=? AND status!='completed'", [$u['id']]);
+    $mineTask = (int)val("SELECT COUNT(*) FROM tasks WHERE assignee_id=? AND is_archived=0 AND " . task_open_sql(), [$u['id']]);
     $pendingApproval = (int)val("SELECT COUNT(*) FROM approvals WHERE status='pending'");
-    $overdue = (int)val("SELECT COUNT(*) FROM tasks WHERE due_date<CURDATE() AND status!='completed'");
+    $overdue = (int)val("SELECT COUNT(*) FROM tasks WHERE due_date<CURDATE() AND is_archived=0 AND " . task_open_sql());
     $newRequest = (int)val("SELECT COUNT(*) FROM requests WHERE status='new'");
 ?>
 <div class="page-top">
@@ -110,7 +110,7 @@ if ($announcements && $wOpen('announcements')): ?>
     $stats = [
         ['value' => $clientCount, 'label' => 'Aktif Dosya', 'icon' => 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z', 'link' => 'clients.php'],
         ['value' => $projectCount, 'label' => 'Aktif Proje', 'icon' => 'M9 12h6m-6 4h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z', 'link' => 'projects.php'],
-        ['value' => $mineTask, 'label' => 'Bekleyen Görevim', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2', 'link' => 'tasks.php'],
+        ['value' => $mineTask, 'label' => 'Bekleyen İşlerim', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2', 'link' => 'tasks.php'],
         ['value' => $pendingApproval, 'label' => 'Bekleyen Onay', 'icon' => 'M9 12l2 2 4-4m5.6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'link' => 'approvals.php'],
     ];
     foreach ($stats as $s): ?>
@@ -128,12 +128,12 @@ if ($announcements && $wOpen('announcements')): ?>
         <div class="card-top">
             <div class="card-title">
                 <svg width="18" fill="none" stroke="var(--brand)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                Görevlerim
+                İşlerim
             </div>
             <a href="tasks.php" class="mini-btn">Tümü →</a>
         </div>
         <?php
-        $my_tasks = rows("SELECT g.*, p.name project_name FROM tasks g JOIN projects p ON p.id=g.project_id WHERE g.assignee_id=? AND g.status!='completed' AND g.is_archived=0 ORDER BY g.due_date IS NULL, g.due_date ASC LIMIT 6", [$u['id']]);
+        $my_tasks = rows("SELECT g.*, p.name project_name FROM tasks g JOIN projects p ON p.id=g.project_id WHERE g.assignee_id=? AND " . task_open_sql('g') . " AND g.is_archived=0 ORDER BY g.due_date IS NULL, g.due_date ASC LIMIT 6", [$u['id']]);
         $pStepCondition = only_own_steps() ? "ga.owner_id=?" : "(ga.owner_id=? OR (ga.owner_id IS NULL AND (g.assignee_id=? OR EXISTS(SELECT 1 FROM task_assignees gat WHERE gat.task_id=g.id AND gat.user_id=?))))";
         $pStepParam = only_own_steps() ? [$u['id']] : [$u['id'], $u['id'], $u['id']];
         $panelSteps = rows("SELECT ga.name step_name, g.id gid, g.title FROM task_steps ga JOIN tasks g ON g.id=ga.task_id WHERE ga.status='active' AND g.is_archived=0 AND $pStepCondition LIMIT 4", $pStepParam);
@@ -155,7 +155,7 @@ if ($announcements && $wOpen('announcements')): ?>
         </div>
         <?php endif;
         if (!$my_tasks && !$panelSteps): ?>
-            <div class="text-muted small" style="padding:20px 0;text-align:center">Bekleyen görevin yok 🎉</div>
+            <div class="text-muted small" style="padding:20px 0;text-align:center">Bekleyen işin yok 🎉</div>
         <?php else: foreach ($my_tasks as $gr):
             $overdue = $gr['due_date'] && $gr['due_date'] < date('Y-m-d'); ?>
         <a href="task.php?id=<?= $gr['id'] ?>" class="row-flex between" style="padding:11px 0;border-bottom:1px solid var(--border)">
@@ -194,19 +194,19 @@ if ($announcements && $wOpen('announcements')): ?>
 </div>
 
 <?php if ($wOpen('upcoming')):
-    // Items for the next 7 days: my tasks + my meetings + events + contents
+    // Items for the next 7 days: my work + my meetings + events + planned publishing
     $today = date('Y-m-d'); $sevenDays = date('Y-m-d', strtotime('+7 days'));
     $upcoming = [];
-    foreach (rows("SELECT g.id, g.title, g.due_date date FROM tasks g WHERE g.is_archived=0 AND g.status!='completed' AND g.due_date BETWEEN ? AND ?
+    foreach (rows("SELECT g.id, g.title, g.due_date date FROM tasks g WHERE g.is_archived=0 AND " . task_open_sql('g') . " AND g.due_date BETWEEN ? AND ?
         AND (g.assignee_id=? OR EXISTS(SELECT 1 FROM task_assignees ga WHERE ga.task_id=g.id AND ga.user_id=?)) ORDER BY g.due_date LIMIT 8", [$today, $sevenDays, $u['id'], $u['id']]) as $r)
-        $upcoming[] = ['date' => $r['date'], 'time' => null, 'icon' => icon('approval', 15), 'text' => $r['title'], 'bottom' => 'Görev teslimi', 'link' => 'task.php?id=' . $r['id']];
+        $upcoming[] = ['date' => $r['date'], 'time' => null, 'icon' => icon('approval', 15), 'text' => $r['title'], 'bottom' => 'İş teslimi', 'link' => 'task.php?id=' . $r['id']];
     foreach (rows("SELECT e.id, e.title, DATE(e.start) date, TIME(e.start) time, e.online_link FROM events e WHERE e.type='meeting' AND DATE(e.start) BETWEEN ? AND ?
         AND (e.created_by=? OR EXISTS(SELECT 1 FROM event_participants ek WHERE ek.event_id=e.id AND ek.user_id=?)) ORDER BY e.start LIMIT 8", [$today, $sevenDays, $u['id'], $u['id']]) as $r)
         $upcoming[] = ['date' => $r['date'], 'time' => substr($r['time'], 0, 5), 'icon' => icon('people', 15), 'text' => $r['title'], 'bottom' => 'Toplantı' . ($r['online_link'] ? ' (online)' : ''), 'link' => 'meetings.php'];
     foreach (rows("SELECT id, title, DATE(start) date, TIME(start) time, type FROM events WHERE type!='meeting' AND DATE(start) BETWEEN ? AND ? ORDER BY start LIMIT 6", [$today, $sevenDays]) as $r)
         $upcoming[] = ['date' => $r['date'], 'time' => substr($r['time'], 0, 5), 'icon' => icon('video', 15), 'text' => $r['title'], 'bottom' => EVENT_TYPES[$r['type']], 'link' => 'calendar.php'];
-    foreach (rows("SELECT id, title, date, time, platform FROM contents WHERE date BETWEEN ? AND ? AND status!='published' ORDER BY date LIMIT 6", [$today, $sevenDays]) as $r)
-        $upcoming[] = ['date' => $r['date'], 'time' => $r['time'] ? substr($r['time'], 0, 5) : null, 'icon' => icon('calendar', 15), 'text' => $r['title'], 'bottom' => (PLATFORMS[$r['platform']] ?? '') . ' içeriği', 'link' => 'content-calendar.php'];
+    foreach (rows("SELECT id, title, publish_date date, publish_time time, platforms FROM tasks WHERE kind='client' AND is_archived=0 AND publish_date BETWEEN ? AND ? AND " . task_open_sql() . " ORDER BY publish_date LIMIT 6", [$today, $sevenDays]) as $r)
+        $upcoming[] = ['date' => $r['date'], 'time' => $r['time'] ? substr($r['time'], 0, 5) : null, 'icon' => icon('calendar', 15), 'text' => $r['title'], 'bottom' => trim(implode(', ', array_map(fn($pl) => PLATFORMS[$pl] ?? $pl, array_filter(explode(',', (string)$r['platforms'])))) . ' yayını'), 'link' => 'content-calendar.php'];
     usort($upcoming, fn($a, $b) => strcmp($a['date'] . ($a['time'] ?? '99'), $b['date'] . ($b['time'] ?? '99')));
     $upcoming = array_slice($upcoming, 0, 10);
     if ($upcoming): ?>
@@ -259,7 +259,7 @@ if ($announcements && $wOpen('announcements')): ?>
         <div class="row-flex between">
             <div class="row-flex">
                 <div class="stat-icon" style="margin:0;background:rgba(240,79,79,.14);color:var(--danger);width:38px;height:38px"><svg width="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/></svg></div>
-                <div><div class="bold"><?= $overdue ?> geciken görev</div><div class="cell-bottom">Son tarihi geçmiş, tamamlanmamış</div></div>
+                <div><div class="bold"><?= $overdue ?> geciken iş</div><div class="cell-bottom">Son tarihi geçmiş, tamamlanmamış</div></div>
             </div>
             <a href="tasks.php?filter=overdue" class="btn btn-sm">Görüntüle</a>
         </div>
@@ -341,8 +341,8 @@ async function widgetSave() {
     <?php else: ?>
     <div class="grid grid-auto">
         <?php foreach ($projects as $p):
-            $progress = (int)val("SELECT COUNT(*) FROM tasks WHERE project_id=?", [$p['id']]);
-            $is_done = (int)val("SELECT COUNT(*) FROM tasks WHERE project_id=? AND status='completed'", [$p['id']]);
+            $progress = (int)val("SELECT COUNT(*) FROM tasks WHERE project_id=? AND kind='client' AND status!='cancelled'", [$p['id']]);
+            $is_done = (int)val("SELECT COUNT(*) FROM tasks WHERE project_id=? AND kind='client' AND " . task_done_sql(), [$p['id']]);
             $rate = $progress ? round($is_done / $progress * 100) : 0; ?>
         <a href="project.php?id=<?= $p['id'] ?>" class="card card-tick" style="padding:16px">
             <div class="row-flex between mb-2">
@@ -351,7 +351,7 @@ async function widgetSave() {
             </div>
             <div class="card-title" style="font-size:15px"><?= e($p['name']) ?></div>
             <div class="progress mt-2"><div class="progress-full" data-rate="<?= $rate ?>" style="width:0"></div></div>
-            <div class="cell-bottom mt-1"><?= $is_done ?>/<?= $progress ?> görev tamamlandı</div>
+            <div class="cell-bottom mt-1"><?= $is_done ?>/<?= $progress ?> iş tamamlandı</div>
         </a>
         <?php endforeach; ?>
     </div>
@@ -402,7 +402,7 @@ function project_modal(?int $clientId = null) {
                     </div>
                     <div class="form-group"><label class="form-label">Sözleşme Tutarı (₺)</label><input name="contract_amount" class="input" placeholder="0,00"></div>
                 </div>
-                <div class="form-group"><label class="form-label">Proje Şablonu (opsiyonel)</label><select name="ptemplate_id" class="select"><option value="">— Boş proje</option><?php foreach (rows("SELECT id, name FROM project_templates ORDER BY name") as $templateRow): ?><option value="<?= $templateRow['id'] ?>"><?= e($templateRow['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse şablondaki görevler akışlarıyla birlikte kurulur.</div></div>
+                <div class="form-group"><label class="form-label">Proje Şablonu (opsiyonel)</label><select name="ptemplate_id" class="select"><option value="">— Boş proje</option><?php foreach (rows("SELECT id, name FROM project_templates ORDER BY name") as $templateRow): ?><option value="<?= $templateRow['id'] ?>"><?= e($templateRow['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse şablondaki işler akışlarıyla birlikte kurulur.</div></div>
                 <?php member_picker(); ?>
                 <div class="form-group"><label class="form-label">Açıklama</label><textarea name="description" class="text-area" placeholder="Proje kapsamı..."></textarea></div>
             </div>

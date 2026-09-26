@@ -5,8 +5,8 @@ $u = require_permission('report');
 
 // General metrics
 $totalTask = (int)val("SELECT COUNT(*) FROM tasks");
-$doneTask = (int)val("SELECT COUNT(*) FROM tasks WHERE status='completed'");
-$overdueTask = (int)val("SELECT COUNT(*) FROM tasks WHERE due_date<CURDATE() AND status!='completed'");
+$doneTask = (int)val("SELECT COUNT(*) FROM tasks WHERE " . task_done_sql());
+$overdueTask = (int)val("SELECT COUNT(*) FROM tasks WHERE due_date<CURDATE() AND is_archived=0 AND " . task_open_sql());
 $doneRate = $totalTask ? round($doneTask / $totalTask * 100) : 0;
 
 // Status distribution
@@ -17,7 +17,7 @@ $maxStatus = max(1, max($statusDistribution));
 // Per-person performance
 $people = rows("SELECT u.id, u.name, u.color,
     (SELECT COUNT(*) FROM tasks g WHERE g.assignee_id=u.id) total,
-    (SELECT COUNT(*) FROM tasks g WHERE g.assignee_id=u.id AND g.status='completed') is_done,
+    (SELECT COUNT(*) FROM tasks g WHERE g.assignee_id=u.id AND " . task_done_sql('g') . ") is_done,
     (SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z WHERE z.user_id=u.id) minutes
     FROM users u WHERE u.role IN ('admin','pm','team') AND u.is_active=1 ORDER BY total DESC");
 
@@ -35,14 +35,14 @@ page_start('Raporlar', 'reports');
 <div class="page-top">
     <div><div class="page-title">Raporlar & Analiz</div><div class="page-bottom">Performans ve iş yükü özeti</div></div>
     <div class="page-top-action">
-        <a href="export.php?type=tasks" class="btn btn-sm"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="15"><path d="M12 15V3m0 12l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg> Görevler CSV</a>
+        <a href="export.php?type=tasks" class="btn btn-sm"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="15"><path d="M12 15V3m0 12l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg> İşler CSV</a>
         <a href="export.php?type=time" class="btn btn-sm"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="15"><path d="M12 15V3m0 12l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg> Zaman CSV</a>
     </div>
 </div>
 
 <div class="stat-grid">
     <div class="stat-card"><div class="stat-value"><?= $doneRate ?>%</div><div class="stat-label">Genel Tamamlanma</div><div class="progress mt-2"><div class="progress-full" data-rate="<?= $doneRate ?>" style="width:0"></div></div></div>
-    <div class="stat-card"><div class="stat-value" data-counter="<?= $totalTask ?>">0</div><div class="stat-label">Toplam Görev</div></div>
+    <div class="stat-card"><div class="stat-value" data-counter="<?= $totalTask ?>">0</div><div class="stat-label">Toplam İş</div></div>
     <div class="stat-card"><div class="stat-value" data-counter="<?= $doneTask ?>">0</div><div class="stat-label">Tamamlanan</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--danger)" data-counter="<?= $overdueTask ?>">0</div><div class="stat-label">Geciken</div></div>
 </div>
@@ -50,7 +50,7 @@ page_start('Raporlar', 'reports');
 <div class="grid grid-2">
     <!-- Status distribution -->
     <div class="card">
-        <div class="card-title mb-3">Görev Durum Dağılımı</div>
+        <div class="card-title mb-3">İş Durum Dağılımı</div>
         <div class="vertical" style="gap:14px">
             <?php foreach ($statusDistribution as $k => $count): ?>
             <div>
@@ -78,7 +78,7 @@ page_start('Raporlar', 'reports');
 
 <div class="card mt-3">
     <div class="card-title mb-3">Ekip Performansı</div>
-    <div class="table-wrap"><table class="table"><thead><tr><th>Kişi</th><th>Toplam Görev</th><th>Tamamlanan</th><th>Tamamlanma</th><th>Kayıtlı Süre</th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Kişi</th><th>Toplam İş</th><th>Tamamlanan</th><th>Tamamlanma</th><th>Kayıtlı Süre</th></tr></thead><tbody>
         <?php foreach ($people as $k):
             $rate = $k['total'] ? round($k['is_done'] / $k['total'] * 100) : 0; ?>
         <tr>

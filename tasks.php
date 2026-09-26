@@ -10,6 +10,8 @@ $filter = $_GET['filter'] ?? '';
 $view = in_array($_GET['view'] ?? '', ['kanban', 'table']) ? $_GET['view'] : ($u['task_view'] ?: 'kanban');
 
 $where_sql = $filter === 'archive' ? "g.is_archived=1" : "g.is_archived=0";
+// Cancelled work only shows under its own filter
+$where_sql .= $filter === 'cancelled' ? " AND g.status='cancelled'" : " AND g.status!='cancelled'";
 $params = [];
 // Interns only see tasks assigned to them
 if (is_intern()) {
@@ -19,7 +21,7 @@ if (is_intern()) {
 if ($projectFilter) { $where_sql .= " AND g.project_id=?"; $params[] = $projectFilter; }
 if ($periodFilter) { $where_sql .= " AND g.period_id=?"; $params[] = $periodFilter; }
 if ($filter === 'mine') { $where_sql .= " AND (g.assignee_id=? OR EXISTS(SELECT 1 FROM task_assignees gax WHERE gax.task_id=g.id AND gax.user_id=?))"; $params[] = $u['id']; $params[] = $u['id']; }
-if ($filter === 'overdue') { $where_sql .= " AND g.due_date<CURDATE() AND g.status!='completed'"; }
+if ($filter === 'overdue') { $where_sql .= " AND g.due_date<CURDATE() AND " . task_open_sql('g'); }
 
 $tasks = rows("SELECT g.*, p.name project_name, d.color client_color, uu.name assignee_name, uu.color assignee_color, uu.avatar assignee_avatar,
     bg.status dependency_status, bg.title dependency_title,
@@ -45,11 +47,11 @@ $stepConditionSql = only_own_steps()
 $stepParam = only_own_steps() ? [$u['id']] : [$u['id'], $u['id'], $u['id']];
 $my_steps = rows("SELECT ga.id step_id, ga.name step_name, ga.status step_status, g.id task_id, g.title, p.name project_name
     FROM task_steps ga JOIN tasks g ON g.id=ga.task_id JOIN projects p ON p.id=g.project_id
-    WHERE ga.status IN ('active','pending') AND g.is_archived=0 AND g.status!='completed' AND $stepConditionSql
+    WHERE ga.status IN ('active','pending') AND g.is_archived=0 AND " . task_open_sql('g') . " AND $stepConditionSql
     ORDER BY ga.status='active' DESC, g.due_date IS NULL, g.due_date LIMIT 12", $stepParam);
 $my_steps = array_filter($my_steps, fn($a2) => $a2['step_status'] === 'active' || count($my_steps) < 8);
 
-page_start('Görevler', 'tasks');
+page_start('İşler', 'tasks');
 ?>
 <?php if ($my_steps):
     $activeStepCount = count(array_filter($my_steps, fn($a3) => $a3['step_status'] === 'active')); ?>
@@ -70,8 +72,8 @@ page_start('Görevler', 'tasks');
 <?php endif; ?>
 <div class="page-top">
     <div>
-        <div class="page-title">Görevler<?= $activeProject ? ' · ' . e($activeProject['name']) : '' ?></div>
-        <div class="page-bottom"><?= count($tasks) ?> görev — <?= $view === 'table' ? 'hücrelere tıklayıp doğrudan düzenleyin' : 'panoda sürükleyerek durum değiştirin' ?></div>
+        <div class="page-title">İşler<?= $activeProject ? ' · ' . e($activeProject['name']) : '' ?></div>
+        <div class="page-bottom"><?= count($tasks) ?> iş — <?= $view === 'table' ? 'hücrelere tıklayıp doğrudan düzenleyin' : 'panoda sürükleyerek durum değiştirin' ?></div>
     </div>
     <div class="page-top-action">
         <div class="view-switch">
@@ -83,7 +85,7 @@ page_start('Görevler', 'tasks');
             </button>
         </div>
         <?php if (!is_intern()): ?>
-        <button class="btn btn-brand" data-modal="modalTask"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni Görev</button>
+        <button class="btn btn-brand" data-modal="modalTask"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Yeni İş</button>
         <?php endif; ?>
     </div>
 </div>
@@ -93,16 +95,17 @@ page_start('Görevler', 'tasks');
         <a href="?<?= http_build_query(array_filter(['project' => $projectFilter, 'view' => $view])) ?>" class="pill <?= !$filter ? 'active' : '' ?>">Tümü</a>
         <a href="?<?= http_build_query(array_filter(['filter' => 'mine', 'project' => $projectFilter, 'view' => $view])) ?>" class="pill <?= $filter === 'mine' ? 'active' : '' ?>">Bana Atanan</a>
         <a href="?<?= http_build_query(array_filter(['filter' => 'overdue', 'project' => $projectFilter, 'view' => $view])) ?>" class="pill <?= $filter === 'overdue' ? 'active' : '' ?>">Geciken</a>
+        <a href="?<?= http_build_query(array_filter(['filter' => 'cancelled', 'project' => $projectFilter, 'view' => $view])) ?>" class="pill <?= $filter === 'cancelled' ? 'active' : '' ?>">İptal</a>
         <a href="?<?= http_build_query(array_filter(['filter' => 'archive', 'project' => $projectFilter, 'view' => $view])) ?>" class="pill <?= $filter === 'archive' ? 'active' : '' ?>">Arşiv</a>
     </div>
     <?php if ($view === 'table'): ?>
-    <div class="search-box"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="input" placeholder="Görev ara..." data-search="#taskTable tbody tr"></div>
+    <div class="search-box"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg><input class="input" placeholder="İş ara..." data-search="#taskTable tbody tr"></div>
     <?php endif; ?>
     <?php if ($projectFilter): ?><a href="tasks.php?view=<?= $view ?>" class="btn btn-sm btn-ghost">Filtreyi Temizle ✕</a><?php endif; ?>
 </div>
 
 <?php if (!$tasks): ?>
-<div class="empty-state"><div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div><div class="empty-title">Görev bulunamadı</div><div class="empty-text">Bu filtreye uygun görev yok. Yeni bir görev oluşturabilirsiniz.</div></div>
+<div class="empty-state"><div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div><div class="empty-title">İş bulunamadı</div><div class="empty-text">Bu filtreye uygun iş yok. Yeni bir iş oluşturabilirsiniz.</div></div>
 
 <?php elseif ($view === 'kanban'): ?>
 <?php task_kanban($tasks, $projectFilter); ?>
@@ -111,23 +114,25 @@ page_start('Görevler', 'tasks');
 <div class="table-wrap">
 <table class="table" id="taskTable">
     <thead><tr>
-        <th class="sortable">Görev <span class="order-mark">↕</span></th>
+        <th class="sortable">İş <span class="order-mark">↕</span></th>
         <th class="sortable">Proje <span class="order-mark">↕</span></th>
         <th>Atanan</th>
         <th>Durum</th>
         <th>Öncelik</th>
         <th class="sortable">Başlangıç <span class="order-mark">↕</span></th>
         <th class="sortable">Son Tarih <span class="order-mark">↕</span></th>
+        <th class="sortable">Yayın <span class="order-mark">↕</span></th>
         <th class="sortable">Tahmin/Gerçek <span class="order-mark">↕</span></th>
         <th class="sortable">Akış <span class="order-mark">↕</span></th>
     </tr></thead>
     <tbody>
     <?php foreach ($tasks as $gr):
-        $locked = !empty($gr['dependency_status']) && $gr['dependency_status'] !== 'completed' && empty($gr['lock_bypassed']);
+        $locked = !empty($gr['dependency_status']) && task_is_open($gr['dependency_status']) && empty($gr['lock_bypassed']);
         $workflowRate = $gr['step_total'] ? round($gr['step_is_done'] / $gr['step_total'] * 100) : null; ?>
     <tr data-search="<?= e($gr['title'] . ' ' . $gr['project_name'] . ' ' . ($gr['tags'] ?? '')) ?>">
         <td style="min-width:220px">
             <a href="task.php?id=<?= $gr['id'] ?>" class="cell-main" style="display:block"><?= $locked ? icon('lock', 12) . ' ' : '' ?><?= $gr['repeat'] !== 'none' ? icon('repeat', 12) . ' ' : '' ?><?= e($gr['title']) ?></a>
+            <?php if ($gr['kind'] === 'internal'): ?><span class="badge badge-type" style="padding:1px 7px">İç iş</span><?php endif; ?>
             <div class="row-flex wrap mt-1" style="gap:4px"><?= tag_chips($gr['tags']) ?><?php if ($gr['check_total']): ?><span class="kanban-label"><?= icon('approval', 12) ?> <?= $gr['check_is_done'] ?>/<?= $gr['check_total'] ?></span><?php endif; ?></div>
         </td>
         <td class="small" data-sort="<?= e($gr['project_name']) ?>"><span class="label-dot" style="width:8px;height:8px;background:<?= e($gr['client_color']) ?>;margin-right:5px"></span><?= e($gr['project_name']) ?></td>
@@ -151,7 +156,10 @@ page_start('Görevler', 'tasks');
             <input type="date" class="input" value="<?= e($gr['start_date']) ?>" onchange="cellSave(this, <?= $gr['id'] ?>, 'start_date')">
         </td>
         <td class="cell-edit" data-sort="<?= e($gr['due_date'] ?? '9999') ?>">
-            <input type="date" class="input" value="<?= e($gr['due_date']) ?>" style="<?= $gr['due_date'] && $gr['due_date'] < date('Y-m-d') && $gr['status'] !== 'completed' ? 'color:var(--danger)' : '' ?>" onchange="cellSave(this, <?= $gr['id'] ?>, 'due_date')">
+            <input type="date" class="input" value="<?= e($gr['due_date']) ?>" style="<?= $gr['due_date'] && $gr['due_date'] < date('Y-m-d') && task_is_open($gr['status']) ? 'color:var(--danger)' : '' ?>" onchange="cellSave(this, <?= $gr['id'] ?>, 'due_date')">
+        </td>
+        <td class="cell-edit" data-sort="<?= e($gr['publish_date'] ?? '9999') ?>">
+            <?php if ($gr['kind'] === 'client'): ?><input type="date" class="input" value="<?= e($gr['publish_date']) ?>" onchange="cellSave(this, <?= $gr['id'] ?>, 'publish_date')"><?php else: ?><span class="text-muted small">—</span><?php endif; ?>
         </td>
         <td class="small" data-sort="<?= $gr['estimated_minutes'] ?>">
             <span class="cell-edit"><input class="input" style="width:56px" value="<?= $gr['estimated_minutes'] ? round($gr['estimated_minutes'] / 60, 1) : '' ?>" placeholder="sa" onchange="cellSave(this, <?= $gr['id'] ?>, 'estimated_minutes')"></span>
@@ -167,7 +175,7 @@ page_start('Görevler', 'tasks');
     </tbody>
 </table>
 </div>
-<div class="form-hint mt-2">💡 Hücrelere tıklayarak doğrudan düzenleyin; sütun başlıklarına tıklayarak sıralayın. Kilitli görevlerde durum değişikliği kurallara takılırsa eski değere döner.</div>
+<div class="form-hint mt-2">💡 Hücrelere tıklayarak doğrudan düzenleyin; sütun başlıklarına tıklayarak sıralayın. Kilitli işlerde durum değişikliği kurallara takılırsa eski değere döner.</div>
 <?php endif; ?>
 
 <?php task_modal($projectFilter, $team, $templates); ?>

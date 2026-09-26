@@ -16,10 +16,10 @@ $monthInitial = sprintf('%04d-%02d-01', $year, $month);
 $monthLast = date('Y-m-t', strtotime($monthInitial));
 $siteName = setting('site_name', 'SADA One');
 
-$completed = rows("SELECT g.*, u.name assignee_name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id WHERE g.project_id=? AND g.status='completed' AND g.completion BETWEEN ? AND ? ORDER BY g.completion", [$projectId, $monthInitial . ' 00:00:00', $monthLast . ' 23:59:59']);
-$ongoingOne = rows("SELECT g.* FROM tasks g WHERE g.project_id=? AND g.is_archived=0 AND g.status!='completed' ORDER BY g.due_date IS NULL, g.due_date", [$projectId]);
+$completed = rows("SELECT g.*, u.name assignee_name FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id WHERE g.project_id=? AND g.kind='client' AND " . task_done_sql('g') . " AND g.completion BETWEEN ? AND ? ORDER BY g.completion", [$projectId, $monthInitial . ' 00:00:00', $monthLast . ' 23:59:59']);
+$ongoing = rows("SELECT g.* FROM tasks g WHERE g.project_id=? AND g.kind='client' AND g.is_archived=0 AND " . task_open_sql('g') . " ORDER BY g.due_date IS NULL, g.due_date", [$projectId]);
 $approvals = rows("SELECT * FROM approvals WHERE project_id=? AND created BETWEEN ? AND ? ORDER BY id", [$projectId, $monthInitial . ' 00:00:00', $monthLast . ' 23:59:59']);
-$contents = rows("SELECT * FROM contents WHERE project_id=? AND date BETWEEN ? AND ? ORDER BY date", [$projectId, $monthInitial, $monthLast]);
+$publishPlan = rows("SELECT title, platforms, publish_date, status FROM tasks WHERE project_id=? AND kind='client' AND status!='cancelled' AND publish_date BETWEEN ? AND ? ORDER BY publish_date", [$projectId, $monthInitial, $monthLast]);
 $totalMin = (int)val("SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z JOIN tasks g ON g.id=z.task_id WHERE g.project_id=? AND z.date BETWEEN ? AND ?", [$projectId, $monthInitial, $monthLast]);
 $satisfaction = row("SELECT AVG(rating) average, COUNT(*) qty FROM ratings WHERE project_id=?", [$projectId]);
 ?>
@@ -74,8 +74,8 @@ body { background: #fff !important; color: #1a2233; }
     </div>
 
     <div class="summary-box">
-        <div><div class="summary-value"><?= count($completed) ?></div><div class="summary-label">Tamamlanan Görev</div></div>
-        <div><div class="summary-value"><?= count($contents) ?></div><div class="summary-label">Planlanan İçerik</div></div>
+        <div><div class="summary-value"><?= count($completed) ?></div><div class="summary-label">Tamamlanan İş</div></div>
+        <div><div class="summary-value"><?= count($publishPlan) ?></div><div class="summary-label">Planlanan Yayın</div></div>
         <div><div class="summary-value"><?= count(array_filter($approvals, fn($o) => $o['status'] === 'approved')) ?>/<?= count($approvals) ?></div><div class="summary-label">Onaylanan İş</div></div>
         <div><div class="summary-value"><?= $totalMin ? round($totalMin / 60) : 0 ?> sa</div><div class="summary-label">Harcanan Emek</div></div>
     </div>
@@ -96,13 +96,13 @@ body { background: #fff !important; color: #1a2233; }
     </tbody></table>
     <?php endif; ?>
 
-    <?php if ($contents): ?>
-    <h2>📅 İçerik Planı</h2>
-    <table><thead><tr><th>İçerik</th><th>Platform</th><th>Tarih</th><th>Durum</th></tr></thead><tbody>
-        <?php foreach ($contents as $contentItem):
-            $colors = ['published' => '#dcf5e4;color:#1d7a41', 'approved' => '#dcf5e4;color:#1d7a41', 'draft' => '#eef0f5;color:#5a6780'];
-            $style = $colors[$contentItem['status']] ?? '#fdf0d9;color:#9a6b10'; ?>
-        <tr><td><?= e($contentItem['title']) ?></td><td><?= implode(', ', array_map(fn($pl) => PLATFORMS[trim($pl)] ?? trim($pl), explode(',', $contentItem['platform']))) ?></td><td><?= format_date($contentItem['date']) ?></td><td><span class="status-chip" style="background:<?= $style ?>"><?= CONTENT_STATUSES[$contentItem['status']] ?></span></td></tr>
+    <?php if ($publishPlan): ?>
+    <h2>📅 Yayın Planı</h2>
+    <table><thead><tr><th>İş</th><th>Platform</th><th>Tarih</th><th>Durum</th></tr></thead><tbody>
+        <?php foreach ($publishPlan as $item):
+            $colors = ['published' => '#dcf5e4;color:#1d7a41', 'completed' => '#dcf5e4;color:#1d7a41', 'todo' => '#eef0f5;color:#5a6780'];
+            $style = $colors[$item['status']] ?? '#fdf0d9;color:#9a6b10'; ?>
+        <tr><td><?= e($item['title']) ?></td><td><?= implode(', ', array_map(fn($pl) => PLATFORMS[trim($pl)] ?? trim($pl), array_filter(explode(',', (string)$item['platforms'])))) ?></td><td><?= format_date($item['publish_date']) ?></td><td><span class="status-chip" style="background:<?= $style ?>"><?= TASK_STATUSES[$item['status']] ?></span></td></tr>
         <?php endforeach; ?>
     </tbody></table>
     <?php endif; ?>
@@ -116,10 +116,10 @@ body { background: #fff !important; color: #1a2233; }
     </tbody></table>
     <?php endif; ?>
 
-    <?php if ($ongoingOne): ?>
+    <?php if ($ongoing): ?>
     <h2>🔄 Devam Eden İşler</h2>
     <table><thead><tr><th>İş</th><th>Durum</th><th>Hedef Tarih</th></tr></thead><tbody>
-        <?php foreach ($ongoingOne as $d): ?>
+        <?php foreach ($ongoing as $d): ?>
         <tr><td><?= e($d['title']) ?></td><td><?= TASK_STATUSES[$d['status']] ?></td><td><?= format_date($d['due_date']) ?></td></tr>
         <?php endforeach; ?>
     </tbody></table>

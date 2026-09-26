@@ -15,12 +15,15 @@ $tasks = rows("SELECT g.*, u.name assignee_name, u.color assignee_color, u.avata
     (SELECT COUNT(*) FROM task_assignees gaa WHERE gaa.task_id=g.id) assignee_count,
     (SELECT GROUP_CONCAT(u3.name SEPARATOR ', ') FROM task_assignees ga3 JOIN users u3 ON u3.id=ga3.user_id WHERE ga3.task_id=g.id) assignee_names
     FROM tasks g LEFT JOIN users u ON u.id=g.assignee_id LEFT JOIN tasks bg ON bg.id=g.depends_on_id
-    WHERE g.project_id=? AND g.is_archived=0 ORDER BY g.sort_order, g.due_date IS NULL, g.due_date", [$id]);
-$doneTask = count(array_filter($tasks, fn($g) => $g['status'] === 'completed'));
-$rate = count($tasks) ? round($doneTask / count($tasks) * 100) : 0;
+    WHERE g.project_id=? AND g.is_archived=0" . (is_staff() ? '' : " AND g.kind='client'") . " ORDER BY g.sort_order, g.due_date IS NULL, g.due_date", [$id]);
+// Progress counts delivered work; cancelled work is left out of the total
+$activeTasks = array_filter($tasks, fn($g) => $g['status'] !== 'cancelled');
+$doneTask = count(array_filter($activeTasks, fn($g) => in_array($g['status'], ['completed', 'published'], true)));
+$rate = count($activeTasks) ? round($doneTask / count($activeTasks) * 100) : 0;
 
-$contents = rows("SELECT * FROM contents WHERE project_id=? ORDER BY date DESC LIMIT 30", [$id]);
-$approvals = rows("SELECT o.*, u.name sender_name FROM approvals o LEFT JOIN users u ON u.id=o.sender_id WHERE o.project_id=? ORDER BY o.id DESC", [$id]);
+$publishPlan = rows("SELECT id, title, platforms, publish_date, publish_time, status FROM tasks WHERE project_id=? AND kind='client' AND publish_date IS NOT NULL AND status!='cancelled' AND is_archived=0 ORDER BY publish_date DESC LIMIT 30", [$id]);
+$approvals = rows("SELECT o.*, u.name sender_name, g.title task_title FROM approvals o LEFT JOIN users u ON u.id=o.sender_id LEFT JOIN tasks g ON g.id=o.task_id WHERE o.project_id=? ORDER BY o.id DESC", [$id]);
+$sendableTasks = is_staff() ? rows("SELECT id, title FROM tasks WHERE project_id=? AND kind='client' AND is_archived=0 AND " . task_open_sql() . " ORDER BY title", [$id]) : [];
 $archives = rows("SELECT a.*, u.name uploader_name FROM archive a LEFT JOIN users u ON u.id=a.uploader_id WHERE a.project_id=? ORDER BY a.id DESC", [$id]);
 $activities = rows("SELECT a.*, u.name FROM activities a JOIN users u ON u.id=a.user_id WHERE (a.ref_type='project' AND a.ref_id=?) ORDER BY a.id DESC LIMIT 30", [$id]);
 $periods = $project['type'] === 'monthly' ? rows("SELECT d.*, (SELECT COUNT(*) FROM tasks g WHERE g.period_id=d.id) task_count FROM periods d WHERE d.project_id=? ORDER BY d.year DESC, d.month DESC", [$id]) : [];
@@ -56,7 +59,7 @@ page_start($project['name'], 'projects');
     <?php if (is_staff()): ?>
     <div class="page-top-action">
         <a href="report.php?project=<?= $id ?>" target="_blank" class="btn"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 17h6M9 13h6M9 9h1m4 12H7a2 2 0 01-2-2V5a2 2 0 012-2h5.6a1 1 0 01.7.3l5.4 5.4a1 1 0 01.3.7V19a2 2 0 01-2 2z"/></svg> Rapor</a>
-        <button class="btn btn-brand" data-modal="modalTask"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Görev Ekle</button>
+        <button class="btn btn-brand" data-modal="modalTask"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> İş Ekle</button>
         <?php if (permission('client_manage')): ?><button class="btn" onclick="modalOpen('modalProjectEdit')"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button><?php endif; ?>
     </div>
     <?php endif; ?>
@@ -65,10 +68,10 @@ page_start($project['name'], 'projects');
 <div class="tab-container">
     <div class="tabs">
         <button class="tab active" data-tab="summary">Özet</button>
-        <button class="tab" data-tab="tasks">Görevler <span class="badge" style="padding:1px 7px"><?= count($tasks) ?></span></button>
+        <button class="tab" data-tab="tasks">İşler <span class="badge" style="padding:1px 7px"><?= count($activeTasks) ?></span></button>
         <?php if ($project['type'] === 'monthly'): ?><button class="tab" data-tab="periods">Dönemler</button><?php endif; ?>
         <button class="tab" data-tab="approvals">Onaylar <?php if ($b = count(array_filter($approvals, fn($o) => $o['status'] === 'pending'))): ?><span class="badge r-pending" style="padding:1px 7px"><?= $b ?></span><?php endif; ?></button>
-        <button class="tab" data-tab="content">İçerikler</button>
+        <button class="tab" data-tab="content">Yayın Planı</button>
         <?php if (is_staff()): ?><button class="tab" data-tab="station">İstasyon <?php if ($checkList && ($missingChecks = count(array_filter($checkList, fn($k) => !$k['is_done'])))): ?><span class="badge r-pending" style="padding:1px 7px"><?= $missingChecks ?></span><?php endif; ?></button><?php endif; ?>
         <button class="tab" data-tab="discussion">Tartışma <?php if ($commentCount = (int)val("SELECT COUNT(*) FROM comments WHERE ref_type='project' AND ref_id=?", [$id])): ?><span class="badge" style="padding:1px 7px"><?= $commentCount ?></span><?php endif; ?></button>
         <button class="tab" data-tab="archive">Arşiv</button>
@@ -79,7 +82,7 @@ page_start($project['name'], 'projects');
     <div class="tab-content active" id="tab-summary">
         <div class="stat-grid">
             <div class="stat-card"><div class="stat-value"><?= $rate ?>%</div><div class="stat-label">Tamamlanma</div><div class="progress mt-2"><div class="progress-full" data-rate="<?= $rate ?>" style="width:0"></div></div></div>
-            <div class="stat-card"><div class="stat-value" data-counter="<?= count($tasks) ?>">0</div><div class="stat-label">Toplam Görev</div></div>
+            <div class="stat-card"><div class="stat-value" data-counter="<?= count($activeTasks) ?>">0</div><div class="stat-label">Toplam İş</div></div>
             <div class="stat-card"><div class="stat-value" data-counter="<?= count(array_filter($tasks, fn($g) => in_array($g['status'], ['in_progress','in_review','awaiting_approval']))) ?>">0</div><div class="stat-label">Devam Eden</div></div>
             <?php if (is_pm() && $project['contract_amount'] > 0): ?>
             <div class="stat-card"><div class="stat-value" style="font-size:22px"><?= money($project['contract_amount']) ?></div><div class="stat-label">Sözleşme Tutarı</div></div>
@@ -100,11 +103,11 @@ page_start($project['name'], 'projects');
                 <?php if ($project['description']): ?><div class="mt-3"><div class="cell-bottom mb-2">Açıklama</div><div class="small text-2"><?= nl2br(e($project['description'])) ?></div></div><?php endif; ?>
             </div>
             <div class="card">
-                <div class="card-title mb-2">Yaklaşan Görevler</div>
-                <?php $upcoming = array_filter($tasks, fn($g) => $g['status'] !== 'completed' && $g['due_date']);
+                <div class="card-title mb-2">Yaklaşan İşler</div>
+                <?php $upcoming = array_filter($tasks, fn($g) => task_is_open($g['status']) && $g['due_date']);
                 usort($upcoming, fn($a, $b) => strcmp($a['due_date'], $b['due_date']));
                 $upcoming = array_slice($upcoming, 0, 5);
-                if (!$upcoming): ?><div class="text-muted small mt-2">Tarihi belirlenmiş görev yok.</div>
+                if (!$upcoming): ?><div class="text-muted small mt-2">Tarihi belirlenmiş iş yok.</div>
                 <?php else: foreach ($upcoming as $gr): $overdue = $gr['due_date'] < date('Y-m-d'); ?>
                 <a href="task.php?id=<?= $gr['id'] ?>" class="row-flex between" style="padding:10px 0;border-bottom:1px solid var(--border)">
                     <span class="small bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($gr['title']) ?></span>
@@ -116,7 +119,7 @@ page_start($project['name'], 'projects');
     </div>
 
     <?php if (is_customer()):
-        $completed_items = array_filter($tasks, fn($g) => $g['status'] === 'completed');
+        $completed_items = array_filter($tasks, fn($g) => in_array($g['status'], ['completed', 'published'], true));
         $taskRatings = array_column(rows("SELECT ref_id, rating FROM ratings WHERE ref_type='task' AND user_id=? AND project_id=?", [$u['id'], $id]), 'rating', 'ref_id');
         if ($completed_items): ?>
     <!-- Client: rate completed work -->
@@ -141,7 +144,7 @@ page_start($project['name'], 'projects');
     <!-- TASKS -->
     <div class="tab-content" id="tab-tasks">
         <div class="row-flex between mb-2">
-            <div class="text-muted small">Görevleri sürükleyerek durumlarını değiştirebilirsiniz</div>
+            <div class="text-muted small">İşleri sürükleyerek durumlarını değiştirebilirsiniz</div>
             <a href="tasks.php?project=<?= $id ?>" class="btn btn-sm">Tam Kanban Görünümü →</a>
         </div>
         <?php task_kanban($tasks, $id); ?>
@@ -155,13 +158,13 @@ page_start($project['name'], 'projects');
             <?php if (is_staff()): ?><button class="btn btn-brand btn-sm" data-modal="modalPeriod"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Dönem Aç</button><?php endif; ?>
         </div>
         <?php if (!$periods): ?>
-        <div class="empty-state"><div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div><div class="empty-title">Henüz dönem açılmamış</div><div class="empty-text">Aylık düzenli hizmet için ilk dönemi açın; şablondan görevler otomatik oluşturulabilir.</div></div>
+        <div class="empty-state"><div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div><div class="empty-title">Henüz dönem açılmamış</div><div class="empty-text">Aylık düzenli hizmet için ilk dönemi açın; şablondan işler otomatik oluşturulabilir.</div></div>
         <?php else: ?>
         <div class="grid grid-3">
             <?php foreach ($periods as $d): ?>
             <a href="tasks.php?project=<?= $id ?>&period=<?= $d['id'] ?>" class="card card-tick">
                 <div class="row-flex between mb-2"><div class="card-title" style="font-size:15px"><?= period_name($d) ?></div><?= badge($d['status'], PERIOD_STATUSES) ?></div>
-                <div class="cell-bottom"><?= $d['task_count'] ?> görev</div>
+                <div class="cell-bottom"><?= $d['task_count'] ?> iş</div>
             </a>
             <?php endforeach; ?>
         </div>
@@ -182,6 +185,7 @@ page_start($project['name'], 'projects');
             <div class="row-flex between">
                 <div style="min-width:0">
                     <div class="row-flex" style="gap:9px"><span class="bold"><?= e($o['title']) ?></span><?= badge($o['status'], APPROVAL_STATUSES) ?></div>
+                    <?php if ($o['task_title'] && is_staff()): ?><div class="cell-bottom mt-1">İş: <a href="task.php?id=<?= $o['task_id'] ?>"><?= e($o['task_title']) ?> →</a></div><?php endif; ?>
                     <?php if ($o['description']): ?><div class="cell-bottom mt-1"><?= e($o['description']) ?></div><?php endif; ?>
                     <div class="cell-bottom mt-1"><?= e($o['sender_name']) ?> · <?= time_ago($o['created']) ?><?php if ($o['archive_id']): $ar = row("SELECT * FROM archive WHERE id=?", [$o['archive_id']]); if ($ar): ?> · <a href="uploads/<?= e($ar['file_path']) ?>" target="_blank" style="color:var(--brand)"><?= icon('paperclip', 12) ?> <?= e($ar['name']) ?></a><?php endif; endif; ?></div>
                     <?php if ($o['reply_note']): ?><div class="mt-2" style="padding:10px 14px;background:var(--surface-2);border-radius:10px;font-size:13px"><b>Müşteri notu:</b> <?= nl2br(e($o['reply_note'])) ?></div><?php endif; ?>
@@ -197,18 +201,18 @@ page_start($project['name'], 'projects');
         <?php endforeach; endif; ?>
     </div>
 
-    <!-- CONTENTS -->
+    <!-- PUBLISH PLAN -->
     <div class="tab-content" id="tab-content">
         <div class="row-flex between mb-3">
-            <div class="card-title">İçerikler</div>
+            <div class="card-title">Yayın Planı</div>
             <a href="content-calendar.php?project=<?= $id ?>" class="btn btn-sm">Takvim Görünümü →</a>
         </div>
-        <?php if (!$contents): ?>
-        <div class="text-muted small orta card" style="padding:30px">Bu proje için içerik planlanmamış.</div>
+        <?php if (!$publishPlan): ?>
+        <div class="text-muted small orta card" style="padding:30px">Bu projede yayın tarihi olan iş yok.</div>
         <?php else: ?>
-        <div class="table-wrap"><table class="table"><thead><tr><th>İçerik</th><th>Platform</th><th>Tarih</th><th>Durum</th></tr></thead><tbody>
-            <?php foreach ($contents as $contentItem): ?>
-            <tr><td class="cell-main"><?= e($contentItem['title']) ?></td><td><?= platform_badges($contentItem['platform']) ?></td><td><?= format_date($contentItem['date']) ?></td><td><?= badge($contentItem['status'], CONTENT_STATUSES) ?></td></tr>
+        <div class="table-wrap"><table class="table"><thead><tr><th>İş</th><th>Platform</th><th>Yayın</th><th>Durum</th></tr></thead><tbody>
+            <?php foreach ($publishPlan as $item): ?>
+            <tr><td class="cell-main"><?php if (is_staff()): ?><a href="task.php?id=<?= $item['id'] ?>"><?= e($item['title']) ?></a><?php else: ?><?= e($item['title']) ?><?php endif; ?></td><td><?= platform_badges($item['platforms']) ?></td><td><?= format_date($item['publish_date']) ?><?= $item['publish_time'] ? ' ' . substr($item['publish_time'], 0, 5) : '' ?></td><td><?= badge($item['status'], TASK_STATUSES) ?></td></tr>
             <?php endforeach; ?>
         </tbody></table></div>
         <?php endif; ?>
@@ -381,9 +385,9 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
 <div class="modal-overlay" id="modalApproval">
     <div class="modal"><div class="modal-top"><div class="modal-title">Müşteri Onayına Gönder</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="approval_send" data-refresh="yes">
-        <input type="hidden" name="project_id" value="<?= $id ?>">
         <div class="modal-body">
-            <div class="form-group"><label class="form-label">Başlık <span class="required">*</span></label><input name="title" class="input" required placeholder="Örn. Ekim ayı 1. gönderi tasarımı"></div>
+            <div class="form-group"><label class="form-label">İş <span class="required">*</span></label><select name="task_id" class="select" required><option value="">Seçin...</option><?php foreach ($sendableTasks as $st): ?><option value="<?= $st['id'] ?>"><?= e($st['title']) ?></option><?php endforeach; ?></select><div class="form-hint">Gönderince iş "Müşteride" durumuna geçer. İşin kendi sayfasından da gönderebilirsiniz.</div></div>
+            <div class="form-group"><label class="form-label">Başlık</label><input name="title" class="input" placeholder="Boş bırakılırsa işin başlığı kullanılır"></div>
             <div class="form-group"><label class="form-label">Açıklama / Not</label><textarea name="description" class="text-area" placeholder="Müşteriye iletmek istedikleriniz..."></textarea></div>
             <div class="form-group"><label class="form-label">Dosya Eki</label><input type="file" name="file" class="input"><div class="form-hint">Görsel, PDF, video vb. (max 50MB)</div></div>
             <div class="form-group"><label class="form-label">veya Drive Linki</label><input name="drive_link" class="input" placeholder="https://drive.google.com/..."></div>
@@ -413,7 +417,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
                 <div class="form-group"><label class="form-label">Ay</label><select name="month" class="select"><?php foreach (MONTHS as $k => $v): ?><option value="<?= $k ?>" <?= $k == date('n') ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-group"><label class="form-label">Yıl</label><select name="year" class="select"><?php for ($y = date('Y') - 1; $y <= date('Y') + 1; $y++): ?><option value="<?= $y ?>" <?= $y == date('Y') ? 'selected' : '' ?>><?= $y ?></option><?php endfor; ?></select></div>
             </div>
-            <div class="form-group"><label class="form-label">Akış Şablonundan Görev Oluştur</label><select name="template_id" class="select"><option value="">Boş dönem</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen şablonun adımları görev akışı olarak eklenir.</div></div>
+            <div class="form-group"><label class="form-label">Akış Şablonundan İş Oluştur</label><select name="template_id" class="select"><option value="">Boş dönem</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen şablonun adımları iş akışı olarak eklenir.</div></div>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Dönemi Aç</button></div>
     </form></div>
@@ -447,7 +451,7 @@ $pms = rows("SELECT id, name FROM users WHERE role IN ('admin','pm') AND is_acti
             <div class="form-group"><label class="form-label">Açıklama</label><textarea name="description" class="text-area"><?= e($project['description']) ?></textarea></div>
         </div>
         <div class="modal-alt">
-            <?php if (is_admin()): ?><button type="button" class="btn btn-danger" data-action="project_delete" data-id="<?= $id ?>" data-confirm="Proje ve tüm görevleri silinecek. Emin misiniz?" style="margin-right:auto">Sil</button><?php endif; ?>
+            <?php if (is_admin()): ?><button type="button" class="btn btn-danger" data-action="project_delete" data-id="<?= $id ?>" data-confirm="Proje ve tüm işleri silinecek. Emin misiniz?" style="margin-right:auto">Sil</button><?php endif; ?>
             <button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button>
         </div>
     </form></div>

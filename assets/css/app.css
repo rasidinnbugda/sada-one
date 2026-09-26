@@ -876,7 +876,7 @@ table.table { width: 100%; border-collapse: collapse; }
 /* ============================================================
    CALENDAR
    ============================================================ */
-.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
 .calendar-day-title { text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); padding: 8px 0; text-transform: uppercase; letter-spacing: .04em; }
 .calendar-cell {
     min-height: 112px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px;

@@ -183,13 +183,14 @@ CREATE TABLE IF NOT EXISTS template_steps (
 CREATE TABLE IF NOT EXISTS tasks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT NOT NULL,
+    kind ENUM('client','internal') NOT NULL DEFAULT 'client',
     period_id INT DEFAULT NULL,
     title VARCHAR(200) NOT NULL,
     description TEXT,
     assignee_id INT DEFAULT NULL,
     created_by INT NOT NULL,
     priority ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
-    status ENUM('todo','in_progress','in_review','awaiting_approval','completed') NOT NULL DEFAULT 'todo',
+    status ENUM('todo','in_progress','in_review','awaiting_approval','completed','published','cancelled') NOT NULL DEFAULT 'todo',
     due_date DATE DEFAULT NULL,
     completion DATETIME DEFAULT NULL,
     sort_order INT NOT NULL DEFAULT 0,
@@ -202,8 +203,11 @@ CREATE TABLE IF NOT EXISTS tasks (
     start_date DATE DEFAULT NULL,
     is_archived TINYINT(1) NOT NULL DEFAULT 0,
     content_id INT DEFAULT NULL,
+    publish_date DATE DEFAULT NULL,
+    publish_time TIME DEFAULT NULL,
+    platforms VARCHAR(120) DEFAULT NULL,
     created DATETIME NOT NULL,
-    INDEX(project_id), INDEX(assignee_id), INDEX(period_id)
+    INDEX(project_id), INDEX(assignee_id), INDEX(period_id), INDEX publish_date (publish_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
 CREATE TABLE IF NOT EXISTS project_members (

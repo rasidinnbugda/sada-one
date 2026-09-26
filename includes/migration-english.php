@@ -106,28 +106,8 @@ function english_values_needed(PDO $pdo): bool {
  * backs up the code). Returns the file name, or throws — no conversion without a backup.
  */
 function english_values_backup(PDO $pdo): string {
-    $dir = dirname(__DIR__) . '/backups';
-    if (!is_dir($dir)) mkdir($dir, 0755, true);
-    if (!file_exists("$dir/.htaccess")) file_put_contents("$dir/.htaccess", "Require all denied\n");
-    $name = 'db-before-v7-english-' . date('Ymd-His') . '.sql';
-    $fh = fopen("$dir/$name", 'wb');
-    if (!$fh) throw new RuntimeException('Veritabanı yedeği yazılamadı: backups/ klasörü yazılabilir değil.');
-    @set_time_limit(600);
-    fwrite($fh, "-- SADA One database backup before the 7.0 English values migration, " . date('Y-m-d H:i:s') . "\nSET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\n");
-    foreach ($pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN) as $table) {
-        $create = $pdo->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_NUM)[1];
-        fwrite($fh, "\nDROP TABLE IF EXISTS `$table`;\n$create;\n");
-        $st = $pdo->query("SELECT * FROM `$table`");
-        $batch = [];
-        while ($row = $st->fetch(PDO::FETCH_NUM)) {
-            $batch[] = '(' . implode(',', array_map(fn ($v) => $v === null ? 'NULL' : $pdo->quote((string) $v), $row)) . ')';
-            if (count($batch) === 200) { fwrite($fh, "INSERT INTO `$table` VALUES\n" . implode(",\n", $batch) . ";\n"); $batch = []; }
-        }
-        if ($batch) fwrite($fh, "INSERT INTO `$table` VALUES\n" . implode(",\n", $batch) . ";\n");
-    }
-    fwrite($fh, "SET FOREIGN_KEY_CHECKS=1;\n");
-    fclose($fh);
-    return $name;
+    require_once __DIR__ . '/migration-backup.php';
+    return migration_db_backup($pdo, 'v7-english', '7.0 English values migration');
 }
 
 function english_values_migration(PDO $pdo): array {
