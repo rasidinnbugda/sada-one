@@ -996,6 +996,18 @@ a.now-row:hover, .now-row:hover { background: var(--surface-2); }
 .calendar-event.shoot { background: rgba(214,69,96,.12); color: #e86b82; border-color: #e86b82; }
 .calendar-event.meeting { background: rgba(59,157,240,.12); color: var(--info); border-color: var(--info); }
 .calendar-event.delivery { background: rgba(245,165,36,.12); color: var(--warning); border-color: var(--warning); }
+.calendar-event.publish { display: block; background: rgba(53,198,107,.12); color: var(--success); border-color: var(--success); }
+.calendar-event.publish.is-done { opacity: .6; }
+.calendar-event[hidden], .calendar-band[hidden] { display: none; }
+/* One calendar: the view tabs above every calendar page, the lenses inside the month view */
+.view-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 18px; padding: 4px; border-radius: 12px; background: var(--surface-2); width: fit-content; max-width: 100%; }
+.view-bar-label { font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 0 10px 0 8px; }
+.view-tab { padding: 6px 12px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.view-tab:hover { color: var(--text); }
+.view-tab.active { background: var(--surface); color: var(--brand); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.lens-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.lens { padding: 5px 12px; border-radius: 99px; font-size: 12.5px; font-weight: 600; color: var(--text-2); border: 1px solid var(--border-2); }
+.lens.active { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 .calendar-title-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .calendar-month-name { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; min-width: 190px; text-align: center; }
 

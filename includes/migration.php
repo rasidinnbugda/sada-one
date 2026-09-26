@@ -287,5 +287,26 @@ function run_migrations(PDO $pdo): array {
             if ($n) $results[] = ['ok', "steps: waiting time known for $n active steps"];
         }
     } catch (PDOException $e) { $results[] = ['error', 'activated_at — ' . $e->getMessage()]; }
+    // 7.6: the old content records live in their work since 7.1 and the month's phase replaced its open/closed status
+    // in 7.3 — the leftovers go, after a backup. Runs last, so every earlier conversion has already read them.
+    try {
+        if ($pdo->query("SELECT setting_value FROM settings WHERE setting_key='unified_work'")->fetchColumn() === '1') {
+            $hasColumn = fn(string $t, string $c) => (int)$pdo->query("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=" . $pdo->quote($t) . " AND column_name=" . $pdo->quote($c))->fetchColumn() > 0;
+            $hasContents = (bool)$pdo->query("SHOW TABLES LIKE 'contents'")->fetchColumn();
+            $drops = array_values(array_filter([
+                $hasContents ? 'DROP TABLE contents' : null,
+                $hasColumn('tasks', 'content_id') ? 'ALTER TABLE tasks DROP COLUMN content_id' : null,
+                $hasColumn('approvals', 'content_id') ? 'ALTER TABLE approvals DROP COLUMN content_id' : null,
+                $hasColumn('periods', 'status') && $hasColumn('periods', 'phase') ? 'ALTER TABLE periods DROP COLUMN status' : null,
+            ]));
+            if ($drops) {
+                if (($hasContents && (int)$pdo->query('SELECT COUNT(*) FROM contents')->fetchColumn()) || (int)$pdo->query('SELECT COUNT(*) FROM tasks')->fetchColumn()) {
+                    require_once __DIR__ . '/migration-backup.php';
+                    $results[] = ['ok', 'legacy: backup ' . migration_db_backup($pdo, 'v7.6-legacy', '7.6 removal of the old content archive and month status')];
+                }
+                foreach ($drops as $sql) { $pdo->exec($sql); $results[] = ['ok', 'legacy: ' . $sql]; }
+            }
+        }
+    } catch (Throwable $e) { $results[] = ['error', 'legacy: ' . $e->getMessage()]; }
     return $results;
 }

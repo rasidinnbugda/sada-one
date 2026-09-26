@@ -421,6 +421,7 @@ CREATE TABLE IF NOT EXISTS archive (
     INDEX(client_id), INDEX(project_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
+-- Legacy (7.0): kept so the historical migration commands run on a fresh install, then removed by the 7.6 step
 CREATE TABLE IF NOT EXISTS contents (
     id INT AUTO_INCREMENT PRIMARY KEY,
     client_id INT DEFAULT NULL,

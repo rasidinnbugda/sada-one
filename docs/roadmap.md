@@ -22,8 +22,14 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 3. **Ay ve Proje** — 7.3 ✅: aylık projelerde "Ay" plan → üretim → kapanış; planlı/gündem ayrımı; ay sonu raporu aya bağlanır; kapsam sinyali; dosya bazlı onay kuralları.
 4. **Eylemden durum** — 7.4 ✅: dosya yüklenince adım ilerler; müşteri hesapsız linkten onaylar, revize üretime döner.
 5. **Yardım eden ekran** — 7.5 ✅: "Şimdi" kartı ve Bugün; işi izleyen Kule (Yönetici Takip'in yerine).
-6. **Sadeleştirme:** menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
+6. **Sadeleştirme** — 7.6 ✅: menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm:** açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
+
+## 6. aşama — Sadeleştirme (7.6)
+
+- **Tek takvim:** `calendar.php` ayın her şeyini gösterir — etkinlikler (çekim, toplantı, teslim, diğer) ve müşteri işlerinin yayın tarihleri — ve merceklerle (`data-kind`) süzülür; mercek tarayıcıda hatırlanır. Yayın planı (`content-calendar.php`, sürükle-bırak planlama), Toplantılar, Randevular ve Zaman çizelgesi aynı takvimin görünümleridir (`CALENDAR_VIEWS`): ekip menüsünde tek "Takvim" vardır, her görünümün üstünde görünüm sekmeleri durur. Eski adresler aynen çalışır.
+- **Menü:** üstte Panel, Bugün, İşler, Takvim, Dosyalar, Projeler, Mesajlar; gruplar Stüdyo, Analiz (Kule dahil), Ekip & Fikir. Onaylar yalnızca müşteri menüsünde; ekip onayları işin, ayın ve Kule'nin içinden görür (`approvals.php` adresi durur).
+- **Eski veri:** `contents` tablosu, `tasks.content_id`, `approvals.content_id` ve `periods.status` göç zincirinin en sonunda, veritabanı yedeği alındıktan sonra kaldırılır (`legacy:`). Kurulum şeması tarihsel komutlar temiz çalışsın diye bu yapıları hâlâ kurar; aynı adım kurulumun hemen ardından onları kaldırır.
 
 ## 5. aşama — Yardım eden ekran (7.5)
 

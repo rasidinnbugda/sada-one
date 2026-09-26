@@ -1,6 +1,7 @@
 <?php
 /**
- * SADA One — Shoot & Production Calendar
+ * SADA One — Calendar (month view)
+ * Shoots, meetings, deliveries and the publishing plan in one month; lenses bring one kind forward.
  * Multi-day events are shown as continuous strips (bands) across the week.
  */
 require __DIR__ . '/includes/init.php';
@@ -32,6 +33,12 @@ if ($events) {
 }
 foreach ($events as &$e) $e['equipment'] = $eventEquipment[$e['id']] ?? [];
 unset($e);
+
+// Client work planned to go out this month (the publishing lens)
+$publishByDay = [];
+foreach (rows("SELECT t.id, t.title, t.publish_date, t.publish_time, t.status, c.name client_name FROM tasks t JOIN projects p ON p.id=t.project_id JOIN clients c ON c.id=p.client_id
+    WHERE t.kind='client' AND t.publish_date BETWEEN ? AND ? AND t.status!='cancelled' AND t.is_archived=0 ORDER BY t.publish_time IS NULL, t.publish_time", [$monthInitial, $monthLast]) as $pt)
+    $publishByDay[(int)substr($pt['publish_date'], 8, 2)][] = $pt;
 
 /* ---- Split into weeks: 7 cells per week (days outside the month are null) ---- */
 $weeks = [];
@@ -105,14 +112,17 @@ $availableEquipment = rows("SELECT id, code, name, category FROM equipment WHERE
 
 $typeColors = ['shoot' => '#e86b82', 'meeting' => 'var(--info)', 'delivery' => 'var(--warning)', 'other' => 'var(--brand)'];
 
-page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
+page_start('Takvim', 'calendar');
 ?>
 <div class="page-top">
-    <div><div class="page-title">Prodüksiyon Takvimi</div><div class="page-bottom">Çekimler, toplantılar ve teslim tarihleri — çok günlü işler şerit olarak yayılır</div></div>
+    <div><div class="page-title">Takvim</div><div class="page-bottom">Çekimler, toplantılar, teslimler ve yayın planı aynı ayda — mercekle birini öne çıkar</div></div>
     <div class="page-top-action"><button class="btn btn-brand" data-modal="modalEvent"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Etkinlik Ekle</button></div>
 </div>
 
-<div class="card">
+<div class="card" id="calendarCard">
+    <div class="lens-bar" role="group" aria-label="Mercek">
+        <?php foreach (['all' => 'Hepsi', 'shoot' => 'Çekim', 'meeting' => 'Toplantı', 'delivery' => 'Teslim', 'publish' => 'Yayın'] as $lensKey => $lensLabel): ?><button type="button" class="lens<?= $lensKey === 'all' ? ' active' : '' ?>" data-lens="<?= $lensKey ?>"><?= $lensLabel ?></button><?php endforeach; ?>
+    </div>
     <div class="calendar-title-bar">
         <div class="row-flex" style="gap:8px">
             <a href="?month=<?= $month - 1 ?>&year=<?= $year ?>" class="icon-action"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></a>
@@ -137,7 +147,7 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
             $color = $typeColors[$e['type']] ?? 'var(--brand)';
             $left = $b['initial_col'] / 7 * 100;
             $width = ($b['last_col'] - $b['initial_col'] + 1) / 7 * 100; ?>
-        <div class="calendar-band <?= $b['ongoing_from_left'] ? 'continues-left' : '' ?> <?= $b['ongoing_from_right'] ? 'continues-right' : '' ?>"
+        <div class="calendar-band <?= $b['ongoing_from_left'] ? 'continues-left' : '' ?> <?= $b['ongoing_from_right'] ? 'continues-right' : '' ?>" data-kind="<?= e($e['type']) ?>"
              style="left:calc(<?= $left ?>% + 3px);width:calc(<?= $width ?>% - 6px);top:<?= 30 + $b['lane'] * 26 ?>px;--band-color:<?= $color ?>"
              onclick="eventShow(<?= $e['id'] ?>)" title="<?= e($e['title']) ?> · <?= format_date(substr($e['start'], 0, 10)) ?> → <?= format_date(substr($e['end'], 0, 10)) ?>">
             <?= $b['ongoing_from_left'] ? '◂ ' : '' ?><?= e($e['title']) ?><?= $b['ongoing_from_right'] ? ' ▸' : '' ?>
@@ -151,7 +161,10 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
         <div class="calendar-cell <?= $today ? 'today' : '' ?>" data-date="<?= $dateStr ?>" onclick="eventAdd('<?= $dateStr ?>')" style="cursor:pointer;padding-top:<?= 30 + $bandField ?>px">
             <div class="calendar-day-number" style="position:absolute;top:8px;right:10px"><?= $day ?></div>
             <?php foreach ($singleDay[$day] ?? [] as $e): ?>
-            <div class="calendar-event <?= $e['type'] ?>" draggable="true" data-event="<?= $e['id'] ?>" onclick="event.stopPropagation();eventShow(<?= $e['id'] ?>)" title="<?= e($e['title']) ?>"><?= date('H:i', strtotime($e['start'])) ?> <?= e($e['title']) ?></div>
+            <div class="calendar-event <?= $e['type'] ?>" data-kind="<?= e($e['type']) ?>" draggable="true" data-event="<?= $e['id'] ?>" onclick="event.stopPropagation();eventShow(<?= $e['id'] ?>)" title="<?= e($e['title']) ?>"><?= date('H:i', strtotime($e['start'])) ?> <?= e($e['title']) ?></div>
+            <?php endforeach; ?>
+            <?php foreach ($publishByDay[$day] ?? [] as $pt): ?>
+            <a class="calendar-event publish<?= $pt['status'] === 'published' ? ' is-done' : '' ?>" data-kind="publish" href="task.php?id=<?= $pt['id'] ?>" onclick="event.stopPropagation()" title="<?= e($pt['client_name'] . ' — ' . $pt['title']) ?>"><?= $pt['publish_time'] ? substr($pt['publish_time'], 0, 5) . ' ' : '' ?><?= e($pt['title']) ?></a>
             <?php endforeach; ?>
         </div>
         <?php endforeach; ?>
@@ -160,12 +173,29 @@ page_start('Çekim & Prodüksiyon Takvimi', 'calendar');
 </div>
 
 <div class="grid grid-3 mt-3">
+    <div class="card row-flex" style="gap:12px;padding:14px"><span class="label-dot" style="width:14px;height:14px;background:var(--success)"></span><div><div class="bold"><?= array_sum(array_map('count', $publishByDay)) ?> Yayın</div><div class="cell-bottom">bu ay · <a href="content-calendar.php?month=<?= $month ?>&year=<?= $year ?>">yayın planını aç</a></div></div></div>
     <?php foreach (EVENT_TYPES as $k => $v):
         $color = $typeColors[$k];
         $say = count(array_filter($events, fn($e) => $e['type'] === $k)); ?>
     <div class="card row-flex" style="gap:12px;padding:14px"><span class="label-dot" style="width:14px;height:14px;background:<?= $color ?>"></span><div><div class="bold"><?= $say ?> <?= $v ?></div><div class="cell-bottom">bu ay</div></div></div>
     <?php endforeach; ?>
 </div>
+
+<script>
+// Lenses: one kind at a time or all; remembered in this browser
+(() => {
+    const card = document.getElementById('calendarCard');
+    const apply = (lens) => {
+        card.querySelectorAll('.lens').forEach(b => b.classList.toggle('active', b.dataset.lens === lens));
+        card.querySelectorAll('[data-kind]').forEach(el => { el.hidden = lens !== 'all' && el.dataset.kind !== lens; });
+        try { localStorage.setItem('calendar:lens', lens); } catch (e) { /* private window */ }
+    };
+    card.querySelectorAll('.lens').forEach(b => b.addEventListener('click', () => apply(b.dataset.lens)));
+    let saved = 'all';
+    try { saved = localStorage.getItem('calendar:lens') || 'all'; } catch (e) { /* private window */ }
+    if (card.querySelector(`.lens[data-lens="${saved}"]`)) apply(saved);
+})();
+</script>
 
 <!-- Add event -->
 <div class="modal-overlay" id="modalEvent">

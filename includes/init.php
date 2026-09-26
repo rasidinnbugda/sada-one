@@ -424,6 +424,8 @@ const TASK_CLOSED = ['completed', 'published', 'cancelled'];
 const TASK_KINDS = ['client' => 'Müşteri işi', 'internal' => 'İç iş'];
 // Planned work is the month's plan; agenda work comes up during the month (news, trends)
 const TASK_LANES = ['planned' => 'Planlı', 'agenda' => 'Gündem'];
+// One calendar, several views (page key => [page, label]); the team menu shows a single "Takvim"
+const CALENDAR_VIEWS = ['calendar' => ['calendar.php', 'Ay'], 'content' => ['content-calendar.php', 'Yayın planı'], 'meetings' => ['meetings.php', 'Toplantılar'], 'appointments' => ['appointments.php', 'Randevular'], 'timeline' => ['timeline.php', 'Zaman çizelgesi']];
 const MONTH_PHASES = ['planning' => 'Planlama', 'production' => 'Üretim', 'closing' => 'Kapanış', 'closed' => 'Kapandı'];
 const PLAN_STATUSES = ['none' => 'Gönderilmedi', 'pending' => 'Müşteride', 'approved' => 'Onaylandı', 'revision' => 'Revize istendi'];
 const PRIORITIES = ['low' => 'Düşük', 'normal' => 'Normal', 'high' => 'Yüksek', 'urgent' => 'Acil'];
@@ -441,7 +443,6 @@ const PAYMENT_STATUSES = ['pending' => 'Bekliyor', 'paid' => 'Ödendi', 'overdue
 const DOCUMENT_TYPES = ['quote' => 'Teklif', 'invoice' => 'Fatura'];
 const DOCUMENT_STATUSES = ['draft' => 'Taslak', 'sent' => 'Gönderildi', 'approved' => 'Onaylandı', 'rejected' => 'Reddedildi'];
 const CLIENT_STATUSES = ['active' => 'Aktif', 'inactive' => 'Pasif'];
-const PERIOD_STATUSES = ['open' => 'Açık', 'closed' => 'Kapalı'];
 const EXTRA_REQUEST_STATUSES = ['pending' => 'Bekliyor', 'approved' => 'Onaylandı', 'rejected' => 'Reddedildi'];
 const MENTORSHIP_STATUSES = ['planned' => 'Planlandı', 'in_progress' => 'Devam Ediyor', 'completed' => 'Tamamlandı'];
 const IDEA_STATUSES = ['new' => 'Yeni', 'liked' => 'Beğenildi', 'implemented' => 'Uygulandı'];
@@ -451,8 +452,13 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.5';
+const APP_VERSION = '7.6';
 const VERSION_NOTES = [
+    '7.6' => [
+        'Tek takvim: menüde tek "Takvim". Ay görünümü çekimleri, toplantıları, teslimleri ve yayın planını birlikte gösterir; mercekle (Hepsi / Çekim / Toplantı / Teslim / Yayın) birini öne çıkarırsınız. Yayın planı, Toplantılar, Randevular ve Zaman çizelgesi aynı takvimin sekmeleri; eski adresler çalışmaya devam eder',
+        'Daha kısa menü: Panel, Bugün, İşler, Takvim, Dosyalar, Projeler, Mesajlar üstte; Stüdyo (Çekim Listesi, Ekipman, Ekip), Analiz (Finans, Raporlar, Aylık Raporlar, Kule) ve Ekip & Fikir (Duyurular, Talepler, Fikir Panosu, Gelişim, Çalışan Havuzu, Alanım) grupları. Onaylar ekip menüsünden kalktı — onaylar işin, ayın ve Kule\'nin içinde; müşteriler Onaylar\'ı görmeye devam eder',
+        'Temizlik: 7.1\'de işlere taşınan eski içerik kayıtları (contents tablosu, bağlantı sütunları) ve 7.3\'te ay evrelerine geçen eski açık/kapalı ay durumu veritabanından kaldırıldı; öncesinde veritabanının yedeği alındı',
+    ],
     '7.5' => [
         '"Şimdi" kartı: Panel\'in başında şu an yapman gereken tek iş, ardından gelenler ve günün özeti (havuz, bugünkü çekim ve yayınlar, yeni gelişmeler)',
         'Bugün sayfası (menüde Panel\'in altında): sırası sende olan adımlar ne kadar süredir beklediğiyle, uzmanlık havuzun ("Ben alıyorum"), bugünün çekimleri ve yayınları, yapılacakların ve işlerindeki son gelişmeler',
@@ -953,7 +959,7 @@ function get_or_create_period(int $projectId, int $year, int $month, ?string $ph
     $d = row("SELECT id FROM periods WHERE project_id=? AND year=? AND month=?", [$projectId, $year, $month]);
     if ($d) return (int)$d['id'];
     $phase ??= $year * 12 + $month > (int)date('Y') * 12 + (int)date('n') ? 'planning' : 'production';
-    return insert('periods', ['project_id' => $projectId, 'year' => $year, 'month' => $month, 'status' => 'open', 'phase' => $phase, 'created' => date('Y-m-d H:i:s')]);
+    return insert('periods', ['project_id' => $projectId, 'year' => $year, 'month' => $month, 'phase' => $phase, 'created' => date('Y-m-d H:i:s')]);
 }
 
 /** Is this the approval that counts for its work / month? A newer sending replaces the older one. */

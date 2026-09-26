@@ -17,48 +17,32 @@ function page_start(string $title, string $activePage = ''): void {
         $nav = [
             ['index.php', 'panel', 'Panel', 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10'],
             ['today.php', 'today', 'Bugün', 'M12 3v2m0 14v2m9-9h-2M5 12H3m15.4-6.4L17 7M7 17l-1.4 1.4m12.8 0L17 17M7 7L5.6 5.6M16 12a4 4 0 11-8 0 4 4 0 018 0z'],
-            ['my-space.php', 'my_space', 'Alanım', 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z'],
+            ['tasks.php', 'tasks', 'İşler', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'],
+            ['calendar.php', 'calendar', 'Takvim', 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'],
             ['clients.php', 'clients', 'Dosyalar', 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z'],
             ['projects.php', 'projects', 'Projeler', 'M9 12h6m-6 4h6M9 8h6M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z'],
-            ['tasks.php', 'tasks', 'İşler', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'],
+            ['messages.php', 'messages', 'Mesajlar', 'M8 12h8m-8-4h8m-9 8l-4 4V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H7z'],
         ];
         // Groups: [key, label, icon, items]
-        $navGroups[] = ['calendars', 'Takvimler', 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', [
-            ['calendar.php', 'calendar', 'Prodüksiyon', 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z'],
-            ['content-calendar.php', 'content', 'İçerik', 'M7 4v16M17 4v16M3 8h18M3 16h18M3 4h18v16H3z'],
-            ['meetings.php', 'meetings', 'Toplantılar', 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z'],
-            ['appointments.php', 'appointments', 'Randevular', 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zm7-6l2 2 4-4'],
-            ['timeline.php', 'timeline', 'Zaman Çizelgesi', 'M4 6h6m-6 6h10M4 18h14M20 6v12'],
-        ]];
-        $contactItems = [
-            ['messages.php', 'messages', 'Mesajlar', 'M8 12h8m-8-4h8m-9 8l-4 4V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H7z'],
-            ['announcements.php', 'announcements', 'Duyurular', 'M11 5.88V19.24a1.76 1.76 0 01-3.42.6L5.44 14M18.7 4a9 9 0 01.3 13.3M5.44 14A2 2 0 015 10h1a8 8 0 005-2l3-2v12l-3-2a8 8 0 00-5-2H5.44z'],
-        ];
-        if (!is_intern()) {
-            $contactItems[] = ['approvals.php', 'approvals', 'Onaylar', 'M9 12l2 2 4-4m5.6 2a9 9 0 11-18 0 9 9 0 0118 0z'];
-            $contactItems[] = ['requests.php', 'requests', 'Talepler', 'M8 10h8m-8 4h4m9-2a9 9 0 11-18 0 9 9 0 0118 0zM12 3v1m0 16v1'];
-        }
-        $navGroups[] = ['contact', 'İletişim', 'M8 12h8m-8-4h8m-9 8l-4 4V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H7z', $contactItems];
         $navGroups[] = ['studio', 'Stüdyo', 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z', [
+            ['shoot-list.php', 'shoots', 'Çekim Listesi', 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z'],
             ['equipment.php', 'equipment', 'Ekipman', 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z'],
             ['team.php', 'team', 'Ekip', 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a3 3 0 11-3-3'],
         ]];
         $analyticsItems = [];
         if (permission('finance')) $analyticsItems[] = ['finance.php', 'finance', 'Finans', 'M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8c1.66 0 3.07.5 3.6 1.2M12 8V6m0 12v-2m0 2c-1.66 0-3.07-.5-3.6-1.2M21 12a9 9 0 11-18 0 9 9 0 0118 0z'];
         if (permission('report')) $analyticsItems[] = ['reports.php', 'reports', 'Raporlar', 'M9 19v-6M15 19v-2M12 19v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z'];
+        if (!is_intern()) $analyticsItems[] = ['monthly-reports.php', 'mreports', 'Aylık Raporlar', 'M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'];
+        if (is_pm()) $analyticsItems[] = ['tower.php', 'tower', 'Kule', 'M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7zM12 15a3 3 0 100-6 3 3 0 000 6z'];
         if ($analyticsItems) $navGroups[] = ['analytics', 'Analiz', 'M9 19v-6M15 19v-2M12 19v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z', $analyticsItems];
-        // Operations: SOP modules (v14)
-        $opItems = [
-            ['shoot-list.php', 'shoots', 'Çekim Listesi', 'M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14v-4zM3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z'],
-            ['growth.php', 'growth', 'Gelişim & Mentörlük', 'M12 14l9-5-9-5-9 5 9 5zm0 0v6m-6-3.5V12m12 4.5V12'],
-            ['ideas.php', 'ideas', 'Fikir Panosu', 'M9.66 18h4.68M10 21h4m-2-18a7 7 0 00-4 12.7c.6.5 1 1.2 1 2v.3h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 3z'],
-        ];
-        if (!is_intern()) {
-            $opItems[] = ['talent-pool.php', 'pool', 'Çalışan Havuzu', 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z'];
-            $opItems[] = ['monthly-reports.php', 'mreports', 'Aylık Raporlar', 'M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'];
-        }
-        if (is_admin() || ($u && $u['role'] === 'pm')) $opItems[] = ['tower.php', 'tower', 'Kule', 'M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7zM12 15a3 3 0 100-6 3 3 0 000 6z'];
-        $navGroups[] = ['operations', 'Operasyon', 'M4 6h16M4 12h16M4 18h10', $opItems];
+        // The team's own things: announcements, requests, ideas, growth, personal space
+        $teamItems = [['announcements.php', 'announcements', 'Duyurular', 'M11 5.88V19.24a1.76 1.76 0 01-3.42.6L5.44 14M18.7 4a9 9 0 01.3 13.3M5.44 14A2 2 0 015 10h1a8 8 0 005-2l3-2v12l-3-2a8 8 0 00-5-2H5.44z']];
+        if (!is_intern()) $teamItems[] = ['requests.php', 'requests', 'Talepler', 'M8 10h8m-8 4h4m9-2a9 9 0 11-18 0 9 9 0 0118 0zM12 3v1m0 16v1'];
+        $teamItems[] = ['ideas.php', 'ideas', 'Fikir Panosu', 'M9.66 18h4.68M10 21h4m-2-18a7 7 0 00-4 12.7c.6.5 1 1.2 1 2v.3h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 3z'];
+        $teamItems[] = ['growth.php', 'growth', 'Gelişim & Mentörlük', 'M12 14l9-5-9-5-9 5 9 5zm0 0v6m-6-3.5V12m12 4.5V12'];
+        if (!is_intern()) $teamItems[] = ['talent-pool.php', 'pool', 'Çalışan Havuzu', 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z'];
+        $teamItems[] = ['my-space.php', 'my_space', 'Alanım', 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z'];
+        $navGroups[] = ['team', 'Ekip & Fikir', 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z', $teamItems];
     } else {
         $nav = [
             ['index.php', 'panel', 'Panel', 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10'],
@@ -131,7 +115,8 @@ function page_start(string $title, string $activePage = ''): void {
             <?php
             // Renders a single nav item (with the messages badge)
             $navItemWrite = function (array $n, bool $subItem = false) use ($activePage, $u) {
-                echo '<a href="' . $n[0] . '" class="nav-item ' . ($subItem ? 'nav-sub-item ' : '') . ($activePage === $n[1] ? 'active' : '') . '">';
+                $isActive = $activePage === $n[1] || ($n[1] === 'calendar' && is_staff() && isset(CALENDAR_VIEWS[$activePage]));
+                echo '<a href="' . $n[0] . '" class="nav-item ' . ($subItem ? 'nav-sub-item ' : '') . ($isActive ? 'active' : '') . '">';
                 echo '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="' . $n[3] . '"/></svg>';
                 echo '<span>' . $n[2] . '</span>';
                 if ($n[1] === 'messages' && $u) {
@@ -245,6 +230,12 @@ function page_start(string $title, string $activePage = ''): void {
         </header>
         <main class="main">
 <?php
+    if (is_staff() && isset(CALENDAR_VIEWS[$activePage])): ?>
+            <nav class="view-bar" aria-label="Takvim görünümleri">
+                <span class="view-bar-label">Takvim</span>
+                <?php foreach (CALENDAR_VIEWS as $viewKey => [$viewHref, $viewLabel]): ?><a href="<?= $viewHref ?>" class="view-tab<?= $viewKey === $activePage ? ' active' : '' ?>"><?= $viewLabel ?></a><?php endforeach; ?>
+            </nav>
+<?php endif;
 }
 
 function page_end(): void {

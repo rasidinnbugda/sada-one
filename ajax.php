@@ -571,7 +571,7 @@ case 'project_save':
 case 'project_delete':
     require_admin();
     $id = (int)$g('id');
-    foreach (['tasks', 'contents', 'approvals', 'payments', 'periods'] as $t) q("DELETE FROM $t WHERE project_id=?", [$id]);
+    foreach (['tasks', 'approvals', 'payments', 'periods'] as $t) q("DELETE FROM $t WHERE project_id=?", [$id]);
     q("DELETE FROM projects WHERE id=?", [$id]);
     json_out(['ok' => true, 'message' => 'Proje silindi.', 'redirect' => 'projects.php']);
 
@@ -605,7 +605,7 @@ case 'month_phase':
     if ($toIndex === false || abs($toIndex - (int)array_search($month['phase'], $order, true)) !== 1) json_out(['ok' => false, 'error' => 'Ay bir adım ileri ya da geri alınabilir.']);
     if ($to === 'closed' && ($openCount = (int)val("SELECT COUNT(*) FROM tasks WHERE period_id=? AND is_archived=0 AND " . task_open_sql(), [$month['id']])))
         json_out(['ok' => false, 'error' => "Ayda $openCount açık iş var: önce sonraki aya taşıyın ya da iptal edin."]);
-    update_row('periods', ['phase' => $to, 'status' => $to === 'closed' ? 'closed' : 'open', 'closed_at' => $to === 'closed' ? $now : null], 'id=?', [$month['id']]);
+    update_row('periods', ['phase' => $to, 'closed_at' => $to === 'closed' ? $now : null], 'id=?', [$month['id']]);
     log_activity(period_name($month) . ' ayı: ' . MONTH_PHASES[$to], 'project', (int)$month['project_id']);
     json_out(['ok' => true, 'message' => period_name($month) . ': ' . ($month['phase'] === 'closed' ? 'yeniden açıldı' : MONTH_PHASES[$to]) . '.']);
 
