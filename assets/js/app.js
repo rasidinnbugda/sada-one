@@ -245,6 +245,9 @@
         // Serialize task assignees
         const assigneeJson = form.querySelector('.assignees-json');
         if (assigneeJson) assigneeJson.value = JSON.stringify($$('.assigned-box:checked', form).map(c => c.value));
+        // Serialize step owners of a new task (type step id → user id, 0 = pool)
+        const stepOwnerJson = form.querySelector('.step-owners-json');
+        if (stepOwnerJson) stepOwnerJson.value = JSON.stringify(Object.fromEntries($$('.step-owner', form).map(s => [s.dataset.step, s.value])));
         // Serialize publish platforms
         const platformJson = form.querySelector('.platforms-json');
         if (platformJson) platformJson.value = JSON.stringify($$('.platform-box:checked', form).map(c => c.value));

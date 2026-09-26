@@ -8,7 +8,7 @@ require_once __DIR__ . '/includes/layout.php';
 $u = require_admin();
 
 $templates = rows("SELECT * FROM project_templates ORDER BY name");
-$workflows = rows("SELECT id, name FROM workflow_templates ORDER BY name");
+$types = rows("SELECT id, name FROM task_types ORDER BY name");
 
 page_start('Proje Şablonları', 'ptemplates');
 ?>
@@ -42,8 +42,8 @@ page_start('Proje Şablonları', 'ptemplates');
                 <span><?= e($sg['title']) ?></span>
                 <span class="row-flex" style="gap:6px">
                     <?php if (($sg['priority'] ?? 'normal') !== 'normal'): ?><?= badge($sg['priority'], PRIORITIES) ?><?php endif; ?>
-                    <?php if (!empty($sg['workflow_id'])): $workflowName = ''; foreach ($workflows as $ak) if ($ak['id'] == $sg['workflow_id']) $workflowName = $ak['name']; ?>
-                    <span class="badge badge-type"><?= icon('rocket', 10) ?> <?= e($workflowName ?: 'Akış') ?></span>
+                    <?php if (!empty($sg['type_id'])): $typeName = ''; foreach ($types as $tt) if ($tt['id'] == $sg['type_id']) $typeName = $tt['name']; ?>
+                    <span class="badge badge-type"><?= icon('rocket', 10) ?> <?= e($typeName ?: 'İş türü') ?></span>
                     <?php endif; ?>
                 </span>
             </div>
@@ -74,18 +74,18 @@ page_start('Proje Şablonları', 'ptemplates');
 </div>
 
 <script>
-const ptWorkflows = <?= json_encode($workflows, JSON_UNESCAPED_UNICODE) ?>;
+const ptTypes = <?= json_encode($types, JSON_UNESCAPED_UNICODE) ?>;
 const ptPriorities = <?= json_encode(PRIORITIES, JSON_UNESCAPED_UNICODE) ?>;
 function ptTaskAdd(g = {}) {
     const div = document.createElement('div');
     div.className = 'row-flex pt-row';
     div.style.gap = '8px';
-    let workflowOps = '<option value="0">Akışsız</option>';
-    ptWorkflows.forEach(a => workflowOps += `<option value="${a.id}" ${g.workflow_id == a.id ? 'selected' : ''}>${esc(a.name)}</option>`);
+    let typeOps = '<option value="0">Adımsız iş</option>';
+    ptTypes.forEach(a => typeOps += `<option value="${a.id}" ${g.type_id == a.id ? 'selected' : ''}>${esc(a.name)}</option>`);
     let priorityOptions = '';
     for (const k in ptPriorities) priorityOptions += `<option value="${k}" ${(g.priority || 'normal') === k ? 'selected' : ''}>${ptPriorities[k]}</option>`;
     div.innerHTML = `<input class="input pt-title" placeholder="İş başlığı" style="flex:2" value="${(g.title || '').replace(/"/g, '&quot;')}">
-        <select class="select pt-flow" style="flex:1">${workflowOps}</select>
+        <select class="select pt-type" style="flex:1">${typeOps}</select>
         <select class="select pt-priority" style="width:110px">${priorityOptions}</select>
         <button type="button" class="icon-action danger" onclick="this.parentElement.remove()">✕</button>`;
     document.getElementById('ptTaskList').appendChild(div);
@@ -110,7 +110,7 @@ function ptEdit(ps) {
 document.getElementById('ptForm').addEventListener('submit', () => {
     const tasks = Array.from(document.querySelectorAll('.pt-row')).map(s => ({
         title: s.querySelector('.pt-title').value.trim(),
-        workflow_id: parseInt(s.querySelector('.pt-flow').value) || 0,
+        type_id: parseInt(s.querySelector('.pt-type').value) || 0,
         priority: s.querySelector('.pt-priority').value,
     })).filter(g => g.title);
     document.getElementById('pt_tasks').value = JSON.stringify(tasks);

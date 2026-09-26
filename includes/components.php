@@ -16,7 +16,7 @@ function task_kanban(array $tasks, int $projectId = 0): void {
             <?php foreach ($group as $gr):
                 // Locked? (dependency still open and no admin has bypassed the lock)
                 $locked = !empty($gr['dependency_status']) && task_is_open($gr['dependency_status']) && empty($gr['lock_bypassed']);
-                $drag = is_staff() ? 'draggable="true"' : ''; ?>
+                $drag = is_staff() && empty($gr['step_total']) ? 'draggable="true"' : ''; ?>
             <div class="kanban-card <?= $locked ? 'locked' : '' ?>" <?= $drag ?> data-task="<?= $gr['id'] ?>" data-status="<?= $status ?>" <?= $locked && !empty($gr['dependency_title']) ? 'title="Kilitli — bağlı olduğu iş: ' . e($gr['dependency_title']) . '"' : '' ?> onclick="if(!event.defaultPrevented)location.href='task.php?id=<?= $gr['id'] ?>'">
                 <div class="kanban-card-title"><?= e($gr['title']) ?></div>
                 <?php if (!empty($gr['project_name'])): ?><div class="kanban-label" style="margin-bottom:6px"><span class="label-dot" style="width:7px;height:7px;background:<?= e($gr['client_color'] ?? 'var(--brand)') ?>"></span><?= e($gr['project_name']) ?></div><?php endif; ?>
@@ -80,15 +80,22 @@ function task_modal(int $projectId, array $team, array $templates, array $period
 <div class="modal-overlay" id="modalTask">
     <div class="modal"><div class="modal-top"><div class="modal-title">Yeni İş</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="task_save">
-        <input type="hidden" name="project_id" value="<?= $projectId ?>" <?= $projectId ? '' : 'disabled' ?> id="taskProjectId">
+        <input type="hidden" name="project_id" value="<?= $projectId ?>" <?= $projectId ? '' : 'disabled' ?> id="taskProjectId" data-pm="<?= $projectId ? (int)val("SELECT pm_id FROM projects WHERE id=?", [$projectId]) : '' ?>">
         <div class="modal-body">
             <?php if (!$projectId): ?>
-            <div class="form-group"><label class="form-label">Proje <span class="required">*</span></label><select name="project_id" class="select" required id="taskProjectSelect"><option value="">Seçin...</option><?php foreach (rows("SELECT id, name FROM projects WHERE status='active' ORDER BY name") as $pr): ?><option value="<?= $pr['id'] ?>"><?= e($pr['name']) ?></option><?php endforeach; ?></select></div>
+            <div class="form-group"><label class="form-label">Proje <span class="required">*</span></label><select name="project_id" class="select" required id="taskProjectSelect"><option value="">Seçin...</option><?php foreach (rows("SELECT id, name, pm_id FROM projects WHERE status='active' ORDER BY name") as $pr): ?><option value="<?= $pr['id'] ?>" data-pm="<?= (int)$pr['pm_id'] ?>"><?= e($pr['name']) ?></option><?php endforeach; ?></select></div>
             <?php endif; ?>
             <div class="form-group"><label class="form-label">İş Başlığı <span class="required">*</span></label><input name="title" class="input" required></div>
+            <div class="form-group">
+                <label class="form-label">İş Türü</label>
+                <select name="type_id" class="select native-select task-type-select"><option value="">Adımsız iş — durumu elle yönetilir</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select>
+                <input type="hidden" name="step_owners" class="step-owners-json">
+                <div class="type-steps vertical mt-2" style="gap:6px"></div>
+                <div class="form-hint type-hint">Tür seçilirse iş, türün adımlarından geçer; durumu adımlar belirler. Kişi seçilmeyen adım uzmanlığın havuzuna düşer.</div>
+            </div>
             <div class="form-group"><label class="form-label">Açıklama</label><textarea name="description" class="text-area"></textarea></div>
             <?php task_publish_fields(); ?>
-            <div class="form-group">
+            <div class="form-group assignee-block">
                 <label class="form-label">Atanan Kişiler <span class="text-muted" style="font-weight:400">(birden fazla seçilebilir)</span></label>
                 <input type="hidden" name="assignees" class="assignees-json">
                 <div class="grid grid-2" style="gap:6px;max-height:150px;overflow-y:auto;padding:2px">
@@ -117,11 +124,67 @@ function task_modal(int $projectId, array $team, array $templates, array $period
                 <div class="form-group"><label class="form-label">Bağlı Olduğu İş</label><select name="depends_on_id" class="select"><option value="">— Bağımsız</option><?php foreach ($projectTasks as $pg): ?><option value="<?= $pg['id'] ?>"><?= e($pg['title']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen iş bitmeden bu iş ilerleyemez.</div></div>
                 <?php endif; ?>
             </div>
-            <div class="form-group"><label class="form-label">Akış Şablonu (opsiyonel)</label><select name="template_id" class="select"><option value="">Akışsız iş</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilirse iş, şablondaki adımlar üzerinden ilerler.</div></div>
-        </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Oluştur</button></div>
     </form></div>
 </div>
+<?php task_type_picker_script($team); ?>
+<?php }
+
+/** Data + behaviour of the task-type picker (printed once per page) */
+function task_type_picker_script(array $team): void {
+    static $printed = false;
+    if ($printed) return;
+    $printed = true;
+    $types = [];
+    foreach (rows("SELECT id, name, kind FROM task_types ORDER BY name") as $t) {
+        $t['steps'] = rows("SELECT s.id, s.name, s.kind, s.owner_id, s.skill_id, k.name skill FROM task_type_steps s LEFT JOIN skills k ON k.id=s.skill_id WHERE s.type_id=? ORDER BY s.sort_order, s.id", [$t['id']]);
+        $types[$t['id']] = $t;
+    }
+    $holders = [];
+    foreach (rows("SELECT skill_id, user_id FROM user_skills") as $r) $holders[$r['skill_id']][] = (int)$r['user_id'];
+    $coordination = (int)val("SELECT id FROM skills WHERE name='Koordinasyon'");
+?>
+<script>
+(() => {
+    const TYPES = <?= json_encode($types, JSON_UNESCAPED_UNICODE) ?>;
+    const TEAM = <?= json_encode(array_map(fn($p) => ['id' => (int)$p['id'], 'name' => $p['name']], $team), JSON_UNESCAPED_UNICODE) ?>;
+    const HOLDERS = <?= json_encode($holders) ?>;
+    const COORDINATION = <?= $coordination ?>;
+    const pmOf = form => {
+        const fixed = form.querySelector('input[name=project_id]:not([disabled])');
+        if (fixed && fixed.dataset.pm) return fixed.dataset.pm;
+        return form.querySelector('select[name=project_id]')?.selectedOptions[0]?.dataset.pm || '';
+    };
+    const render = form => {
+        const box = form.querySelector('.type-steps'), select = form.querySelector('.task-type-select');
+        if (!box || !select) return;
+        const type = TYPES[select.value];
+        box.innerHTML = '';
+        form.querySelectorAll('.assignee-block').forEach(b => { b.hidden = !!(type && type.steps.length); });
+        if (!type) return;
+        const kind = form.querySelector(`input[name=kind][value="${type.kind}"]`);
+        if (kind && !kind.checked) { kind.checked = true; kind.dispatchEvent(new Event('change', { bubbles: true })); }
+        const pm = pmOf(form);
+        type.steps.forEach(step => {
+            const skilled = new Set((HOLDERS[step.skill_id] || []).map(String));
+            const preset = step.owner_id ? String(step.owner_id) : (Number(step.skill_id) === COORDINATION && pm ? String(pm) : '0');
+            const people = [...TEAM].sort((a, b) => skilled.has(String(b.id)) - skilled.has(String(a.id)));
+            const row = document.createElement('div');
+            row.className = 'row-flex between';
+            row.style.cssText = 'gap:8px;padding:6px 10px;background:var(--surface-2);border-radius:9px';
+            row.innerHTML = `<span class="small" style="min-width:0"><b>${esc(step.name)}</b> <span class="cell-bottom">· ${esc(step.skill || 'uzmanlık yok')}</span></span>
+                <select class="select native-select step-owner" data-step="${step.id}" style="width:auto;max-width:200px;padding:5px 28px 5px 10px;font-size:12px">
+                    <option value="0">${step.skill ? 'Havuz — ' + esc(step.skill) : 'Kişisiz'}</option>
+                    ${people.map(p => `<option value="${p.id}" ${String(p.id) === preset ? 'selected' : ''}>${skilled.has(String(p.id)) ? '★ ' : ''}${esc(p.name)}</option>`).join('')}
+                </select>`;
+            box.appendChild(row);
+        });
+    };
+    document.addEventListener('change', e => {
+        if (e.target.matches('.task-type-select') || e.target.matches('select[name=project_id]')) render(e.target.form);
+    });
+})();
+</script>
 <?php }
 /** Multi-member picker: checkbox list + hidden JSON field (app.js serializes automatically) */
 function member_picker(array $selectedIds = [], string $label = 'Atanan Ekip Üyeleri'): void {

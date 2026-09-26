@@ -5,12 +5,14 @@ require_once __DIR__ . '/includes/components.php';
 $u = require_staff();
 
 $id = (int)($_GET['id'] ?? 0);
-$task = row("SELECT g.*, p.name project_name, p.client_id, d.name client_name, uu.name assignee_name, uu.color assignee_color, ol.name creator_name
+$task = row("SELECT g.*, p.name project_name, p.client_id, d.name client_name, uu.name assignee_name, uu.color assignee_color, ol.name creator_name, tt.name type_name
     FROM tasks g JOIN projects p ON p.id=g.project_id JOIN clients d ON d.id=p.client_id
-    LEFT JOIN users uu ON uu.id=g.assignee_id LEFT JOIN users ol ON ol.id=g.created_by WHERE g.id=?", [$id]);
+    LEFT JOIN users uu ON uu.id=g.assignee_id LEFT JOIN users ol ON ol.id=g.created_by LEFT JOIN task_types tt ON tt.id=g.type_id WHERE g.id=?", [$id]);
 if (!$task) { header('Location: tasks.php'); exit; }
 
-$steps = rows("SELECT ga.*, u.name owner_name, u.color owner_color FROM task_steps ga LEFT JOIN users u ON u.id=ga.owner_id WHERE ga.task_id=? ORDER BY ga.sort_order", [$id]);
+$steps = rows("SELECT ga.*, u.name owner_name, u.color owner_color, k.name skill_name FROM task_steps ga LEFT JOIN users u ON u.id=ga.owner_id LEFT JOIN skills k ON k.id=ga.skill_id WHERE ga.task_id=? ORDER BY ga.sort_order, ga.id", [$id]);
+// Open steps per person, shown when handing a step on
+$stepLoad = array_column(rows("SELECT owner_id, COUNT(*) n FROM task_steps WHERE status='active' AND owner_id IS NOT NULL GROUP BY owner_id"), 'n', 'owner_id');
 $times = rows("SELECT z.*, u.name FROM time_entries z JOIN users u ON u.id=z.user_id WHERE z.task_id=? ORDER BY z.date DESC, z.id DESC", [$id]);
 $totalMin = (int)val("SELECT COALESCE(SUM(minutes),0) FROM time_entries WHERE task_id=?", [$id]);
 $team = rows("SELECT id, name, color FROM users WHERE role IN ('admin','pm','team') AND is_active=1 ORDER BY name");
@@ -53,32 +55,66 @@ page_start($task['title'], 'tasks');
         <div class="page-title mt-1"><?= e($task['title']) ?></div>
     </div>
     <div class="page-top-action">
+        <?php if ($steps): ?>
+        <?php if ($task['status'] === 'cancelled'): ?><button class="btn" onclick="statusChange('reopen')">Yeniden aç</button>
+        <?php else: ?><button class="btn btn-ghost" onclick="if (confirm('İş iptal edilsin mi? Adımları olduğu gibi durur.')) statusChange('cancelled')">İptal et</button><?php endif; ?>
+        <?php else: ?>
         <select class="select" style="width:auto;min-width:160px" id="statusPicker" onchange="statusChange(this.value)">
             <?php foreach (TASK_STATUSES as $k => $v): ?><option value="<?= $k ?>" <?= $task['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
         </select>
+        <?php endif; ?>
         <button class="btn" title="İşi ve tartışmayı AI ile özetle" onclick="aiSummary(<?= $id ?>)">🪄</button>
         <button class="btn" onclick="modalOpen('modalTaskEdit')"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
     </div>
 </div>
 
-<?php if ($steps): ?>
+<?php if ($steps):
+    $activeStep = null;
+    foreach ($steps as $a) if ($a['status'] === 'active') { $activeStep = $a; break; }
+    $canAct = $activeStep && step_can_act($activeStep, $u);
+    $mySkills = user_skill_ids((int)$u['id']);
+    $canClaim = $activeStep && !$activeStep['owner_id'] && $activeStep['skill_id'] && (is_pm() || in_array((int)$activeStep['skill_id'], $mySkills, true)); ?>
 <!-- WORKFLOW STEPS -->
 <div class="card mb-3">
-    <div class="row-flex between mb-3"><div class="card-title">Adımlar</div><span class="text-muted small" id="stepCounter"><?= count(array_filter($steps, fn($a) => $a['status'] === 'done')) ?>/<?= count($steps) ?> adım tamamlandı</span></div>
+    <div class="row-flex between mb-3"><div class="card-title">Adımlar<?= $task['type_name'] ? ' <span class="cell-bottom" style="font-weight:400">· ' . e($task['type_name']) . '</span>' : '' ?></div><span class="text-muted small" id="stepCounter"><?= count(array_filter($steps, fn($a) => $a['status'] === 'done')) ?>/<?= count($steps) ?> adım tamamlandı</span></div>
     <div class="flow-rail">
         <?php foreach ($steps as $i => $a): ?>
         <div class="flow-step <?= $a['status'] === 'done' ? 'done' : ($a['status'] === 'active' ? 'active' : '') ?>" data-step="<?= $a['id'] ?>" data-sort_order="<?= $i + 1 ?>">
             <div class="flow-line"></div>
             <div class="flow-step-inner">
-                <button class="flow-circle" onclick="stepComplete(<?= $a['id'] ?>)" title="Tamamla / geri al">
+                <button class="flow-circle" onclick="stepComplete(<?= $a['id'] ?>)" title="<?= $a['status'] === 'done' ? 'Geri aç' : STEP_KINDS[$a['kind']] ?>">
                     <?php if ($a['status'] === 'done'): ?><svg width="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg><?php else: ?><?= $i + 1 ?><?php endif; ?>
                 </button>
                 <div class="flow-name"><?= e($a['name']) ?></div>
-                <button class="flow-owner" onclick="stepOwner(<?= $a['id'] ?>)" style="cursor:pointer"><?= $a['owner_name'] ? e(explode(' ', $a['owner_name'])[0]) : '+ sorumlu' ?></button>
+                <div class="cell-bottom" style="font-size:11px"><?= e($a['skill_name'] ?? '') ?><?= $a['kind'] !== 'work' ? ($a['skill_name'] ? ' · ' : '') . STEP_KINDS[$a['kind']] : '' ?></div>
+                <button class="flow-owner" onclick="stepOwner(<?= $a['id'] ?>)" style="cursor:pointer"><?= $a['owner_name'] ? e(explode(' ', $a['owner_name'])[0]) : ($a['skill_name'] ? 'Havuz' : '+ sorumlu') ?></button>
             </div>
         </div>
         <?php endforeach; ?>
     </div>
+    <?php if ($activeStep && $task['status'] !== 'cancelled'): ?>
+    <!-- Who holds the work now, and what they can do -->
+    <div class="row-flex between wrap mt-3" style="gap:10px;padding:12px 14px;background:var(--surface-2);border-radius:12px">
+        <div class="small">
+            <b>Sıradaki: <?= e($activeStep['name']) ?></b> · <?= STEP_KINDS[$activeStep['kind']] ?>
+            <span class="cell-bottom"> — <?= $activeStep['owner_name'] ? e($activeStep['owner_name']) . ' üzerinde' : ($activeStep['skill_name'] ? e($activeStep['skill_name']) . ' havuzunda, sahibi yok' : 'sorumlusu yok') ?></span>
+        </div>
+        <div class="row-flex wrap" style="gap:6px">
+            <?php if ($canClaim): ?><button class="btn btn-sm btn-brand" data-action="step_claim" data-id="<?= $activeStep['id'] ?>" data-refresh="yes">Ben alıyorum</button><?php endif; ?>
+            <?php if ($canAct && $activeStep['kind'] === 'work'): ?><button class="btn btn-sm btn-brand" onclick="stepComplete(<?= $activeStep['id'] ?>)">Bitir</button><?php endif; ?>
+            <?php if ($canAct && $activeStep['kind'] === 'review'): ?>
+            <button class="btn btn-sm btn-brand" onclick="stepComplete(<?= $activeStep['id'] ?>)">Onayla</button>
+            <button class="btn btn-sm" onclick="stepReturn(<?= $activeStep['id'] ?>)">Geri gönder</button>
+            <?php endif; ?>
+            <?php if ($activeStep['kind'] === 'client_approval' && $task['kind'] === 'client'): ?>
+            <?php if (permission('approval_send')): ?><button class="btn btn-sm btn-brand" data-modal="modalSendApproval">Müşteriye gönder</button><?php endif; ?>
+            <?php if (is_pm()): ?><button class="btn btn-sm" onclick="if (confirm('Müşteri onayını onun adına kaydediyorsunuz. Devam edilsin mi?')) stepComplete(<?= $activeStep['id'] ?>)" title="Müşteri onayı telefonda/e-postada geldiyse">Onay geldi</button><button class="btn btn-sm" onclick="stepReturn(<?= $activeStep['id'] ?>)">Revize geldi</button><?php endif; ?>
+            <?php endif; ?>
+            <?php if ($canAct && $activeStep['kind'] === 'publish'): ?><button class="btn btn-sm btn-brand" onclick="stepComplete(<?= $activeStep['id'] ?>)"><?= icon('rocket', 13) ?> Yayınlandı</button><?php endif; ?>
+            <?php if (is_pm() || (int)$activeStep['owner_id'] === (int)$u['id']): ?><button class="btn btn-sm btn-ghost" onclick="stepOwner(<?= $activeStep['id'] ?>)">Devret</button><?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -191,7 +227,7 @@ page_start($task['title'], 'tasks');
         <div class="card mb-2">
             <div class="row-flex between mb-2">
                 <div class="card-title" style="font-size:14px"><?= icon('approval', 15) ?> Müşteri Onayı</div>
-                <?php if (permission('approval_send') && task_is_open($task['status'])): ?><button class="mini-btn" data-modal="modalSendApproval">Müşteriye gönder</button><?php endif; ?>
+                <?php if (permission('approval_send') && task_is_open($task['status']) && (!$steps || ($activeStep['kind'] ?? '') === 'client_approval')): ?><button class="mini-btn" data-modal="modalSendApproval">Müşteriye gönder</button><?php endif; ?>
             </div>
             <?php if (!$approvals): ?><div class="text-muted small">Henüz müşteriye gönderilmedi.</div>
             <?php else: foreach ($approvals as $o): ?>
@@ -334,18 +370,26 @@ page_start($task['title'], 'tasks');
 
 <!-- Step owner assignment -->
 <div class="modal-overlay" id="modalStepOwner">
-    <div class="modal"><div class="modal-top"><div class="modal-title">Adım Sorumlusu</div><button class="modal-close" data-modal-close>✕</button></div>
+    <div class="modal"><div class="modal-top"><div class="modal-title">Adımı Devret</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="step_owner" data-refresh="yes">
         <input type="hidden" name="id" id="stepOwnerId">
-        <div class="modal-body"><div class="form-group"><label class="form-label">Sorumlu Kişi</label><select name="owner_id" class="select"><option value="">— Kaldır</option><?php foreach ($team as $k): ?><option value="<?= $k['id'] ?>"><?= e($k['name']) ?></option><?php endforeach; ?></select></div></div>
+        <div class="modal-body"><div class="form-group"><label class="form-label">Kime</label><select name="owner_id" class="select native-select"><option value="">Havuza bırak (uzmanlığı olan alsın)</option><?php foreach ($team as $k): ?><option value="<?= $k['id'] ?>"><?= e($k['name']) ?><?= ($stepLoad[$k['id']] ?? 0) ? ' — ' . $stepLoad[$k['id']] . ' açık adım' : ' — boşta' ?></option><?php endforeach; ?></select><div class="form-hint">Parantezdeki sayı kişinin üzerindeki açık adımları gösterir; karar sizde.</div></div></div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Ata</button></div>
     </form></div>
 </div>
 
+<!-- Send back with the reason -->
+<div class="modal-overlay" id="modalStepReturn">
+    <div class="modal"><div class="modal-top"><div class="modal-title">Geri Gönder</div><button class="modal-close" data-modal-close>✕</button></div>
+    <form data-ajax="step_return" data-refresh="yes">
+        <input type="hidden" name="id" id="stepReturnId">
+        <div class="modal-body"><div class="form-group"><label class="form-label">Ne değişmeli? <span class="required">*</span></label><textarea name="note" class="text-area" required placeholder="Örn. renkler marka kitine uymuyor, ilk 3 saniye daha hızlı olmalı"></textarea><div class="form-hint">İş, en son biten üretim adımına döner; not işin tartışmasına düşer.</div></div></div>
+        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Geri Gönder</button></div>
+    </form></div>
+</div>
 <script>
 // Live sync: if someone else changes this task, the page refreshes
 window.sadaLive = { context: 'task', id: <?= $id ?>, hash: '<?= live_hash_task($id) ?>' };
-const CHECK_SVG = '<svg width="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>';
 
 async function statusChange(status) {
     const j = await api('task_status', { id: <?= $id ?>, status });
@@ -353,24 +397,15 @@ async function statusChange(status) {
     else if (!['network', 'timeout'].includes(j.error)) setTimeout(() => location.reload(), 1600); // the lock rejected it → revert to the stored value (a network failure must not add a reload to a struggling server)
 }
 function stepOwner(id) { document.getElementById('stepOwnerId').value = id; modalOpen('modalStepOwner'); }
+function stepReturn(id) { document.getElementById('stepReturnId').value = id; modalOpen('modalStepReturn'); }
 
-/* Workflow step: update without a page reload */
+/* Workflow step: a step changes who holds the work and its status, so the page reloads */
 async function stepComplete(id) {
     const j = await api('step_complete', { id });
     if (!j.ok) return;
-    toast(j.message, 'success', 1800);
-    j.steps.forEach(a => {
-        const el = document.querySelector(`[data-step="${a.id}"]`);
-        if (!el) return;
-        el.classList.toggle('done', a.status === 'done');
-        el.classList.toggle('active', a.status === 'active');
-        el.querySelector('.flow-circle').innerHTML = a.status === 'done' ? CHECK_SVG : el.dataset.sort_order;
-    });
-    document.getElementById('stepCounter').textContent = j.done_count + '/' + j.total + ' adım tamamlandı';
-    // If the task is completed, sync the status picker and badge
-    const picker = document.getElementById('statusPicker');
-    if (picker && picker.value !== j.task_status) { picker.value = j.task_status; toast('İş durumu: ' + j.task_status_tag, 'success', 2400); }
+    toast(j.message + (j.task_status_tag ? ' · İş: ' + j.task_status_tag : ''), 'success', 1800);
     liveRefresh();
+    setTimeout(() => location.reload(), 700);
 }
 
 /* Checklist: update without a page reload */

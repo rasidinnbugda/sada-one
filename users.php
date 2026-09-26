@@ -8,6 +8,11 @@ $users = rows("SELECT us.*, d.name client_name,
     (SELECT COUNT(*) FROM customer_clients md WHERE md.user_id=us.id) md_count
     FROM users us LEFT JOIN clients d ON d.id=us.client_id ORDER BY us.is_active DESC, FIELD(us.role,'admin','pm','team','finance','intern','customer'), us.name");
 $clients = rows("SELECT id, name FROM clients ORDER BY name");
+$skills = skills_all();
+$userSkills = [];
+foreach (rows("SELECT us.user_id, s.id, s.name FROM user_skills us JOIN skills s ON s.id=us.skill_id ORDER BY s.sort_order") as $r) $userSkills[$r['user_id']][] = $r;
+foreach ($users as &$usr) $usr['skill_ids'] = array_map('intval', array_column($userSkills[$usr['id']] ?? [], 'id'));
+unset($usr);
 
 page_start('Kullanıcılar', 'users');
 ?>
@@ -30,7 +35,7 @@ page_start('Kullanıcılar', 'users');
         <td style="width:44px"><?= avatar($k, 38) ?></td>
         <td><div class="cell-main"><?= e($k['name']) ?><?php if ($k['id'] == $u['id']): ?> <span class="cell-bottom">(siz)</span><?php endif; ?></div><div class="cell-bottom"><?= e($k['email']) ?></div></td>
         <td><span class="badge badge-type"><?= ROLES[$k['role']] ?></span></td>
-        <td class="small"><?= $k['job_title'] ? e($k['job_title']) : '' ?><?= $k['md_count'] > 1 ? ' · ' . $k['md_count'] . ' dosya' : ($k['client_name'] ? ' · ' . e($k['client_name']) : '') ?></td>
+        <td class="small"><?= $k['job_title'] ? e($k['job_title']) : '' ?><?php foreach ($userSkills[$k['id']] ?? [] as $sk): ?> <span class="badge badge-type" style="padding:1px 7px"><?= e($sk['name']) ?></span><?php endforeach; ?><?= $k['md_count'] > 1 ? ' · ' . $k['md_count'] . ' dosya' : ($k['client_name'] ? ' · ' . e($k['client_name']) : '') ?></td>
         <td class="small text-muted"><?= $k['last_login'] ? 'Son giriş ' . time_ago($k['last_login']) : 'Hiç girmedi' ?></td>
         <td style="width:150px;text-align:right">
             <button class="icon-action" onclick='userEdit(<?= json_encode($k, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)'><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="17"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button>
@@ -52,6 +57,13 @@ page_start('Kullanıcılar', 'users');
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Rol</label><select name="role" id="k_role" class="select" onchange="roleChanged()"><?php foreach (ROLES as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-group"><label class="form-label">Ünvan</label><input name="job_title" id="k_job_title" class="input" placeholder="Örn. Sosyal Medya Uzmanı"></div>
+            </div>
+            <div class="form-group" id="skillGroup">
+                <label class="form-label">Uzmanlıklar <span class="text-muted" style="font-weight:400">— hangi adımları yapabileceği; sahipsiz adımlar bu havuzlara düşer</span></label>
+                <input type="hidden" name="skills" id="k_skills">
+                <div class="row-flex wrap" style="gap:6px">
+                    <?php foreach ($skills as $s): ?><label class="row-flex small" style="gap:7px;padding:7px 12px;background:var(--surface-2);border-radius:9px;cursor:pointer"><input type="checkbox" class="skill-box" value="<?= $s['id'] ?>"> <?= e($s['name']) ?></label><?php endforeach; ?>
+                </div>
             </div>
             <div class="form-group" id="clientGroup" style="display:none">
                 <label class="form-label">Erişebileceği Dosyalar (müşteri için) <span class="required">*</span> <span class="text-muted" style="font-weight:400">— birden fazla seçilebilir</span></label>
@@ -98,6 +110,7 @@ function roleChanged() {
     document.getElementById('clientGroup').style.display = role === 'customer' ? 'block' : 'none';
     document.getElementById('permissionGroup').style.display = roleDefault[role] ? 'block' : 'none';
     document.getElementById('capacityGroup').style.display = role === 'customer' ? 'none' : 'block';
+    document.getElementById('skillGroup').style.display = role === 'customer' ? 'none' : 'block';
     // Reflect role defaults onto the checkboxes (if there is no custom override)
     if (roleDefault[role] && !window.permissionCustom) {
         document.querySelectorAll('.permission-box').forEach(c => { c.checked = !!roleDefault[role][c.dataset.permission]; });
@@ -121,6 +134,7 @@ function userEdit(k) {
     document.getElementById('k_email').value = k.email;
     document.getElementById('k_role').value = k.role;
     document.getElementById('k_job_title').value = k.job_title || '';
+    document.querySelectorAll('.skill-box').forEach(c => { c.checked = (k.skill_ids || []).includes(Number(c.value)); });
     // Customer clients: junction table + primary client
     const selected = new Set((k.md_ids ? String(k.md_ids).split(',') : []).concat(k.client_id ? [String(k.client_id)] : []));
     document.querySelectorAll('.mclient-box').forEach(c => { c.checked = selected.has(c.value); });
@@ -147,6 +161,7 @@ document.getElementById('userForm').addEventListener('submit', () => {
         document.querySelectorAll('.permission-box').forEach(c => { permissions[c.dataset.permission] = c.checked ? 1 : 0; });
         document.getElementById('k_permissions').value = JSON.stringify(permissions);
     } else document.getElementById('k_permissions').value = '';
+    document.getElementById('k_skills').value = role === 'customer' ? '' : JSON.stringify(Array.from(document.querySelectorAll('.skill-box:checked')).map(c => c.value));
     document.getElementById('k_customer_clients').value = role === 'customer'
         ? JSON.stringify(Array.from(document.querySelectorAll('.mclient-box:checked')).map(c => c.value))
         : '';

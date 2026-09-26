@@ -38,18 +38,24 @@ $tasks = rows("SELECT g.*, p.name project_name, d.color client_color, uu.name as
 
 $activeProject = $projectFilter ? row("SELECT name FROM projects WHERE id=?", [$projectFilter]) : null;
 $team = rows("SELECT id, name, color FROM users WHERE role IN ('admin','pm','team') AND is_active=1 ORDER BY name");
-$templates = rows("SELECT * FROM workflow_templates ORDER BY name");
+$templates = rows("SELECT * FROM task_types ORDER BY name");
 
 // Active workflow steps I am responsible for
 $stepConditionSql = only_own_steps()
     ? "ga.owner_id=?"
-    : "(ga.owner_id=? OR (ga.owner_id IS NULL AND (g.assignee_id=? OR EXISTS(SELECT 1 FROM task_assignees gat WHERE gat.task_id=g.id AND gat.user_id=?))))";
+    : "(ga.owner_id=? OR (ga.owner_id IS NULL AND ga.skill_id IS NULL AND (g.assignee_id=? OR EXISTS(SELECT 1 FROM task_assignees gat WHERE gat.task_id=g.id AND gat.user_id=?))))";
 $stepParam = only_own_steps() ? [$u['id']] : [$u['id'], $u['id'], $u['id']];
 $my_steps = rows("SELECT ga.id step_id, ga.name step_name, ga.status step_status, g.id task_id, g.title, p.name project_name
     FROM task_steps ga JOIN tasks g ON g.id=ga.task_id JOIN projects p ON p.id=g.project_id
     WHERE ga.status IN ('active','pending') AND g.is_archived=0 AND " . task_open_sql('g') . " AND $stepConditionSql
     ORDER BY ga.status='active' DESC, g.due_date IS NULL, g.due_date LIMIT 12", $stepParam);
 $my_steps = array_filter($my_steps, fn($a2) => $a2['step_status'] === 'active' || count($my_steps) < 8);
+// Unowned active steps waiting in the pools of my skills (managers see every pool)
+$mySkills = user_skill_ids((int)$u['id']);
+$pool = ($mySkills || is_pm()) ? rows("SELECT ga.id step_id, ga.name step_name, k.name skill_name, g.id task_id, g.title, g.due_date, p.name project_name
+    FROM task_steps ga JOIN tasks g ON g.id=ga.task_id JOIN projects p ON p.id=g.project_id JOIN skills k ON k.id=ga.skill_id
+    WHERE ga.status='active' AND ga.owner_id IS NULL AND g.is_archived=0 AND g.status!='cancelled'" . (is_pm() ? '' : ' AND ga.skill_id IN (' . implode(',', $mySkills) . ')') . "
+    ORDER BY g.due_date IS NULL, g.due_date, g.id LIMIT 12") : [];
 
 page_start('İşler', 'tasks');
 ?>
@@ -65,6 +71,19 @@ page_start('İşler', 'tasks');
         <div class="row-flex between" style="padding:9px 12px;background:var(--surface-2);border-radius:10px;gap:10px">
             <a href="task.php?id=<?= $myStep['task_id'] ?>" class="small" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b><?= e($myStep['step_name']) ?></b> · <?= e($myStep['title']) ?> <span class="text-muted">(<?= e($myStep['project_name']) ?>)</span></a>
             <?php if ($myStep['step_status'] === 'active'): ?><button class="btn btn-sm btn-brand" data-action="step_complete" data-id="<?= $myStep['step_id'] ?>" style="flex-shrink:0">Tamamla</button><?php else: ?><span class="badge" style="flex-shrink:0">Sırada</span><?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+<?php if ($pool): ?>
+<div class="card mb-3" style="border-style:dashed">
+    <div class="card-title mb-2" style="display:flex;align-items:center;gap:9px"><?= icon('people', 16) ?> Havuz <span class="badge r-pending" style="padding:1px 9px"><?= count($pool) ?> sahipsiz adım</span><span class="cell-bottom">· <?= is_pm() ? 'tüm uzmanlıklar' : 'uzmanlıklarına düşenler' ?></span></div>
+    <div class="vertical" style="gap:6px">
+        <?php foreach ($pool as $p): ?>
+        <div class="row-flex between" style="padding:9px 12px;background:var(--surface-2);border-radius:10px;gap:10px">
+            <a href="task.php?id=<?= $p['task_id'] ?>" class="small" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b><?= e($p['step_name']) ?></b> · <?= e($p['title']) ?> <span class="text-muted">(<?= e($p['project_name']) ?> · <?= e($p['skill_name']) ?>)</span><?= $p['due_date'] ? ' <span class="text-muted">· son ' . format_date($p['due_date']) . '</span>' : '' ?></a>
+            <button class="btn btn-sm btn-brand" data-action="step_claim" data-id="<?= $p['step_id'] ?>" style="flex-shrink:0">Ben alıyorum</button>
         </div>
         <?php endforeach; ?>
     </div>

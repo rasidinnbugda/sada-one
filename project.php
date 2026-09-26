@@ -11,6 +11,7 @@ if (!$project || !project_access($id)) { header('Location: projects.php'); exit;
 $tasks = rows("SELECT g.*, u.name assignee_name, u.color assignee_color, u.avatar assignee_avatar,
     bg.status dependency_status, bg.title dependency_title,
     (SELECT COUNT(*) FROM task_checklist k WHERE k.task_id=g.id) check_total,
+    (SELECT COUNT(*) FROM task_steps st WHERE st.task_id=g.id) step_total,
     (SELECT COUNT(*) FROM task_checklist k WHERE k.task_id=g.id AND k.is_done=1) check_is_done,
     (SELECT COUNT(*) FROM task_assignees gaa WHERE gaa.task_id=g.id) assignee_count,
     (SELECT GROUP_CONCAT(u3.name SEPARATOR ', ') FROM task_assignees ga3 JOIN users u3 ON u3.id=ga3.user_id WHERE ga3.task_id=g.id) assignee_names
@@ -28,7 +29,7 @@ $archives = rows("SELECT a.*, u.name uploader_name FROM archive a LEFT JOIN user
 $activities = rows("SELECT a.*, u.name FROM activities a JOIN users u ON u.id=a.user_id WHERE (a.ref_type='project' AND a.ref_id=?) ORDER BY a.id DESC LIMIT 30", [$id]);
 $periods = $project['type'] === 'monthly' ? rows("SELECT d.*, (SELECT COUNT(*) FROM tasks g WHERE g.period_id=d.id) task_count FROM periods d WHERE d.project_id=? ORDER BY d.year DESC, d.month DESC", [$id]) : [];
 $team = rows("SELECT id, name, color FROM users WHERE role IN ('admin','pm','team') AND is_active=1 ORDER BY name");
-$templates = rows("SELECT * FROM workflow_templates ORDER BY name");
+$templates = rows("SELECT * FROM task_types ORDER BY name");
 $projectMembers = rows("SELECT u.id, u.name, u.color, u.avatar, u.job_title FROM project_members pu JOIN users u ON u.id=pu.user_id WHERE pu.project_id=? AND u.is_active=1 ORDER BY u.name", [$id]);
 
 // Station (SOP) data — visible only to staff
@@ -417,7 +418,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
                 <div class="form-group"><label class="form-label">Ay</label><select name="month" class="select"><?php foreach (MONTHS as $k => $v): ?><option value="<?= $k ?>" <?= $k == date('n') ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-group"><label class="form-label">Yıl</label><select name="year" class="select"><?php for ($y = date('Y') - 1; $y <= date('Y') + 1; $y++): ?><option value="<?= $y ?>" <?= $y == date('Y') ? 'selected' : '' ?>><?= $y ?></option><?php endfor; ?></select></div>
             </div>
-            <div class="form-group"><label class="form-label">Akış Şablonundan İş Oluştur</label><select name="template_id" class="select"><option value="">Boş dönem</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen şablonun adımları iş akışı olarak eklenir.</div></div>
+            <div class="form-group"><label class="form-label">İş Türünden İş Oluştur</label><select name="type_id" class="select"><option value="">Boş dönem</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen şablonun adımları iş akışı olarak eklenir.</div></div>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Dönemi Aç</button></div>
     </form></div>

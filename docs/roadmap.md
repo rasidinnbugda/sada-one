@@ -17,13 +17,25 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 ## Aşamalar
 
 0. **Temizlik** — 7.0 ✅ (7.0.1: dosya yüklemeleri onarıldı)
-1. **İş'i tekleştirme** — 7.1 (bu belge aşağıda)
-2. **Adım motoru:** iş türü tarifleri, adımlarda uzmanlık etiketi (Tasarım, Kurgu, Metin, Çekim, Koordinasyon), atanmayan adım uzmanlık havuzuna düşer, İş'in durumu adımlardan kendiliğinden hesaplanır.
+1. **İş'i tekleştirme** — 7.1 ✅
+2. **Adım motoru** — 7.2 ✅: iş türü tarifleri, adımlarda uzmanlık etiketi (Tasarım, Kurgu, Metin, Çekim, Koordinasyon), atanmayan adım uzmanlık havuzuna düşer, İş'in durumu adımlardan kendiliğinden hesaplanır.
 3. **Ay ve Proje:** aylık projelerde "Ay" plan → üretim → kapanış; planlı/gündem ayrımı; ay sonu raporu aya bağlanır; kapsam sinyali; dosya bazlı onay kuralları.
 4. **Eylemden durum:** dosya yüklenince adım ilerler; müşteri hesapsız linkten onaylar, revize üretime döner.
 5. **Yardım eden ekran:** "Şimdi" kartı ve Bugün; işi izleyen Kule (Yönetici Takip'in yerine).
 6. **Sadeleştirme:** menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm:** açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
+
+## 2. aşama — Adım motoru (7.2)
+
+**İş türü** (eski adıyla akış şablonu) bir tariftir: adımlar, her adımın **uzmanlığı** (Koordinasyon, Tasarım, Kurgu, Çekim, Metin, Geliştirme — yönetici düzenler) ve **türü**: üretim, iç kontrol, müşteri onayı, yayın. İsteğe bağlı varsayılan kişi; boşsa Koordinasyon adımı proje yöneticisine, diğerleri havuza gider.
+
+**Durum adımlardan gelir:** aktif üretim adımı → Devam Ediyor (hiç adım bitmediyse Yapılacak), iç kontrol → İç Onayda, müşteri onayı → Müşteride, yayın → Tamamlandı (yayın bekliyor); tüm adımlar bitince Tamamlandı, son adım yayınsa Yayınlandı. Adımlı işte elle yalnızca İptal / Yeniden aç. Adımsız işler elle yönetilir.
+
+**Havuz:** sahibi olmayan aktif adım uzmanlığın havuzundadır; uzmanlığı olan herkese bildirim gider ("yalnızca bana atananlar" tercihini açanlar hariç), ilk "Ben alıyorum" diyen alır. İşin "atananı" aktif adımın sahibidir.
+
+**Geri gönderme:** iç kontrol ya da müşteri revizesi işi en son biten üretim adımına döndürür; sebep işin tartışmasına yazılır. Müşteri onayı adımını müşterinin cevabı ilerletir; yönetici "Onay geldi / Revize geldi" ile müşteri adına kaydedebilir.
+
+**Taşıma:** akış şablonları iş türü olur; adımların türü ve uzmanlığı adlarından çıkarılır, sabit "Revizyon" adımı kalkar; adımlı işlerin durumu adımlardan yeniden hesaplanır (kapanmış işler kapalı kalır); kişilerin uzmanlıkları unvanlarından önerilir.
 
 ## 1. aşama — İş'i tekleştirme (7.1)
 

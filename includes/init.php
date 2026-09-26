@@ -132,7 +132,7 @@ function legacy_schema_check(): void {
             require_once __DIR__ . '/migration.php';
             $t0 = microtime(true); $fresh = 0; $failed = false;
             foreach (run_migrations(db()) as $mr) {
-                if (($mr[0] ?? '') === 'error') { error_log('[SADA] migration error: ' . ($mr[1] ?? '?')); $failed = $failed || preg_match('~^(english|work):~', (string)($mr[1] ?? '')); }
+                if (($mr[0] ?? '') === 'error') { error_log('[SADA] migration error: ' . ($mr[1] ?? '?')); $failed = $failed || preg_match('~^(english|work|steps):~', (string)($mr[1] ?? '')); }
                 if (($mr[0] ?? '') === 'ok') $fresh++;
             }
             if ($failed) {
@@ -447,8 +447,17 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.1';
+const APP_VERSION = '7.2';
 const VERSION_NOTES = [
+    '7.2' => [
+        'Adım motoru: Akış Şablonları artık "İş Türleri". Her tür bir adım tarifi taşır; her adımın bir uzmanlığı (Tasarım, Kurgu, Metin, Çekim, Koordinasyon, Geliştirme) ve türü (üretim, iç kontrol, müşteri onayı, yayın) vardır',
+        'Adımlı işlerin durumu adımlardan gelir: üretim → Devam Ediyor, iç kontrol → İç Onayda, müşteri onayı → Müşteride, yayın → Tamamlandı (yayın bekliyor), hepsi bitince Tamamlandı / Yayınlandı. Elle yalnızca iptal edilir ya da yeniden açılır',
+        'Havuz: sahibi olmayan adım uzmanlığın havuzuna düşer, o uzmanlıktaki herkese bildirim gider; İşler sayfasındaki "Havuz" kartından "Ben alıyorum" ile alınır (aynı adımı iki kişi alamaz)',
+        'İş sayfasında sıradaki adımın bandı: Bitir, Onayla / Geri gönder (not işin tartışmasına düşer, iş son üretim adımına döner), Müşteriye gönder, Yayınlandı, Devret (kişilerin açık adım sayısıyla)',
+        'Müşteri onaylayınca müşteri onayı adımı kendiliğinden biter; revize ya da ret iş\'i üretime geri gönderir',
+        'Yeni İş açarken tür seçilir; adımlar formda listelenir, her adıma kişi ya da havuz atanır (Koordinasyon adımları varsayılan olarak proje yöneticisine gider)',
+        'Kullanıcılar sayfasında kişilere uzmanlık verilir; güncellemede unvanlardan tahmin edilen uzmanlıklar önerilir. Sabit "Revizyon" adımı kaldırıldı (revize artık geri gönderme döngüsü)',
+    ],
     '7.1' => [
         'Bir çıktı, tek kayıt: görev, içerik ve onay artık tek bir İş\'te birleşti. Menüde "Görevler" artık "İşler"',
         'İşin sayfasında yayın planı (tarih, saat, platformlar) ve müşteri onay geçmişi var. "Müşteriye gönder" ile onaya yollanır; müşteri onaylarsa iş tamamlanır, revize isterse üretime döner',
@@ -1006,7 +1015,7 @@ function run_recurring_jobs(bool $force = false): int {
             'title' => $g['title'],
             'description' => $g['description'],
             'assignee_id' => $g['assignee_id'], 'created_by' => $g['created_by'],
-            'priority' => $g['priority'], 'status' => 'todo', 'kind' => $g['kind'], 'platforms' => $g['platforms'],
+            'priority' => $g['priority'], 'status' => 'todo', 'kind' => $g['kind'], 'platforms' => $g['platforms'], 'type_id' => $g['type_id'],
             'due_date' => $newLastDate, 'repeat' => 'none',
             'created' => date('Y-m-d H:i:s'),
         ]);
@@ -1014,10 +1023,11 @@ function run_recurring_jobs(bool $force = false): int {
         $steps = rows("SELECT * FROM task_steps WHERE task_id=? ORDER BY sort_order", [$g['id']]);
         foreach ($steps as $i => $a) {
             insert('task_steps', [
-                'task_id' => $newId, 'sort_order' => $a['sort_order'], 'name' => $a['name'],
+                'task_id' => $newId, 'sort_order' => $a['sort_order'], 'name' => $a['name'], 'skill_id' => $a['skill_id'], 'kind' => $a['kind'],
                 'owner_id' => $a['owner_id'], 'status' => $i === 0 ? 'active' : 'pending',
             ]);
         }
+        if ($steps) { if ($first = task_active_step($newId)) step_announce($first); task_sync_from_steps($newId); }
         // Copy the checklist in a reset state
         foreach (rows("SELECT * FROM task_checklist WHERE task_id=? ORDER BY sort_order", [$g['id']]) as $k) {
             insert('task_checklist', ['task_id' => $newId, 'name' => $k['name'], 'is_done' => 0, 'sort_order' => $k['sort_order']]);
@@ -1333,6 +1343,116 @@ function task_set_status(array $task, string $status, bool $checkLock = true): ?
         notify($aid, 'İşin durumu değişti', $task['title'] . ' → ' . TASK_STATUSES[$status], 'task.php?id=' . $task['id'], 'task');
     return null;
 }
+
+/* ---------------- Step engine (7.2) ----------------
+ * A task built from a task type moves through its steps; its status follows the active step
+ * (work → Devam Ediyor, review → İç Onayda, client approval → Müşteride, publish → Tamamlandı ·
+ * yayın bekliyor; all done → Tamamlandı / Yayınlandı). An active step without an owner that has a
+ * skill sits in that skill's pool: anyone with the skill can take it.
+ */
+require_once __DIR__ . '/migration-steps.php'; // step_status_for(), shared with the migration
+
+const STEP_KINDS = ['work' => 'Üretim', 'review' => 'İç kontrol', 'client_approval' => 'Müşteri onayı', 'publish' => 'Yayın'];
+
+function skills_all(): array { return rows("SELECT id, name FROM skills ORDER BY sort_order, name"); }
+function user_skill_ids(int $userId): array { return array_map('intval', array_column(rows("SELECT skill_id FROM user_skills WHERE user_id=?", [$userId]), 'skill_id')); }
+function task_has_steps(int $taskId): bool { return (bool)val("SELECT COUNT(*) FROM task_steps WHERE task_id=?", [$taskId]); }
+
+/** Creates a task's steps from its task type; $owners maps a type-step id (or its position) to a user id, 0 = pool */
+function task_steps_setup(int $taskId, int $typeId, array $owners = []): void {
+    $task = row("SELECT t.id, p.pm_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=?", [$taskId]);
+    $coordination = (int)val("SELECT id FROM skills WHERE name='Koordinasyon'");
+    foreach (rows("SELECT * FROM task_type_steps WHERE type_id=? ORDER BY sort_order, id", [$typeId]) as $i => $st) {
+        $owner = array_key_exists($st['id'], $owners) ? $owners[$st['id']] : ($owners[$i] ?? null);
+        // No choice made: the type's default person, else the project manager for coordination steps
+        if ($owner === null) $owner = $st['owner_id'] ?: ((int)$st['skill_id'] === $coordination && $task ? $task['pm_id'] : null);
+        insert('task_steps', [
+            'task_id' => $taskId, 'sort_order' => $st['sort_order'], 'name' => $st['name'],
+            'skill_id' => $st['skill_id'], 'kind' => $st['kind'], 'owner_id' => $owner ? (int)$owner : null,
+            'status' => $i === 0 ? 'active' : 'pending',
+        ]);
+        if ($owner) q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$taskId, (int)$owner]);
+    }
+    update_row('tasks', ['type_id' => $typeId], 'id=?', [$taskId]);
+    if ($first = row("SELECT * FROM task_steps WHERE task_id=? AND status='active' LIMIT 1", [$taskId])) step_announce($first);
+    task_sync_from_steps($taskId);
+}
+
+/** Recomputes a task's status (and who holds it) from its steps. Cancelled work stays cancelled. */
+function task_sync_from_steps(int $taskId): void {
+    $task = row("SELECT * FROM tasks WHERE id=?", [$taskId]);
+    if (!$task || $task['status'] === 'cancelled') return;
+    $steps = rows("SELECT status, kind, owner_id FROM task_steps WHERE task_id=? ORDER BY sort_order, id", [$taskId]);
+    if (!$steps) return;
+    $status = step_status_for($steps);
+    if ($status && $status !== $task['status']) task_set_status($task, $status, false);
+    // The person holding the work right now: the active step's owner
+    foreach ($steps as $s) if ($s['status'] === 'active') {
+        if ($s['owner_id'] && (int)$s['owner_id'] !== (int)$task['assignee_id']) update_row('tasks', ['assignee_id' => (int)$s['owner_id']], 'id=?', [$taskId]);
+        break;
+    }
+}
+
+/** Tells the owner it is their turn, or the skill's pool that work is waiting. */
+function step_announce(array $step): void {
+    $title = (string)val("SELECT title FROM tasks WHERE id=?", [$step['task_id']]);
+    if ($step['owner_id']) { notify((int)$step['owner_id'], 'Sıra sende: ' . $step['name'], $title, 'task.php?id=' . $step['task_id'], 'task'); return; }
+    if (!$step['skill_id']) return;
+    $skill = (string)val("SELECT name FROM skills WHERE id=?", [$step['skill_id']]);
+    foreach (rows("SELECT u.id, u.notification_preferences FROM user_skills us JOIN users u ON u.id=us.user_id WHERE us.skill_id=? AND u.is_active=1 AND u.role!='customer'", [$step['skill_id']]) as $person) {
+        $pref = json_decode((string)$person['notification_preferences'], true);
+        if (is_array($pref) && !empty($pref['only_own_steps'])) continue; // "only my steps" opts out of pool alerts
+        notify((int)$person['id'], $skill . ' havuzuna iş düştü', $title . ' → ' . $step['name'], 'task.php?id=' . $step['task_id'], 'task');
+    }
+}
+
+/** May this user act on (finish / send back) the step? Owner, managers, or anyone with the skill for a pool step. */
+function step_can_act(array $step, array $user): bool {
+    if (in_array($user['role'], ['admin', 'pm'], true)) return true;
+    if ($step['owner_id']) return (int)$step['owner_id'] === (int)$user['id'];
+    return !$step['skill_id'] || in_array((int)$step['skill_id'], user_skill_ids((int)$user['id']), true);
+}
+
+/** Finishes the active step and hands the work to the next one. Returns an error or null. */
+function step_finish(array $step, int $userId): ?string {
+    if ($step['status'] !== 'active') return 'Yalnızca sıradaki adım bitirilebilir.';
+    update_row('task_steps', ['status' => 'done', 'done_date' => date('Y-m-d H:i:s'), 'done_by' => $userId, 'owner_id' => $step['owner_id'] ?: $userId], 'id=?', [$step['id']]);
+    $next = row("SELECT * FROM task_steps WHERE task_id=? AND status!='done' AND (sort_order>? OR (sort_order=? AND id>?)) ORDER BY sort_order, id LIMIT 1", [$step['task_id'], $step['sort_order'], $step['sort_order'], $step['id']]);
+    if ($next) { update_row('task_steps', ['status' => 'active'], 'id=?', [$next['id']]); $next['status'] = 'active'; step_announce($next); }
+    task_sync_from_steps((int)$step['task_id']);
+    return null;
+}
+
+/** Sends the work back from a review / client-approval step to the last finished production step. */
+function step_send_back(array $step, string $note, int $userId, string $who = ''): ?string {
+    if ($step['status'] !== 'active') return 'Yalnızca sıradaki adım geri gönderilebilir.';
+    $target = row("SELECT * FROM task_steps WHERE task_id=? AND kind='work' AND status='done' AND sort_order<=? AND id!=? ORDER BY sort_order DESC, id DESC LIMIT 1", [$step['task_id'], $step['sort_order'], $step['id']])
+        ?: row("SELECT * FROM task_steps WHERE task_id=? ORDER BY sort_order, id LIMIT 1", [$step['task_id']]);
+    if (!$target || (int)$target['id'] === (int)$step['id']) return 'Geri gönderilecek bir üretim adımı yok.';
+    q("UPDATE task_steps SET status='pending', done_date=NULL, done_by=NULL WHERE task_id=? AND sort_order>? AND sort_order<=?", [$step['task_id'], $target['sort_order'], $step['sort_order']]);
+    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null], 'id=?', [$target['id']]);
+    // The reason lands in the task's discussion, so the maker sees it next to the work
+    insert('comments', ['ref_type' => 'task', 'ref_id' => $step['task_id'], 'user_id' => $userId, 'created' => date('Y-m-d H:i:s'),
+        'message' => '↩ ' . ($who !== '' ? $who . ' — ' : '') . $step['name'] . ' adımından "' . $target['name'] . '" adımına geri gönderildi' . (trim($note) !== '' ? ': ' . trim($note) : '')]);
+    $target['status'] = 'active';
+    step_announce($target);
+    task_sync_from_steps((int)$step['task_id']);
+    return null;
+}
+
+/** Reopens a finished step (undo); the steps after it wait again. */
+function step_reopen(array $step): ?string {
+    if ($step['status'] !== 'done') return 'Bu adım zaten açık.';
+    q("UPDATE task_steps SET status='pending', done_date=NULL, done_by=NULL WHERE task_id=? AND status IN ('done','active') AND (sort_order>? OR (sort_order=? AND id>?))", [$step['task_id'], $step['sort_order'], $step['sort_order'], $step['id']]);
+    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null], 'id=?', [$step['id']]);
+    $task = row("SELECT * FROM tasks WHERE id=?", [$step['task_id']]);
+    if ($task && in_array($task['status'], ['completed', 'published'], true)) task_set_status($task, 'in_progress', false);
+    task_sync_from_steps((int)$step['task_id']);
+    return null;
+}
+
+/** The active step of a task, if any */
+function task_active_step(int $taskId): ?array { return row("SELECT * FROM task_steps WHERE task_id=? AND status='active' ORDER BY sort_order, id LIMIT 1", [$taskId]); }
 
 /* ---------------- Task lock checks ---------------- */
 

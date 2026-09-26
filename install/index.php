@@ -165,19 +165,36 @@ CREATE TABLE IF NOT EXISTS periods (
     UNIQUE KEY uniq_period (project_id, year, month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS workflow_templates (
+CREATE TABLE IF NOT EXISTS task_types (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(120) NOT NULL,
     description VARCHAR(255) DEFAULT NULL,
+    kind ENUM('client','internal') NOT NULL DEFAULT 'client',
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
-CREATE TABLE IF NOT EXISTS template_steps (
+CREATE TABLE IF NOT EXISTS task_type_steps (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    template_id INT NOT NULL,
+    type_id INT NOT NULL,
     sort_order TINYINT NOT NULL DEFAULT 1,
     name VARCHAR(120) NOT NULL,
-    INDEX(template_id)
+    skill_id INT DEFAULT NULL,
+    kind ENUM('work','review','client_approval','publish') NOT NULL DEFAULT 'work',
+    owner_id INT DEFAULT NULL,
+    INDEX(type_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
+
+CREATE TABLE IF NOT EXISTS skills (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(60) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
+
+CREATE TABLE IF NOT EXISTS user_skills (
+    user_id INT NOT NULL,
+    skill_id INT NOT NULL,
+    PRIMARY KEY (user_id, skill_id),
+    INDEX(skill_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -206,6 +223,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     publish_date DATE DEFAULT NULL,
     publish_time TIME DEFAULT NULL,
     platforms VARCHAR(120) DEFAULT NULL,
+    type_id INT DEFAULT NULL,
     created DATETIME NOT NULL,
     INDEX(project_id), INDEX(assignee_id), INDEX(period_id), INDEX publish_date (publish_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
@@ -239,7 +257,10 @@ CREATE TABLE IF NOT EXISTS task_steps (
     owner_id INT DEFAULT NULL,
     status ENUM('pending','active','done') NOT NULL DEFAULT 'pending',
     done_date DATETIME DEFAULT NULL,
-    INDEX(task_id)
+    skill_id INT DEFAULT NULL,
+    kind ENUM('work','review','client_approval','publish') NOT NULL DEFAULT 'work',
+    done_by INT DEFAULT NULL,
+    INDEX(task_id), INDEX pool (status, owner_id, skill_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
 CREATE TABLE IF NOT EXISTS comments (
@@ -700,19 +721,22 @@ SQL;
     $st = $pdo->prepare("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)");
     foreach ($settings as $k => $v) $st->execute([$k, $v]);
 
-    // Default workflow templates
-    $workflows = [
-        ['Sosyal Medya İçerik Üretimi', 'Aylık düzenli içerik üretim akışı', ['Brief & Konsept', 'Tasarım / Üretim', 'İç Onay', 'Müşteri Onayı', 'Yayın / Planlama']],
-        ['Video Prodüksiyon', 'Çekim ve kurgu süreci', ['Senaryo & Plan', 'Çekim', 'Kurgu', 'İç Onay', 'Müşteri Onayı', 'Teslim']],
-        ['Web Sitesi Projesi', 'Web sitesi yapım akışı', ['Analiz & Brief', 'Tasarım', 'Geliştirme', 'İçerik Girişi', 'Test', 'Yayına Alma']],
-        ['Grafik Tasarım', 'Tek seferlik tasarım işleri', ['Brief', 'Tasarım', 'Revizyon', 'Müşteri Onayı', 'Teslim']],
+    // Skills and default task types (each step: name, skill, kind)
+    $skillIds = [];
+    $stS = $pdo->prepare("INSERT INTO skills (name, sort_order) VALUES (?, ?)");
+    foreach (['Koordinasyon', 'Tasarım', 'Kurgu', 'Çekim', 'Metin', 'Geliştirme'] as $i => $skill) { $stS->execute([$skill, $i + 1]); $skillIds[$skill] = (int)$pdo->lastInsertId(); }
+    $types = [
+        ['Sosyal Medya İçerik Üretimi', 'Aylık düzenli içerik üretim akışı', [['Brief & Konsept', 'Koordinasyon', 'work'], ['Tasarım / Üretim', 'Tasarım', 'work'], ['İç Onay', 'Koordinasyon', 'review'], ['Müşteri Onayı', 'Koordinasyon', 'client_approval'], ['Yayın / Planlama', 'Koordinasyon', 'publish']]],
+        ['Video Prodüksiyon', 'Çekim ve kurgu süreci', [['Senaryo & Plan', 'Metin', 'work'], ['Çekim', 'Çekim', 'work'], ['Kurgu', 'Kurgu', 'work'], ['İç Onay', 'Koordinasyon', 'review'], ['Müşteri Onayı', 'Koordinasyon', 'client_approval'], ['Teslim', 'Koordinasyon', 'work']]],
+        ['Web Sitesi Projesi', 'Web sitesi yapım akışı', [['Analiz & Brief', 'Koordinasyon', 'work'], ['Tasarım', 'Tasarım', 'work'], ['Geliştirme', 'Geliştirme', 'work'], ['İçerik Girişi', 'Metin', 'work'], ['Test', 'Koordinasyon', 'review'], ['Yayına Alma', 'Koordinasyon', 'publish']]],
+        ['Grafik Tasarım', 'Tek seferlik tasarım işleri', [['Brief', 'Koordinasyon', 'work'], ['Tasarım', 'Tasarım', 'work'], ['Müşteri Onayı', 'Koordinasyon', 'client_approval'], ['Teslim', 'Koordinasyon', 'work']]],
     ];
-    $stA = $pdo->prepare("INSERT INTO workflow_templates (name, description, created) VALUES (?, ?, ?)");
-    $stB = $pdo->prepare("INSERT INTO template_steps (template_id, sort_order, name) VALUES (?, ?, ?)");
-    foreach ($workflows as $a) {
+    $stA = $pdo->prepare("INSERT INTO task_types (name, description, kind, created) VALUES (?, ?, 'client', ?)");
+    $stB = $pdo->prepare("INSERT INTO task_type_steps (type_id, sort_order, name, skill_id, kind) VALUES (?, ?, ?, ?, ?)");
+    foreach ($types as $a) {
         $stA->execute([$a[0], $a[1], $now]);
-        $sid = (int)$pdo->lastInsertId();
-        foreach ($a[2] as $i => $stepName) $stB->execute([$sid, $i + 1, $stepName]);
+        $typeId = (int)$pdo->lastInsertId();
+        foreach ($a[2] as $i => [$stepName, $skill, $kind]) $stB->execute([$typeId, $i + 1, $stepName, $skillIds[$skill], $kind]);
     }
 
     // Ready-made request form templates

@@ -549,7 +549,7 @@ case 'project_save':
             $ps = row("SELECT * FROM project_templates WHERE id=?", [(int)$g('ptemplate_id')]);
             foreach (json_decode($ps['tasks'] ?? '[]', true) ?: [] as $si => $sg) {
                 $gid = insert('tasks', ['project_id' => $id, 'title' => $sg['title'], 'priority' => $sg['priority'] ?? 'normal', 'created_by' => $u['id'], 'status' => 'todo', 'sort_order' => $si + 1, 'created' => $now]);
-                if (!empty($sg['workflow_id'])) task_steps_setup($gid, (int)$sg['workflow_id']);
+                if (!empty($sg['type_id'])) task_steps_setup($gid, (int)$sg['type_id']);
             }
         }
         log_activity('"' . $data['name'] . '" projesini oluşturdu', 'project', $id);
@@ -567,17 +567,16 @@ case 'period_open':
     require_pm();
     $projectId = (int)$g('project_id');
     $periodId = get_or_create_period($projectId, (int)$g('year'), (int)$g('month'));
-    // Option to create a task from a template
-    if ($g('template_id')) {
-        $template = row("SELECT * FROM workflow_templates WHERE id=?", [(int)$g('template_id')]);
-        $firstStep = row("SELECT name FROM template_steps WHERE template_id=? ORDER BY sort_order LIMIT 1", [(int)$g('template_id')]);
+    // Option to create this month's work from a task type
+    if ($g('type_id')) {
+        $template = row("SELECT * FROM task_types WHERE id=?", [(int)$g('type_id')]);
         if ($template) {
             $taskId = insert('tasks', [
                 'project_id' => $projectId, 'period_id' => $periodId,
                 'title' => $template['name'] . ' — ' . MONTHS[(int)$g('month')] . ' ' . $g('year'),
                 'created_by' => $u['id'], 'status' => 'todo', 'created' => $now,
             ]);
-            task_steps_setup($taskId, (int)$g('template_id'));
+            task_steps_setup($taskId, (int)$g('type_id'));
         }
     }
     json_out(['ok' => true, 'message' => 'Dönem açıldı.']);
@@ -637,7 +636,13 @@ case 'task_save':
         $data['created_by'] = $u['id']; $data['status'] = 'todo'; $data['created'] = $now;
         $data['sort_order'] = (int)val("SELECT COALESCE(MAX(sort_order),0)+1 FROM tasks WHERE project_id=? AND status='todo'", [$data['project_id']]);
         $id = insert('tasks', $data);
-        if ($g('template_id')) task_steps_setup($id, (int)$g('template_id'));
+        $typeId = (int)$g('type_id');
+        if ($typeId && val("SELECT id FROM task_types WHERE id=?", [$typeId])) {
+            $owners = [];
+            foreach ((json_decode($g('step_owners', ''), true) ?: []) as $typeStepId => $ownerId) $owners[(int)$typeStepId] = (int)$ownerId;
+            if (!array_key_exists('kind', $_POST)) update_row('tasks', ['kind' => val("SELECT kind FROM task_types WHERE id=?", [$typeId])], 'id=?', [$id]);
+            task_steps_setup($id, $typeId, $owners);
+        }
         if (is_array($assignees)) {
             foreach ($assignees as $aid) {
                 q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$id, $aid]);
@@ -657,7 +662,15 @@ case 'task_sort':
     $id = (int)$g('id');
     $task = row("SELECT * FROM tasks WHERE id=?", [$id]);
     if (!$task) json_out(['ok' => false, 'error' => 'İş bulunamadı.']);
-    if ($error = task_set_status($task, (string)$g('status'))) json_out(['ok' => false, 'error' => $error]);
+    $newStatus = (string)$g('status');
+    // Work with steps moves by its steps; by hand it can only be cancelled or reopened
+    if (task_has_steps((int)$task['id']) && $newStatus !== 'cancelled') {
+        if ($newStatus !== 'reopen' || $task['status'] !== 'cancelled') json_out(['ok' => false, 'error' => 'Bu işin durumu adımlarından geliyor: adımları ilerletin ya da işi iptal edin.']);
+        update_row('tasks', ['status' => 'in_progress'], 'id=?', [$task['id']]);
+        task_sync_from_steps((int)$task['id']);
+        json_out(['ok' => true, 'message' => 'İş yeniden açıldı.']);
+    }
+    if ($error = task_set_status($task, $newStatus)) json_out(['ok' => false, 'error' => $error]);
     // Save the in-column sort order
     $ids = json_decode($g('ids', '[]'), true);
     if (is_array($ids) && $ids) {
@@ -684,7 +697,15 @@ case 'task_field':
     $allowed = ['status', 'priority', 'assignee_id', 'due_date', 'start_date', 'publish_date', 'estimated_minutes', 'tags'];
     if (!in_array($field, $allowed)) json_out(['ok' => false, 'error' => 'Bu alan düzenlenemez.']);
     if ($field === 'status') {
-        if ($error = task_set_status($task, (string)$value)) json_out(['ok' => false, 'error' => $error]);
+        $newStatus = (string)$value;
+        // Work with steps moves by its steps; by hand it can only be cancelled or reopened
+        if (task_has_steps((int)$task['id']) && $newStatus !== 'cancelled') {
+                if ($newStatus !== 'reopen' || $task['status'] !== 'cancelled') json_out(['ok' => false, 'error' => 'Bu işin durumu adımlarından geliyor: adımları ilerletin ya da işi iptal edin.']);
+                update_row('tasks', ['status' => 'in_progress'], 'id=?', [$task['id']]);
+                task_sync_from_steps((int)$task['id']);
+                json_out(['ok' => true, 'message' => 'İş yeniden açıldı.']);
+        }
+        if ($error = task_set_status($task, $newStatus)) json_out(['ok' => false, 'error' => $error]);
     } elseif ($field === 'publish_date' && $task['kind'] !== 'client') {
         json_out(['ok' => false, 'error' => 'İç işlerin yayın tarihi olmaz.']);
     } elseif ($field === 'priority') {
@@ -787,7 +808,7 @@ case 'ptemplate_save':
     require_admin();
     $name = trim($g('name'));
     $templateTasks = json_decode($g('tasks', '[]'), true) ?: [];
-    $templateTasks = array_values(array_filter(array_map(fn($s) => ['title' => mb_substr(trim($s['title'] ?? ''), 0, 200), 'workflow_id' => (int)($s['workflow_id'] ?? 0), 'priority' => isset(PRIORITIES[$s['priority'] ?? '']) ? $s['priority'] : 'normal'], $templateTasks), fn($s) => $s['title'] !== ''));
+    $templateTasks = array_values(array_filter(array_map(fn($s) => ['title' => mb_substr(trim($s['title'] ?? ''), 0, 200), 'type_id' => (int)($s['type_id'] ?? 0), 'priority' => isset(PRIORITIES[$s['priority'] ?? '']) ? $s['priority'] : 'normal'], $templateTasks), fn($s) => $s['title'] !== ''));
     if ($name === '' || !$templateTasks) json_out(['ok' => false, 'error' => 'Ad ve en az bir iş gerekli.']);
     if ($g('id')) {
         update_row('project_templates', ['name' => $name, 'description' => $g('description'), 'tasks' => json_encode($templateTasks, JSON_UNESCAPED_UNICODE)], 'id=?', [(int)$g('id')]);
@@ -812,47 +833,34 @@ case 'lock_toggle':
     json_out(['ok' => true, 'message' => $new ? 'Kilit devre dışı — iş serbestçe ilerletilebilir.' : 'Kilit yeniden etkin.']);
 
 case 'step_complete':
+    // Finish the active step (work / review approve / publish); a done step toggles back open (undo)
     require_staff();
-    $stepId = (int)$g('id');
-    $step = row("SELECT * FROM task_steps WHERE id=?", [$stepId]);
+    $step = row("SELECT * FROM task_steps WHERE id=?", [(int)$g('id')]);
     if (!$step) json_out(['ok' => false, 'error' => 'Adım bulunamadı.']);
     $task = row("SELECT * FROM tasks WHERE id=?", [$step['task_id']]);
-    // Reverting makes this the current (active) step again, not a plain pending one
-    $newStatus = $step['status'] === 'done' ? 'active' : 'done';
-    // Sequential step rule: this step cannot be completed until earlier steps are done
-    if ($newStatus === 'done' && empty($task['lock_bypassed'])) {
-        $previousMissing = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND sort_order<? AND status!='done'", [$step['task_id'], $step['sort_order']]);
-        if ($previousMissing > 0) json_out(['ok' => false, 'error' => '🔒 Önceki ' . $previousMissing . ' adım tamamlanmadan bu adım tamamlanamaz.' . (is_pm() ? ' (İş sayfasından kilidi devre dışı bırakabilirsiniz.)' : '')]);
-    }
-    update_row('task_steps', ['status' => $newStatus, 'done_date' => $newStatus === 'done' ? $now : null], 'id=?', [$stepId]);
-    if ($newStatus === 'done') {
-        $next = row("SELECT id FROM task_steps WHERE task_id=? AND sort_order>? AND status!='done' ORDER BY sort_order LIMIT 1", [$step['task_id'], $step['sort_order']]);
-        if ($next) update_row('task_steps', ['status' => 'active'], 'id=?', [$next['id']]);
-        $remaining = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND status!='done'", [$step['task_id']]);
-        if ($remaining === 0 && task_is_open($task['status'])) task_set_status($task, 'completed', false);
-        // Notify the step owner that it is their turn
-        if ($next) {
-            $ownerId = val("SELECT owner_id FROM task_steps WHERE id=?", [$next['id']]);
-            if ($ownerId) notify((int)$ownerId, 'Akışta sıra sizde', $task['title'], 'task.php?id=' . $step['task_id'], 'task');
-        }
+    if ($task['status'] === 'cancelled') json_out(['ok' => false, 'error' => 'İptal edilmiş işin adımları değiştirilemez.']);
+    if ($step['status'] === 'done') {
+        if (!is_pm() && (int)$step['done_by'] !== (int)$u['id'] && (int)$step['owner_id'] !== (int)$u['id']) json_out(['ok' => false, 'error' => 'Bu adımı yalnızca bitiren kişi ya da yönetici geri açabilir.']);
+        $error = step_reopen($step);
     } else {
-        // Everything after the reverted step drops back to 'pending' — including the
-        // step the completion had promoted to 'active', so the arrow returns here
-        q("UPDATE task_steps SET status='pending', done_date=NULL WHERE task_id=? AND sort_order>? AND status IN ('done','active')", [$step['task_id'], $step['sort_order']]);
-        if (in_array($task['status'], ['completed', 'published'], true)) task_set_status($task, 'in_progress', false);
+        if ($step['status'] !== 'active' && empty($task['lock_bypassed'])) json_out(['ok' => false, 'error' => '🔒 Önce sıradaki adımlar bitmeli.' . (is_pm() ? ' (İş sayfasından kilidi devre dışı bırakabilirsiniz.)' : '')]);
+        if (!step_can_act($step, $u)) json_out(['ok' => false, 'error' => 'Bu adım size ait değil. Havuzdaysa önce "Ben alıyorum" deyin.']);
+        // The client's approval comes from the client; managers may record it on their behalf
+        if ($step['kind'] === 'client_approval' && !is_pm()) json_out(['ok' => false, 'error' => 'Müşteri onayı müşteriden gelir: "Müşteriye gönder" ile yollayın.']);
+        if ($step['status'] !== 'active') { update_row('task_steps', ['status' => 'active'], 'id=?', [$step['id']]); $step['status'] = 'active'; }
+        $error = step_finish($step, (int)$u['id']);
     }
-    // Return the current workflow state (for refresh-free UI updates)
-    $stepsLast = rows("SELECT id, sort_order, status FROM task_steps WHERE task_id=? ORDER BY sort_order", [$step['task_id']]);
+    if ($error) json_out(['ok' => false, 'error' => $error]);
+    $stepsLast = rows("SELECT id, sort_order, status FROM task_steps WHERE task_id=? ORDER BY sort_order, id", [$step['task_id']]);
     $taskLast = row("SELECT status FROM tasks WHERE id=?", [$step['task_id']]);
     json_out([
-        'ok' => true, 'message' => 'Akış adımı güncellendi.',
+        'ok' => true, 'message' => $step['status'] === 'done' ? 'Adım yeniden açıldı.' : 'Adım tamamlandı.',
         'steps' => $stepsLast,
         'done_count' => count(array_filter($stepsLast, fn($a) => $a['status'] === 'done')),
         'total' => count($stepsLast),
         'task_status' => $taskLast['status'],
         'task_status_tag' => TASK_STATUSES[$taskLast['status']],
     ]);
-
 /* ==================== CHECKLIST ==================== */
 case 'check_add':
     require_staff();
@@ -874,15 +882,42 @@ case 'check_delete':
     json_out(['ok' => true]);
 
 case 'step_owner':
+    // Hand a step to someone (or back to the skill pool); managers, or the owner passing it on
     require_staff();
+    $step = row("SELECT * FROM task_steps WHERE id=?", [(int)$g('id')]);
+    if (!$step) json_out(['ok' => false, 'error' => 'Adım bulunamadı.']);
+    if (!is_pm() && (int)$step['owner_id'] !== (int)$u['id']) json_out(['ok' => false, 'error' => 'Adımı yalnızca sahibi ya da yönetici devredebilir.']);
     $newOwner = $g('owner_id') ? (int)$g('owner_id') : null;
-    update_row('task_steps', ['owner_id' => $newOwner], 'id=?', [(int)$g('id')]);
-    if ($newOwner) {
-        $stepInfo = row("SELECT ga.name, g.title, g.id gid FROM task_steps ga JOIN tasks g ON g.id=ga.task_id WHERE ga.id=?", [(int)$g('id')]);
-        if ($stepInfo) notify($newOwner, 'Akış adımı size atandı', $stepInfo['title'] . ' → ' . $stepInfo['name'], 'task.php?id=' . $stepInfo['gid'], 'task');
-    }
-    json_out(['ok' => true, 'message' => 'Sorumlu atandı.']);
+    update_row('task_steps', ['owner_id' => $newOwner], 'id=?', [$step['id']]);
+    if ($newOwner) q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$step['task_id'], $newOwner]);
+    if ($step['status'] === 'active') { $step['owner_id'] = $newOwner; step_announce($step); task_sync_from_steps((int)$step['task_id']); }
+    elseif ($newOwner) notify($newOwner, 'Akış adımı size atandı', val("SELECT title FROM tasks WHERE id=?", [$step['task_id']]) . ' → ' . $step['name'], 'task.php?id=' . $step['task_id'], 'task');
+    json_out(['ok' => true, 'message' => $newOwner ? 'Sorumlu atandı.' : 'Adım havuza bırakıldı.']);
 
+case 'step_claim':
+    // "Ben alıyorum": take an unowned active step from your skill's pool (two people can't both take it)
+    require_staff();
+    $step = row("SELECT * FROM task_steps WHERE id=?", [(int)$g('id')]);
+    if (!$step || $step['status'] !== 'active') json_out(['ok' => false, 'error' => 'Bu adım şu an alınamaz.']);
+    if ($step['skill_id'] && !is_pm() && !in_array((int)$step['skill_id'], user_skill_ids((int)$u['id']), true))
+        json_out(['ok' => false, 'error' => 'Bu adım ' . val("SELECT name FROM skills WHERE id=?", [$step['skill_id']]) . ' uzmanlığı isteyen bir havuzda.']);
+    $taken = q("UPDATE task_steps SET owner_id=? WHERE id=? AND owner_id IS NULL AND status='active'", [$u['id'], $step['id']])->rowCount();
+    if (!$taken) json_out(['ok' => false, 'error' => 'Bu adımı az önce başkası aldı.']);
+    q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$step['task_id'], $u['id']]);
+    task_sync_from_steps((int)$step['task_id']);
+    log_activity('"' . $step['name'] . '" adımını havuzdan aldı', 'task', (int)$step['task_id']);
+    json_out(['ok' => true, 'message' => 'Adım sende.']);
+
+case 'step_return':
+    // Send the work back from an internal review to the last production step, with the reason
+    require_staff();
+    $step = row("SELECT * FROM task_steps WHERE id=?", [(int)$g('id')]);
+    if (!$step || $step['status'] !== 'active') json_out(['ok' => false, 'error' => 'Yalnızca sıradaki adım geri gönderilebilir.']);
+    if (!in_array($step['kind'], ['review', 'client_approval'], true)) json_out(['ok' => false, 'error' => 'Geri gönderme kontrol ve onay adımlarında yapılır.']);
+    if (!step_can_act($step, $u)) json_out(['ok' => false, 'error' => 'Bu adım size ait değil.']);
+    if (trim($g('note')) === '') json_out(['ok' => false, 'error' => 'Neyin değişmesi gerektiğini yazın.']);
+    if ($error = step_send_back($step, $g('note'), (int)$u['id'])) json_out(['ok' => false, 'error' => $error]);
+    json_out(['ok' => true, 'message' => 'Geri gönderildi.']);
 /* ==================== TIME TRACKING ==================== */
 case 'time_add':
     require_staff();
@@ -979,6 +1014,9 @@ case 'approval_send':
     $task = row("SELECT * FROM tasks WHERE id=?", [(int)$g('task_id')]);
     if (!$task) json_out(['ok' => false, 'error' => 'Müşteriye gönderilecek işi seçin.']);
     if ($task['kind'] !== 'client') json_out(['ok' => false, 'error' => 'İç işler müşteriye gönderilmez.']);
+    $activeStep = task_active_step((int)$task['id']);
+    if (task_has_steps((int)$task['id']) && (!$activeStep || $activeStep['kind'] !== 'client_approval'))
+        json_out(['ok' => false, 'error' => 'Bu iş henüz müşteri onayı adımına gelmedi' . ($activeStep ? ' (sıradaki adım: ' . $activeStep['name'] . ')' : '') . '.']);
     $data = [
         'project_id' => (int)$task['project_id'], 'task_id' => (int)$task['id'],
         'title' => trim($g('title')) ?: $task['title'], 'description' => $g('description'),
@@ -1022,8 +1060,14 @@ case 'approval_reply':
     // Only the task's latest approval counts — a late answer to an older one must not move it.
     $task = $approval['task_id'] ? row("SELECT * FROM tasks WHERE id=?", [$approval['task_id']]) : null;
     if ($task && task_is_open($task['status']) && (int)val("SELECT MAX(id) FROM approvals WHERE task_id=?", [$task['id']]) === $id) {
-        $missingSteps = (int)val("SELECT COUNT(*) FROM task_steps WHERE task_id=? AND status!='done'", [$task['id']]);
-        task_set_status($task, $status === 'approved' && !$missingSteps ? 'completed' : 'in_progress', false);
+        $activeStep = task_active_step((int)$task['id']);
+        if ($activeStep && $activeStep['kind'] === 'client_approval') {
+            // With steps: approved finishes the client step, anything else sends the work back to production
+            if ($status === 'approved') step_finish($activeStep, (int)$u['id']);
+            else step_send_back($activeStep, (string)$g('note'), (int)$u['id'], 'Müşteri ' . ($status === 'rejected' ? 'reddetti' : 'revize istedi'));
+        } elseif (!task_has_steps((int)$task['id'])) {
+            task_set_status($task, $status === 'approved' ? 'completed' : 'in_progress', false);
+        }
     }
     notify($approval['sender_id'], 'Onay yanıtlandı: ' . APPROVAL_STATUSES[$status], $approval['title'] . ($g('note') ? ' — ' . $g('note') : ''), $task ? 'task.php?id=' . $task['id'] : 'approvals.php', 'approval');
     log_activity('"' . $approval['title'] . '" onayını ' . APPROVAL_STATUSES[$status] . ' olarak yanıtladı', 'project', $approval['project_id']);
@@ -1944,6 +1988,11 @@ case 'user_save':
     }
     if ($data['role'] === 'customer' && !$data['client_id'])
         json_out(['ok' => false, 'error' => 'Müşteri için en az bir dosya seçin.']);
+    $skillSave = function (int $uid) use ($data) {
+        if (!array_key_exists('skills', $_POST) || $data['role'] === 'customer') return;
+        q("DELETE FROM user_skills WHERE user_id=?", [$uid]);
+        foreach (array_unique(array_filter(array_map('intval', json_decode((string)$_POST['skills'], true) ?: []))) as $sid) q("INSERT IGNORE INTO user_skills (user_id, skill_id) VALUES (?,?)", [$uid, $sid]);
+    };
     $customerClientSave = function (int $uid) use ($data, $customerClients) {
         if ($data['role'] !== 'customer' || !is_array($customerClients)) return;
         q("DELETE FROM customer_clients WHERE user_id=?", [$uid]);
@@ -1956,6 +2005,7 @@ case 'user_save':
         if ($g('password')) $data['password'] = password_hash($g('password'), PASSWORD_DEFAULT);
         update_row('users', $data, 'id=?', [$id]);
         $customerClientSave($id);
+        $skillSave($id);
         json_out(['ok' => true, 'message' => 'Kullanıcı güncellendi.']);
     }
     if (val("SELECT COUNT(*) FROM users WHERE email=?", [$email]))
@@ -1964,6 +2014,7 @@ case 'user_save':
     $data['password'] = password_hash($g('password'), PASSWORD_DEFAULT);
     $data['theme'] = 'lime'; $data['color'] = '#b1fb01'; $data['created'] = $now;
     $id = insert('users', $data);
+    $skillSave($id);
     // Automatically add the new user to the relevant channels
     if ($data['role'] !== 'customer') {
         // General channel + all project channels (except for interns)
@@ -2008,29 +2059,53 @@ case 'user_delete':
     log_activity('Kullanıcı silindi: ' . $target['name']);
     json_out(['ok' => true, 'message' => 'Kullanıcı silindi.']);
 
-/* ==================== WORKFLOW TEMPLATES (admin) ==================== */
-case 'workflow_save':
+/* ==================== TASK TYPES + SKILLS (admin) ==================== */
+case 'task_type_save':
     require_admin();
     $name = trim($g('name'));
     $steps = json_decode($g('steps', '[]'), true) ?: [];
-    if ($name === '' || !$steps) json_out(['ok' => false, 'error' => 'Şablon adı ve en az bir adım gerekli.']);
+    $steps = array_values(array_filter(array_map(fn($s) => [
+        'name' => mb_substr(trim((string)($s['name'] ?? '')), 0, 120),
+        'skill_id' => (int)($s['skill_id'] ?? 0) ?: null,
+        'kind' => isset(STEP_KINDS[$s['kind'] ?? '']) ? $s['kind'] : 'work',
+        'owner_id' => (int)($s['owner_id'] ?? 0) ?: null,
+    ], $steps), fn($s) => $s['name'] !== ''));
+    if ($name === '') json_out(['ok' => false, 'error' => 'İş türünün adı gerekli.']);
+    $data = ['name' => $name, 'description' => $g('description'), 'kind' => isset(TASK_KINDS[$g('kind')]) ? $g('kind') : 'client'];
     if ($g('id')) {
-        $sid = (int)$g('id');
-        update_row('workflow_templates', ['name' => $name, 'description' => $g('description')], 'id=?', [$sid]);
-        q("DELETE FROM template_steps WHERE template_id=?", [$sid]);
+        $typeId = (int)$g('id');
+        update_row('task_types', $data, 'id=?', [$typeId]);
+        q("DELETE FROM task_type_steps WHERE type_id=?", [$typeId]); // running tasks keep their own copies of the steps
     } else {
-        $sid = insert('workflow_templates', ['name' => $name, 'description' => $g('description'), 'created' => $now]);
+        $data['created'] = $now;
+        $typeId = insert('task_types', $data);
     }
-    foreach ($steps as $i => $stepName) {
-        if (trim($stepName) !== '') insert('template_steps', ['template_id' => $sid, 'sort_order' => $i + 1, 'name' => trim($stepName)]);
-    }
-    json_out(['ok' => true, 'message' => 'Akış şablonu kaydedildi.']);
+    foreach ($steps as $i => $s) insert('task_type_steps', ['type_id' => $typeId, 'sort_order' => $i + 1] + $s);
+    json_out(['ok' => true, 'message' => 'İş türü kaydedildi.']);
 
-case 'workflow_delete':
+case 'task_type_delete':
     require_admin();
-    q("DELETE FROM template_steps WHERE template_id=?", [(int)$g('id')]);
-    q("DELETE FROM workflow_templates WHERE id=?", [(int)$g('id')]);
-    json_out(['ok' => true, 'message' => 'Şablon silindi.']);
+    q("DELETE FROM task_type_steps WHERE type_id=?", [(int)$g('id')]);
+    q("DELETE FROM task_types WHERE id=?", [(int)$g('id')]);
+    q("UPDATE tasks SET type_id=NULL WHERE type_id=?", [(int)$g('id')]);
+    json_out(['ok' => true, 'message' => 'İş türü silindi.']);
+
+case 'skill_save':
+    require_admin();
+    $name = mb_substr(trim($g('name')), 0, 60);
+    if ($name === '') json_out(['ok' => false, 'error' => 'Uzmanlık adı gerekli.']);
+    if ($g('id')) update_row('skills', ['name' => $name], 'id=?', [(int)$g('id')]);
+    else insert('skills', ['name' => $name, 'sort_order' => (int)val("SELECT COALESCE(MAX(sort_order),0)+1 FROM skills")]);
+    json_out(['ok' => true, 'message' => 'Uzmanlık kaydedildi.']);
+
+case 'skill_delete':
+    require_admin();
+    $id = (int)$g('id');
+    if (val("SELECT COUNT(*) FROM task_steps WHERE skill_id=? AND status!='done'", [$id])) json_out(['ok' => false, 'error' => 'Bu uzmanlığı bekleyen açık adımlar var; önce onları başka bir uzmanlığa ya da kişiye verin.']);
+    q("DELETE FROM user_skills WHERE skill_id=?", [$id]);
+    q("UPDATE task_type_steps SET skill_id=NULL WHERE skill_id=?", [$id]);
+    q("DELETE FROM skills WHERE id=?", [$id]);
+    json_out(['ok' => true, 'message' => 'Uzmanlık silindi.']);
 
 /* ==================== FORM TEMPLATES (admin) ==================== */
 case 'form_save':
@@ -2177,17 +2252,6 @@ case 'avatar_delete':
 
 default:
     json_out(['ok' => false, 'error' => 'Bilinmeyen işlem.'], 400);
-}
-
-/* ---------- Helper: set up task steps from a template ---------- */
-function task_steps_setup(int $taskId, int $templateId): void {
-    $steps = rows("SELECT * FROM template_steps WHERE template_id=? ORDER BY sort_order", [$templateId]);
-    foreach ($steps as $i => $a) {
-        insert('task_steps', [
-            'task_id' => $taskId, 'sort_order' => $a['sort_order'], 'name' => $a['name'],
-            'status' => $i === 0 ? 'active' : 'pending',
-        ]);
-    }
 }
 
 /* ---------- Helper: save project/file members (multi-assign) ---------- */

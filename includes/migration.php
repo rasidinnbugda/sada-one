@@ -127,6 +127,18 @@ function migration_commands(): array {
         "ALTER TABLE tasks ADD COLUMN platforms VARCHAR(120) DEFAULT NULL",
         "ALTER TABLE tasks MODIFY status ENUM('todo','in_progress','in_review','awaiting_approval','completed','published','cancelled') NOT NULL DEFAULT 'todo'",
         "ALTER TABLE tasks ADD INDEX publish_date (publish_date)",
+        // 7.2: step engine — task types with step recipes, skills, step kinds and a skill pool
+        "CREATE TABLE IF NOT EXISTS skills (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(60) NOT NULL, sort_order INT NOT NULL DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
+        "CREATE TABLE IF NOT EXISTS user_skills (user_id INT NOT NULL, skill_id INT NOT NULL, PRIMARY KEY (user_id, skill_id), INDEX(skill_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
+        "ALTER TABLE task_types ADD COLUMN kind ENUM('client','internal') NOT NULL DEFAULT 'client' AFTER description",
+        "ALTER TABLE task_type_steps ADD COLUMN skill_id INT DEFAULT NULL",
+        "ALTER TABLE task_type_steps ADD COLUMN kind ENUM('work','review','client_approval','publish') NOT NULL DEFAULT 'work'",
+        "ALTER TABLE task_type_steps ADD COLUMN owner_id INT DEFAULT NULL",
+        "ALTER TABLE task_steps ADD COLUMN skill_id INT DEFAULT NULL",
+        "ALTER TABLE task_steps ADD COLUMN kind ENUM('work','review','client_approval','publish') NOT NULL DEFAULT 'work'",
+        "ALTER TABLE task_steps ADD COLUMN done_by INT DEFAULT NULL",
+        "ALTER TABLE task_steps ADD INDEX pool (status, owner_id, skill_id)",
+        "ALTER TABLE tasks ADD COLUMN type_id INT DEFAULT NULL",
     ];
 }
 
@@ -155,7 +167,7 @@ function run_migrations(PDO $pdo): array {
     // Table renames must run BEFORE the CREATE IF NOT EXISTS list: otherwise an empty
     // new-named table gets created first, the rename then collides, and the old data
     // is stranded in the old table. If both exist, keep the one that holds the data.
-    foreach ([['project_ek_requests', 'project_extra_requests']] as [$oldT, $newT]) {
+    foreach ([['project_ek_requests', 'project_extra_requests'], ['workflow_templates', 'task_types'], ['template_steps', 'task_type_steps']] as [$oldT, $newT]) {
         try {
             $hasOld = (bool)$pdo->query("SHOW TABLES LIKE " . $pdo->quote($oldT))->fetchColumn();
             $hasNew = (bool)$pdo->query("SHOW TABLES LIKE " . $pdo->quote($newT))->fetchColumn();
@@ -166,6 +178,13 @@ function run_migrations(PDO $pdo): array {
             if ($hasOld && !$hasNew) { $pdo->exec("RENAME TABLE `$oldT` TO `$newT`"); $results[] = ['ok', "rename: $oldT → $newT"]; }
         } catch (PDOException $e) { $results[] = ['error', "rename $oldT — " . $e->getMessage()]; }
     }
+    // 7.2: the renamed step table points at its task type
+    try {
+        if ((int)$pdo->query("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='task_type_steps' AND column_name='template_id'")->fetchColumn()) {
+            $pdo->exec('ALTER TABLE task_type_steps CHANGE template_id type_id INT NOT NULL');
+            $results[] = ['ok', 'rename: task_type_steps.template_id → type_id'];
+        }
+    } catch (PDOException $e) { $results[] = ['error', 'rename task_type_steps.template_id — ' . $e->getMessage()]; }
     // One-time: seed client_contacts from the clients table's single contact fields
     try {
         if ($pdo->query("SHOW TABLES LIKE 'client_contacts'")->fetchColumn()
@@ -219,6 +238,23 @@ function run_migrations(PDO $pdo): array {
         }
     } catch (Throwable $e) {
         $results[] = ['error', 'work: ' . $e->getMessage()];
+    }
+    // 7.2: step kinds, skills and statuses recomputed from steps (after the work step: it needs 7.1 statuses)
+    require_once __DIR__ . '/migration-steps.php';
+    try {
+        $stepsDone = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='step_engine'")->fetchColumn() === '1';
+        if (!$stepsDone && $pdo->query("SELECT setting_value FROM settings WHERE setting_key='unified_work'")->fetchColumn() === '1') {
+            if (!(int)$pdo->query("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='task_steps' AND column_name='kind'")->fetchColumn())
+                throw new RuntimeException('task_steps is missing the 7.2 columns');
+            if ((int)$pdo->query('SELECT COUNT(*) FROM tasks')->fetchColumn() > 0) { // fresh installs have nothing to back up
+                require_once __DIR__ . '/migration-backup.php';
+                $results[] = ['ok', 'steps: backup ' . migration_db_backup($pdo, 'v7.2-steps', '7.2 step engine migration')];
+            }
+            foreach (step_engine_migration($pdo) as $l) $results[] = ['ok', 'steps: ' . $l];
+            $pdo->exec("INSERT INTO settings (setting_key, setting_value) VALUES ('step_engine', '1') ON DUPLICATE KEY UPDATE setting_value='1'");
+        }
+    } catch (Throwable $e) {
+        $results[] = ['error', 'steps: ' . $e->getMessage()];
     }
     return $results;
 }
