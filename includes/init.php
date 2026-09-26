@@ -452,8 +452,14 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.6';
+const APP_VERSION = '7.7';
 const VERSION_NOTES = [
+    '7.7' => [
+        'Yeni görünüm "SADA Açık" varsayılan tema oldu: açık zemin üzerinde SADA laciverti; SADA yeşili yalnızca fosforlu kalem gibi sizin olanı ve şu anı işaretler (menüde bulunduğunuz yer, Şimdi etiketi, bugün, sıradaki adım). Rakamlar zaman kodu gibi eş genişlikte',
+        'Eski varsayılan temada (Lime) kalan herkes yeni temaya geçti; isteyen Profil → Tema Seçimi\'nden eski temasına dönebilir. Diğer temalar olduğu gibi duruyor',
+        'Yazı tipleri artık panelin kendi sunucusundan geliyor (Google Fonts bağlantısı yok): daha hızlı açılış, dışarıya istek yok',
+        'Sayfa geçişleri: menü ve üst çubuk yerinde kalır, sayfa yumuşakça kayarak gelir (destekleyen tarayıcılarda; hareket azaltma tercihine uyulur)',
+    ],
     '7.6' => [
         'Tek takvim: menüde tek "Takvim". Ay görünümü çekimleri, toplantıları, teslimleri ve yayın planını birlikte gösterir; mercekle (Hepsi / Çekim / Toplantı / Teslim / Yayın) birini öne çıkarırsınız. Yayın planı, Toplantılar, Randevular ve Zaman çizelgesi aynı takvimin sekmeleri; eski adresler çalışmaya devam eder',
         'Daha kısa menü: Panel, Bugün, İşler, Takvim, Dosyalar, Projeler, Mesajlar üstte; Stüdyo (Çekim Listesi, Ekipman, Ekip), Analiz (Finans, Raporlar, Aylık Raporlar, Kule) ve Ekip & Fikir (Duyurular, Talepler, Fikir Panosu, Gelişim, Çalışan Havuzu, Alanım) grupları. Onaylar ekip menüsünden kalktı — onaylar işin, ayın ve Kule\'nin içinde; müşteriler Onaylar\'ı görmeye devam eder',
@@ -806,7 +812,7 @@ function log_equipment(int $equipmentId, string $type, string $description = '',
 function active_theme(): string {
     $u = user();
     $theme = $u['theme'] ?? '';
-    return isset(THEMES[$theme]) ? $theme : setting('default_theme', 'lime');
+    return isset(THEMES[$theme]) ? $theme : setting('default_theme', 'studio');
 }
 /** Is the active theme a dark one? */
 function theme_is_dark(): bool {
@@ -825,6 +831,7 @@ function theme_favicon(): string {
 
 /* Themes: key => [Label, accent color, is dark] */
 const THEMES = [
+    'studio'       => ['SADA Açık', '#182f5d', false], // default since 7.7
     'lime'         => ['Lime', '#b1fb01', true],
     'lime-light'   => ['Lime Aydınlık', '#76a900', false],
     'navy'         => ['Lacivert', '#2f5fb5', true],

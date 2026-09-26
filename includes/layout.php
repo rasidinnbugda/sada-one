@@ -7,7 +7,7 @@ function page_start(string $title, string $activePage = ''): void {
     $u = user();
     // Scheduled housekeeping runs after the page has been sent — never inside the page wait
     if ($u && is_staff()) after_response(fn() => run_recurring_jobs());
-    $theme = isset(THEMES[$u['theme'] ?? '']) ? $u['theme'] : setting('default_theme', 'lime');
+    $theme = isset(THEMES[$u['theme'] ?? '']) ? $u['theme'] : setting('default_theme', 'studio');
     $siteName = setting('site_name', 'SADA One');
     $notificationCount = $u ? (int)val("SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0", [$u['id']]) : 0;
 
@@ -77,11 +77,10 @@ function page_start(string $title, string $activePage = ''): void {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf" content="<?= csrf_token() ?>">
 <title><?= e($title) ?> — <?= e($siteName) ?></title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/fonts.css?v=<?= APP_VERSION ?>">
 <link rel="stylesheet" href="assets/css/app.css?v=<?= APP_VERSION ?>">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#b1fb01">
+<meta name="theme-color" content="<?= e(THEMES[$theme][1]) ?>">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="assets/img/icon-192.png">

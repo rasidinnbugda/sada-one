@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $approval) {
 $file = $approval && $approval['archive_id'] ? row("SELECT * FROM archive WHERE id=?", [$approval['archive_id']]) : null;
 $isImage = $file && in_array($file['extension'], ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
 $plan = $approval && $approval['task_id'] ? row("SELECT publish_date, publish_time, platforms FROM tasks WHERE id=?", [$approval['task_id']]) : null;
-$theme = setting('default_theme', 'lime');
+$theme = setting('default_theme', 'studio');
 $siteName = setting('site_name', 'SADA One');
 ?>
 <!DOCTYPE html>
@@ -43,8 +43,7 @@ $siteName = setting('site_name', 'SADA One');
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title><?= $approval ? e($approval['title']) . ' — ' : '' ?>Onay — <?= e($siteName) ?></title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/fonts.css?v=<?= APP_VERSION ?>">
 <link rel="stylesheet" href="assets/css/app.css?v=<?= APP_VERSION ?>">
 <?php if (theme_favicon()): ?><link rel="icon" href="uploads/<?= e(theme_favicon()) ?>"><?php endif; ?>
 </head>

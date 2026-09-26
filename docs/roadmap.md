@@ -23,7 +23,14 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 4. **Eylemden durum** — 7.4 ✅: dosya yüklenince adım ilerler; müşteri hesapsız linkten onaylar, revize üretime döner.
 5. **Yardım eden ekran** — 7.5 ✅: "Şimdi" kartı ve Bugün; işi izleyen Kule (Yönetici Takip'in yerine).
 6. **Sadeleştirme** — 7.6 ✅: menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
-7. **Görünüm:** açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
+7. **Görünüm** — 7.7 ✅: açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
+
+## 7. aşama — Görünüm (7.7)
+
+- **SADA Açık** (`studio`) varsayılan tema: soğuk kâğıt zemin (`#eceff3`), beyaz sayfalar, SADA laciverti (`#182f5d`) mürekkep ve ana renk; SADA yeşili (`#b1fb01`) yalnızca "fosforlu kalem" olarak — aktif menü öğesi, Şimdi etiketi, bugünün tarihi, sıradaki adım, seçili mercek. Başlıklar Bricolage Grotesque, metin Instrument Sans, rakamlar JetBrains Mono.
+- **Geçiş:** kullanıcı teması eski varsayılan `lime` olanlar ve varsayılan tema ayarı `studio`'ya taşınır; sütunun varsayılanı da `studio` olur. Diğer temalar ve bilerek seçilmiş temalar korunur.
+- **Yazı tipleri sunucuda:** `assets/fonts/` (latin + latin-ext woff2, SIL OFL), `assets/css/fonts.css`; hiçbir sayfa Google Fonts'a bağlanmaz. Yazı tipi rolleri CSS değişkenleridir (`--font-display`, `--font-body`, `--font-mono`, `--font-logo`); eski temalar Space Grotesk / Inter ile kalır.
+- **Sayfa geçişleri:** belgeler arası View Transitions (`@view-transition`); menü ve üst çubuk sabit kalır, içerik kayarak gelir; `prefers-reduced-motion` açıksa kapalı.
 
 ## 6. aşama — Sadeleştirme (7.6)
 

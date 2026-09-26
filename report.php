@@ -28,7 +28,7 @@ $satisfaction = row("SELECT AVG(rating) average, COUNT(*) qty FROM ratings WHERE
 <head>
 <meta charset="UTF-8">
 <title><?= e($project['client_name']) ?> — <?= MONTHS[$month] ?> <?= $year ?> Raporu</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Unbounded:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/fonts.css?v=<?= APP_VERSION ?>">
 <link rel="stylesheet" href="assets/css/app.css?v=<?= APP_VERSION ?>">
 <style>
 body { background: #fff !important; color: #1a2233; }

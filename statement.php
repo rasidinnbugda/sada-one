@@ -17,7 +17,7 @@ $siteName = setting('site_name', 'SADA One');
 <html lang="tr">
 <head>
 <meta charset="UTF-8"><title><?= e($client['name']) ?> — Cari Ekstre</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600&family=Unbounded:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/fonts.css?v=<?= APP_VERSION ?>">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',sans-serif; color:#1a2233; background:#f0f2f7; font-size:13px; line-height:1.5; }

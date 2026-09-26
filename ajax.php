@@ -17,7 +17,7 @@ switch ($action) {
 
 /* ==================== THEME & NOTIFICATIONS ==================== */
 case 'theme_change':
-    $theme = isset(THEMES[$g('theme')]) ? $g('theme') : 'lime';
+    $theme = isset(THEMES[$g('theme')]) ? $g('theme') : 'studio';
     update_row('users', ['theme' => $theme, 'color' => THEMES[$theme][1]], 'id=?', [$u['id']]);
     json_out(['ok' => true]);
 

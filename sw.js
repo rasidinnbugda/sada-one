@@ -3,7 +3,7 @@
  * for the static shell, and a friendly offline page when both fail.
  * Only navigations and /assets/ files are intercepted — ajax.php and everything
  * else go straight to the network untouched. */
-const CACHE = 'sada-one-v3'; // bump when cached shell files must be dropped (7.0 renamed every CSS class)
+const CACHE = 'sada-one-v4'; // bump when cached shell files must be dropped (7.0 renamed every CSS class)
 const SHELL = ['./offline.html', './assets/css/app.css', './assets/js/app.js'];
 
 const fallbackResponse = () => new Response(

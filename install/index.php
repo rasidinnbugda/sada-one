@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS users (
     role ENUM('admin','pm','team','finance','intern','customer') NOT NULL DEFAULT 'team',
     job_title VARCHAR(100) DEFAULT NULL,
     client_id INT DEFAULT NULL,
-    theme VARCHAR(20) NOT NULL DEFAULT 'lime',
+    theme VARCHAR(20) NOT NULL DEFAULT 'studio',
     color VARCHAR(7) NOT NULL DEFAULT '#182f5d',
     avatar VARCHAR(255) DEFAULT NULL,
     task_view VARCHAR(10) NOT NULL DEFAULT 'kanban',
@@ -722,7 +722,7 @@ SQL;
     $now = date('Y-m-d H:i:s');
 
     // Admin account
-    $st = $pdo->prepare("INSERT INTO users (name, email, password, role, job_title, theme, color, is_active, created) VALUES (?, ?, ?, 'admin', 'Kurucu', 'lime', '#b1fb01', 1, ?)");
+    $st = $pdo->prepare("INSERT INTO users (name, email, password, role, job_title, theme, color, is_active, created) VALUES (?, ?, ?, 'admin', 'Kurucu', 'studio', '#b1fb01', 1, ?)");
     $st->execute([$adminAd, $adminMail, password_hash($adminPassword, PASSWORD_DEFAULT), $now]);
     $adminId = (int)$pdo->lastInsertId();
 
@@ -730,7 +730,7 @@ SQL;
     // Keys are the stored (Turkish) contract the runtime reads via setting()
     $settings = [
         'site_name' => $siteName,
-        'default_theme' => 'lime',
+        'default_theme' => 'studio',
         'smtp_enabled' => '0',
         'smtp_host' => 'smtp.hostinger.com',
         'smtp_port' => '465',
@@ -804,8 +804,7 @@ $stepTitles = [1 => 'Gereksinimler', 2 => 'Veritabanı', 3 => 'Site & Yönetici'
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SADA One — Kurulum</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/fonts.css">
 <style>
 :root { --lime:#b1fb01; --navy:#182f5d; --cream:#f8f2cb; --maroon:#610714; --ink:#0a0f1e; --surface:#101830; --surface2:#182448; --border:rgba(248,242,203,.12); --text:#f2f4f8; --muted:#8b93ab; }
 * { margin:0; padding:0; box-sizing:border-box; }
