@@ -18,7 +18,7 @@ $reports = rows("SELECT r.*, d.name client_name, y.name author_name FROM monthly
 // Report to edit (if client file + period are selected)
 $selectClient = (int)($_GET['client'] ?? 0);
 $selectPeriod = preg_match('/^\d{4}-\d{2}$/', $_GET['period'] ?? '') ? $_GET['period'] : date('Y-m');
-$is_active = $selectClient ? row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [$selectClient, $selectPeriod]) : null;
+$current = $selectClient ? row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [$selectClient, $selectPeriod]) : null;
 
 $periodName = function (string $d): string {
     $months = [1 => 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
@@ -86,7 +86,7 @@ page_start('Aylık Raporlar', 'mreports');
             $clientName = val("SELECT name FROM clients WHERE id=?", [$selectClient]); ?>
         <div class="row-flex between mb-3">
             <div class="card-title"><?= e($clientName) ?> — <?= $periodName($selectPeriod) ?> Raporu</div>
-            <?php if ($is_active): ?><span class="small text-muted">Son güncelleme: <?= e($is_active['author_name'] ?? '') ?: '' ?> <?= format_date($is_active['updated'] ?? $is_active['created'], true) ?></span><?php endif; ?>
+            <?php if ($current): ?><span class="small text-muted">Son güncelleme: <?= e($current['author_name'] ?? '') ?: '' ?> <?= format_date($current['updated'] ?? $current['created'], true) ?></span><?php endif; ?>
         </div>
         <?php
         // Automatic financial summary for the selected client + period (live, not stored)
@@ -111,16 +111,16 @@ page_start('Aylık Raporlar', 'mreports');
         <form data-ajax="monthly_report_save" data-refresh="no" id="reportForm">
             <input type="hidden" name="client_id" value="<?= $selectClient ?>">
             <input type="hidden" name="period" value="<?= e($selectPeriod) ?>">
-            <div class="form-group"><label class="form-label">Genel Özet</label><textarea name="summary" class="text-area" rows="3" placeholder="Bu ay genel olarak..."><?= e($is_active['summary'] ?? '') ?></textarea></div>
-            <div class="form-group"><label class="form-label">Yapılan Çalışmalar</label><textarea name="work_done" class="text-area" rows="5" placeholder="- 12 içerik üretildi ve yayınlandı&#10;- 2 çekim gerçekleştirildi..."><?= e($is_active['work_done'] ?? '') ?></textarea></div>
-            <div class="form-group"><label class="form-label">Metrikler & Sonuçlar</label><textarea name="metrics" class="text-area" rows="4" placeholder="Erişim, etkileşim, takipçi değişimi, öne çıkan içerikler..."><?= e($is_active['metrics'] ?? '') ?></textarea></div>
-            <div class="form-group"><label class="form-label">Gelecek Ay Planı</label><textarea name="plan" class="text-area" rows="3" placeholder="Önümüzdeki dönem hedefleri..."><?= e($is_active['plan'] ?? '') ?></textarea></div>
+            <div class="form-group"><label class="form-label">Genel Özet</label><textarea name="summary" class="text-area" rows="3" placeholder="Bu ay genel olarak..."><?= e($current['summary'] ?? '') ?></textarea></div>
+            <div class="form-group"><label class="form-label">Yapılan Çalışmalar</label><textarea name="work_done" class="text-area" rows="5" placeholder="- 12 içerik üretildi ve yayınlandı&#10;- 2 çekim gerçekleştirildi..."><?= e($current['work_done'] ?? '') ?></textarea></div>
+            <div class="form-group"><label class="form-label">Metrikler & Sonuçlar</label><textarea name="metrics" class="text-area" rows="4" placeholder="Erişim, etkileşim, takipçi değişimi, öne çıkan içerikler..."><?= e($current['metrics'] ?? '') ?></textarea></div>
+            <div class="form-group"><label class="form-label">Gelecek Ay Planı</label><textarea name="plan" class="text-area" rows="3" placeholder="Önümüzdeki dönem hedefleri..."><?= e($current['plan'] ?? '') ?></textarea></div>
             <div class="row-flex" style="gap:10px">
                 <button type="submit" class="btn" onclick="this.form.querySelectorAll('input[name=status]').forEach(x => x.remove())">Taslak Kaydet</button>
                 <button type="submit" class="btn btn-brand" onclick="this.form.querySelectorAll('input[name=status]').forEach(x => x.remove()); const i = document.createElement('input'); i.type = 'hidden'; i.name = 'status'; i.value = 'completed'; this.form.appendChild(i)">Tamamlandı Olarak Kaydet</button>
-                <?php if ($is_active): ?>
+                <?php if ($current): ?>
                 <button type="button" class="btn" onclick="reportMailOpen(<?= $selectClient ?>, '<?= e($selectPeriod) ?>')">📧 Müşteri Maili</button>
-                <?php if (!empty($is_active['sent_at'])): ?><span class="badge r-completed small" title="<?= e($is_active['sent_to'] ?? '') ?>">Gönderildi: <?= format_date($is_active['sent_at'], true) ?></span><?php endif; ?>
+                <?php if (!empty($current['sent_at'])): ?><span class="badge r-completed small" title="<?= e($current['sent_to'] ?? '') ?>">Gönderildi: <?= format_date($current['sent_at'], true) ?></span><?php endif; ?>
                 <?php endif; ?>
             </div>
         </form>

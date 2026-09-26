@@ -137,6 +137,10 @@ CREATE TABLE IF NOT EXISTS clients (
     contact_email VARCHAR(150) DEFAULT NULL,
     contact_phone VARCHAR(30) DEFAULT NULL,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    strategy TEXT,
+    brand_kit TEXT,
+    plan_approval TINYINT(1) NOT NULL DEFAULT 0,
+    no_approval_types VARCHAR(255) DEFAULT NULL,
     created DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
@@ -161,6 +165,9 @@ CREATE TABLE IF NOT EXISTS periods (
     year SMALLINT NOT NULL,
     month TINYINT NOT NULL,
     status ENUM('open','closed') NOT NULL DEFAULT 'open',
+    phase ENUM('planning','production','closing','closed') NOT NULL DEFAULT 'production',
+    plan_status ENUM('none','pending','approved','revision') NOT NULL DEFAULT 'none',
+    closed_at DATETIME DEFAULT NULL,
     created DATETIME NOT NULL,
     UNIQUE KEY uniq_period (project_id, year, month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
@@ -224,6 +231,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     publish_time TIME DEFAULT NULL,
     platforms VARCHAR(120) DEFAULT NULL,
     type_id INT DEFAULT NULL,
+    lane ENUM('planned','agenda') NOT NULL DEFAULT 'planned',
     created DATETIME NOT NULL,
     INDEX(project_id), INDEX(assignee_id), INDEX(period_id), INDEX publish_date (publish_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
@@ -582,6 +590,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     drive_link VARCHAR(500) DEFAULT NULL,
     content_id INT DEFAULT NULL,
     task_id INT DEFAULT NULL,
+    period_id INT DEFAULT NULL,
     status ENUM('pending','approved','revision','rejected') NOT NULL DEFAULT 'pending',
     sender_id INT NOT NULL,
     reply_note TEXT,

@@ -5,9 +5,11 @@ require_once __DIR__ . '/includes/components.php';
 $u = require_staff();
 
 $id = (int)($_GET['id'] ?? 0);
-$task = row("SELECT g.*, p.name project_name, p.client_id, d.name client_name, uu.name assignee_name, uu.color assignee_color, ol.name creator_name, tt.name type_name
+$task = row("SELECT g.*, p.name project_name, p.client_id, d.name client_name, d.brand_kit client_brand_kit, uu.name assignee_name, uu.color assignee_color, ol.name creator_name, tt.name type_name,
+    pd.year period_year, pd.month period_month
     FROM tasks g JOIN projects p ON p.id=g.project_id JOIN clients d ON d.id=p.client_id
-    LEFT JOIN users uu ON uu.id=g.assignee_id LEFT JOIN users ol ON ol.id=g.created_by LEFT JOIN task_types tt ON tt.id=g.type_id WHERE g.id=?", [$id]);
+    LEFT JOIN users uu ON uu.id=g.assignee_id LEFT JOIN users ol ON ol.id=g.created_by LEFT JOIN task_types tt ON tt.id=g.type_id
+    LEFT JOIN periods pd ON pd.id=g.period_id WHERE g.id=?", [$id]);
 if (!$task) { header('Location: tasks.php'); exit; }
 
 $steps = rows("SELECT ga.*, u.name owner_name, u.color owner_color, k.name skill_name FROM task_steps ga LEFT JOIN users u ON u.id=ga.owner_id LEFT JOIN skills k ON k.id=ga.skill_id WHERE ga.task_id=? ORDER BY ga.sort_order, ga.id", [$id]);
@@ -27,6 +29,7 @@ if (!$assignees && $task['assignee_id'] && $task['assignee_name']) $assignees = 
 $assigneeIds = array_column($assignees, 'id');
 $watchers = rows("SELECT us.id, us.name, us.color, us.avatar FROM task_watchers gi JOIN users us ON us.id=gi.user_id WHERE gi.task_id=? ORDER BY us.name", [$id]);
 $watcherIds = array_column($watchers, 'id');
+$projectPeriods = rows("SELECT id, year, month FROM periods WHERE project_id=? ORDER BY year DESC, month DESC", [$task['project_id']]);
 
 $activeStepIndex = -1;
 foreach ($steps as $i => $a) { if ($a['status'] === 'active') { $activeStepIndex = $i; break; } }
@@ -44,7 +47,7 @@ page_start($task['title'], 'tasks');
             <?= badge($task['status'], TASK_STATUSES) ?>
             <?= badge($task['priority'], PRIORITIES, 'priority') ?>
             <?php if ($task['repeat'] !== 'none'): ?><span class="badge badge-type"><?= icon('repeat', 12) ?> <?= REPEAT_OPTIONS[$task['repeat']] ?></span><?php endif; ?>
-            <?php if ($task['kind'] === 'internal'): ?><span class="badge badge-type">İç iş</span><?php endif; ?>
+            <?php if ($task['kind'] === 'internal'): ?><span class="badge badge-type">İç iş</span><?php elseif ($task['lane'] === 'agenda'): ?><span class="badge r-agenda" title="Ay içinde çıkan iş; ay planına sayılmaz">Gündem</span><?php endif; ?>
             <?php if ($dependent && task_is_open($dependent['status']) && !$task['lock_bypassed']): ?>
             <span class="lock-badge" title="Bağlı olduğu iş tamamlanmadan ilerleyemez"><?= icon('lock', 12) ?> <a href="task.php?id=<?= $dependent['id'] ?>" style="color:inherit;text-decoration:underline"><?= e(mb_substr($dependent['title'], 0, 34)) ?></a> bekleniyor</span>
             <?php elseif ($task['lock_bypassed']): ?>
@@ -203,9 +206,19 @@ page_start($task['title'], 'tasks');
                 <?php endif; ?>
                 <div class="row-flex between"><span class="cell-bottom">Oluşturan</span><span class="small"><?= e($task['creator_name'] ?? '—') ?></span></div>
                 <div class="row-flex between"><span class="cell-bottom">Oluşturulma</span><span class="small"><?= format_date($task['created']) ?></span></div>
+                <?php if ($task['period_year']): ?><div class="row-flex between"><span class="cell-bottom">Ay</span><a class="small" href="month.php?id=<?= $task['period_id'] ?>"><?= MONTHS[(int)$task['period_month']] . ' ' . $task['period_year'] ?> →</a></div><?php endif; ?>
                 <?php if ($sourceRequest): ?><div class="row-flex between"><span class="cell-bottom">Kaynak</span><a class="small" href="request.php?id=<?= $sourceRequest['id'] ?>">Talep #<?= $sourceRequest['id'] ?> →</a></div><?php endif; ?>
             </div>
         </div>
+
+        <?php if ($task['kind'] === 'client' && trim((string)$task['client_brand_kit']) !== ''): ?>
+        <!-- The client's brand kit, where the work is done -->
+        <details class="card mb-2 brand-kit">
+            <summary class="card-title" style="font-size:14px;cursor:pointer">Marka Kiti</summary>
+            <div class="small text-2 mt-2" style="white-space:pre-wrap"><?= e($task['client_brand_kit']) ?></div>
+            <a href="client.php?id=<?= $task['client_id'] ?>" class="mini-btn mt-2" style="display:inline-block">Dosyada gör →</a>
+        </details>
+        <?php endif; ?>
 
         <?php if ($task['kind'] === 'client'): ?>
         <!-- Publish plan -->
@@ -340,7 +353,10 @@ page_start($task['title'], 'tasks');
                     <?php endforeach; ?>
                 </div>
             </div>
-            <div class="form-group"><label class="form-label">Öncelik</label><select name="priority" class="select"><?php foreach (PRIORITIES as $k => $v): ?><option value="<?= $k ?>" <?= $task['priority'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Öncelik</label><select name="priority" class="select"><?php foreach (PRIORITIES as $k => $v): ?><option value="<?= $k ?>" <?= $task['priority'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+                <?php if ($projectPeriods): ?><div class="form-group"><label class="form-label">Ay</label><select name="period_id" class="select"><option value="">—</option><?php foreach ($projectPeriods as $d): ?><option value="<?= $d['id'] ?>" <?= (int)$task['period_id'] === (int)$d['id'] ? 'selected' : '' ?>><?= period_name($d) ?></option><?php endforeach; ?></select></div><?php endif; ?>
+            </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Başlangıç Tarihi</label><input type="date" name="start_date" class="input" value="<?= e($task['start_date']) ?>"></div>
                 <div class="form-group"><label class="form-label">Son Tarih</label><input type="date" name="due_date" class="input" value="<?= e($task['due_date']) ?>"></div>

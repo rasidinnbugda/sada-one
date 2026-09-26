@@ -511,6 +511,20 @@ case 'client_save':
         json_out(['ok' => true, 'message' => 'Dosya oluşturuldu.', 'redirect' => 'client.php?id=' . $id]);
     }
 
+case 'client_strategy_save':
+    // Strategy, brand kit and the file's approval rules (plan approval, work types that skip client approval)
+    require_permission('client_manage');
+    $id = (int)$g('id');
+    if (!val("SELECT id FROM clients WHERE id=?", [$id])) json_out(['ok' => false, 'error' => 'Dosya bulunamadı.']);
+    $typeIds = json_decode($g('no_approval_types', '[]'), true);
+    $typeIds = is_array($typeIds) ? array_values(array_unique(array_filter(array_map('intval', $typeIds)))) : [];
+    update_row('clients', [
+        'strategy' => trim($g('strategy')) ?: null, 'brand_kit' => trim($g('brand_kit')) ?: null,
+        'plan_approval' => $g('plan_approval') ? 1 : 0, 'no_approval_types' => $typeIds ? implode(',', $typeIds) : null,
+    ], 'id=?', [$id]);
+    log_activity('Strateji ve marka bilgilerini güncelledi', 'client', $id);
+    json_out(['ok' => true, 'message' => 'Strateji ve marka bilgileri kaydedildi.']);
+
 case 'client_delete':
     require_admin();
     $id = (int)$g('id');
@@ -539,8 +553,8 @@ case 'project_save':
     } else {
         $data['created'] = $now;
         $id = insert('projects', $data);
-        // For monthly projects, open a period for the current month
-        if ($data['type'] === 'monthly') get_or_create_period($id, (int)date('Y'), (int)date('n'));
+        // A monthly project starts with this month in planning
+        if ($data['type'] === 'monthly') get_or_create_period($id, (int)date('Y'), (int)date('n'), 'planning');
         project_channel($id, 'project');
         project_channel($id, 'customer');
         project_members_save($id, $g('members'));
@@ -566,7 +580,8 @@ case 'project_delete':
 case 'period_open':
     require_pm();
     $projectId = (int)$g('project_id');
-    $periodId = get_or_create_period($projectId, (int)$g('year'), (int)$g('month'));
+    // A month opened by hand starts with its planning
+    $periodId = get_or_create_period($projectId, (int)$g('year'), (int)$g('month'), 'planning');
     // Option to create this month's work from a task type
     if ($g('type_id')) {
         $template = row("SELECT * FROM task_types WHERE id=?", [(int)$g('type_id')]);
@@ -579,7 +594,57 @@ case 'period_open':
             task_steps_setup($taskId, (int)$g('type_id'));
         }
     }
-    json_out(['ok' => true, 'message' => 'Dönem açıldı.']);
+    json_out(['ok' => true, 'message' => 'Ay açıldı.', 'redirect' => 'month.php?id=' . $periodId]);
+
+case 'month_phase':
+    // Planning → production → closing → closed, one step at a time; the month closes only with no open work in it
+    require_pm();
+    $month = row("SELECT d.* FROM periods d WHERE d.id=?", [(int)$g('id')]);
+    if (!$month || !project_access((int)$month['project_id'])) json_out(['ok' => false, 'error' => 'Ay bulunamadı.']);
+    $order = array_keys(MONTH_PHASES);
+    $to = (string)$g('phase');
+    $toIndex = array_search($to, $order, true);
+    if ($toIndex === false || abs($toIndex - (int)array_search($month['phase'], $order, true)) !== 1) json_out(['ok' => false, 'error' => 'Ay bir adım ileri ya da geri alınabilir.']);
+    if ($to === 'closed' && ($openCount = (int)val("SELECT COUNT(*) FROM tasks WHERE period_id=? AND is_archived=0 AND " . task_open_sql(), [$month['id']])))
+        json_out(['ok' => false, 'error' => "Ayda $openCount açık iş var: önce sonraki aya taşıyın ya da iptal edin."]);
+    update_row('periods', ['phase' => $to, 'status' => $to === 'closed' ? 'closed' : 'open', 'closed_at' => $to === 'closed' ? $now : null], 'id=?', [$month['id']]);
+    log_activity(period_name($month) . ' ayı: ' . MONTH_PHASES[$to], 'project', (int)$month['project_id']);
+    json_out(['ok' => true, 'message' => period_name($month) . ': ' . ($month['phase'] === 'closed' ? 'yeniden açıldı' : MONTH_PHASES[$to]) . '.']);
+
+case 'month_carry':
+    // Month end: open work moves on to the next month (created if needed) and keeps its lane
+    require_pm();
+    $month = row("SELECT d.* FROM periods d WHERE d.id=?", [(int)$g('id')]);
+    if (!$month || !project_access((int)$month['project_id'])) json_out(['ok' => false, 'error' => 'Ay bulunamadı.']);
+    $nextMonth = (int)$month['month'] % 12 + 1;
+    $nextId = get_or_create_period((int)$month['project_id'], (int)$month['year'] + ($nextMonth === 1 ? 1 : 0), $nextMonth);
+    $moved = q("UPDATE tasks SET period_id=? WHERE period_id=? AND is_archived=0 AND " . task_open_sql(), [$nextId, $month['id']])->rowCount();
+    if ($moved) log_activity("$moved açık işi " . period_name($month) . ' ayından ' . MONTHS[$nextMonth] . ' ayına taşıdı', 'project', (int)$month['project_id']);
+    json_out(['ok' => true, 'message' => $moved ? "$moved açık iş " . MONTHS[$nextMonth] . ' ayına taşındı.' : 'Taşınacak açık iş yok.']);
+
+case 'month_plan_send':
+    // The month's planned client work goes to the client as one approval; the answer moves the month
+    require_pm();
+    require_permission('approval_send');
+    $month = row("SELECT d.*, p.client_id, p.name project_name FROM periods d JOIN projects p ON p.id=d.project_id WHERE d.id=?", [(int)$g('id')]);
+    if (!$month || !project_access((int)$month['project_id'])) json_out(['ok' => false, 'error' => 'Ay bulunamadı.']);
+    if ($month['phase'] !== 'planning') json_out(['ok' => false, 'error' => 'Plan, ay planlama aşamasındayken gönderilir.']);
+    $plan = rows("SELECT title, publish_date, publish_time, platforms FROM tasks WHERE period_id=? AND kind='client' AND lane='planned' AND status!='cancelled' AND is_archived=0
+        ORDER BY publish_date IS NULL, publish_date, publish_time, id", [$month['id']]);
+    if (!$plan) json_out(['ok' => false, 'error' => 'Planda henüz müşteri işi yok.']);
+    $lines = array_map(fn($p) => '• ' . ($p['publish_date'] ? format_date($p['publish_date']) . ($p['publish_time'] ? ' ' . substr($p['publish_time'], 0, 5) : '') . ' — ' : '') . $p['title']
+        . ($p['platforms'] ? ' (' . implode(', ', array_map(fn($k) => PLATFORMS[$k] ?? $k, explode(',', $p['platforms']))) . ')' : ''), $plan);
+    $note = trim($g('description'));
+    $title = period_name($month) . ' planı — ' . $month['project_name'];
+    insert('approvals', [
+        'project_id' => (int)$month['project_id'], 'period_id' => (int)$month['id'], 'title' => $title,
+        'description' => ($note !== '' ? $note . "\n\n" : '') . count($plan) . " iş:\n" . implode("\n", $lines),
+        'sender_id' => $u['id'], 'status' => 'pending', 'created' => $now,
+    ]);
+    update_row('periods', ['plan_status' => 'pending'], 'id=?', [$month['id']]);
+    foreach (client_customer_ids((int)$month['client_id']) as $cid) notify($cid, 'Aylık plan onayınızı bekliyor', $title, 'approvals.php', 'approval');
+    log_activity(period_name($month) . ' planını müşteriye gönderdi', 'project', (int)$month['project_id']);
+    json_out(['ok' => true, 'message' => 'Plan müşteriye gönderildi.']);
 
 /* ==================== TASKS ==================== */
 case 'task_save':
@@ -591,7 +656,6 @@ case 'task_save':
         'project_id' => (int)$g('project_id'), 'title' => trim($g('title')), 'description' => $g('description'),
         'assignee_id' => $g('assignee_id') ? (int)$g('assignee_id') : null,
         'priority' => isset(PRIORITIES[$g('priority')]) ? $g('priority') : 'normal', 'due_date' => $g('due_date') ?: null,
-        'period_id' => $g('period_id') ? (int)$g('period_id') : null,
         'depends_on_id' => $g('depends_on_id') ? (int)$g('depends_on_id') : null,
         'repeat' => isset(REPEAT_OPTIONS[$g('repeat')]) ? $g('repeat') : 'none',
         'tags' => mb_substr(trim($g('tags')), 0, 255) ?: null,
@@ -609,6 +673,13 @@ case 'task_save':
         $data['publish_date'] = $kind === 'client' ? $publishDate : null;
         $data['publish_time'] = $kind === 'client' && $publishDate && preg_match('~^\d{2}:\d{2}~', $g('publish_time')) ? $g('publish_time') : null;
         $data['platforms'] = $kind === 'client' ? ($platformCsv ?: null) : null;
+    }
+    // Planned work is the month's plan, agenda work came up during the month; internal work has no lane
+    if (array_key_exists('lane', $_POST)) $data['lane'] = $kind === 'client' && isset(TASK_LANES[$g('lane')]) ? $g('lane') : 'planned';
+    // The month is only changed when the form carries it (an edit form without it must not drop the work out of its month)
+    if (!$id || array_key_exists('period_id', $_POST)) {
+        $data['period_id'] = $g('period_id') ? (int)$g('period_id') : null;
+        if ($data['period_id'] && (int)val("SELECT project_id FROM periods WHERE id=?", [$data['period_id']]) !== $data['project_id']) $data['period_id'] = null;
     }
     if ($data['title'] === '' || !$data['project_id']) json_out(['ok' => false, 'error' => 'İş başlığı ve proje gerekli.']);
     if ($data['depends_on_id'] === $id && $data['depends_on_id']) json_out(['ok' => false, 'error' => 'Bir iş kendisine bağlanamaz.']);
@@ -1038,9 +1109,7 @@ case 'approval_send':
     insert('approvals', $data);
     // Notify the customer (primary client file + extra file assignments)
     $clientId = (int)val("SELECT client_id FROM projects WHERE id=?", [$data['project_id']]);
-    foreach (rows("SELECT DISTINCT us.id FROM users us LEFT JOIN customer_clients md ON md.user_id=us.id
-        WHERE us.role='customer' AND us.is_active=1 AND (us.client_id=? OR md.client_id=?)", [$clientId, $clientId]) as $m)
-        notify((int)$m['id'], 'Onayınız bekleniyor', $data['title'], 'approvals.php', 'approval');
+    foreach (client_customer_ids($clientId) as $cid) notify($cid, 'Onayınız bekleniyor', $data['title'], 'approvals.php', 'approval');
     // The work now waits on the client
     if (task_is_open($task['status'])) task_set_status($task, 'awaiting_approval', false);
     log_activity('"' . $data['title'] . '" için onay gönderdi', 'project', $data['project_id']);
@@ -1069,7 +1138,13 @@ case 'approval_reply':
             task_set_status($task, $status === 'approved' ? 'completed' : 'in_progress', false);
         }
     }
-    notify($approval['sender_id'], 'Onay yanıtlandı: ' . APPROVAL_STATUSES[$status], $approval['title'] . ($g('note') ? ' — ' . $g('note') : ''), $task ? 'task.php?id=' . $task['id'] : 'approvals.php', 'approval');
+    // A month's plan: the latest plan approval sets the plan status; approval moves a month still in planning on to production
+    if ($approval['period_id'] && (int)val("SELECT MAX(id) FROM approvals WHERE period_id=?", [$approval['period_id']]) === $id && ($planMonth = row("SELECT * FROM periods WHERE id=?", [$approval['period_id']]))) {
+        $fields = ['plan_status' => $status === 'approved' ? 'approved' : 'revision'];
+        if ($status === 'approved' && $planMonth['phase'] === 'planning') $fields['phase'] = 'production';
+        update_row('periods', $fields, 'id=?', [$planMonth['id']]);
+    }
+    notify($approval['sender_id'], 'Onay yanıtlandı: ' . APPROVAL_STATUSES[$status], $approval['title'] . ($g('note') ? ' — ' . $g('note') : ''), $task ? 'task.php?id=' . $task['id'] : ($approval['period_id'] ? 'month.php?id=' . $approval['period_id'] : 'approvals.php'), 'approval');
     log_activity('"' . $approval['title'] . '" onayını ' . APPROVAL_STATUSES[$status] . ' olarak yanıtladı', 'project', $approval['project_id']);
     json_out(['ok' => true, 'message' => 'Yanıtınız kaydedildi.']);
 /* ==================== SOCIAL MEDIA TRACKING ==================== */

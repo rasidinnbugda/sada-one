@@ -251,6 +251,8 @@
         // Serialize publish platforms
         const platformJson = form.querySelector('.platforms-json');
         if (platformJson) platformJson.value = JSON.stringify($$('.platform-box:checked', form).map(c => c.value));
+        // Any checkbox group: <input type="hidden" data-collect=".box-class"> receives the checked values as JSON
+        $$('input[data-collect]', form).forEach(h => { h.value = JSON.stringify($$(h.dataset.collect + ':checked', form).map(c => c.value)); });
         const btn = form.querySelector('[type="submit"]');
         const oldText = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.innerHTML = 'İşleniyor...'; }

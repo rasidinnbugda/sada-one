@@ -12,11 +12,16 @@ $clientMembers = rows("SELECT u.id, u.name, u.color, u.avatar, u.job_title FROM 
 
 $projects = rows("SELECT p.*, u.name pm_name,
     (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND g.status!='cancelled') task_count,
-    (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND " . task_done_sql('g') . ") is_done_count
+    (SELECT COUNT(*) FROM tasks g WHERE g.project_id=p.id AND " . task_done_sql('g') . ") is_done_count,
+    (SELECT pd.phase FROM periods pd WHERE pd.project_id=p.id AND pd.year=YEAR(CURDATE()) AND pd.month=MONTH(CURDATE())) month_phase
     FROM projects p LEFT JOIN users u ON u.id=p.pm_id WHERE p.client_id=? ORDER BY p.created DESC", [$id]);
 $customers = rows("SELECT * FROM users WHERE client_id=? AND role='customer'", [$id]);
 $archiveCount = (int)val("SELECT COUNT(*) FROM archive WHERE client_id=?", [$id]);
 $contracts = rows("SELECT s.*, a.file_path, a.name ek_name FROM contracts s LEFT JOIN archive a ON a.id=s.archive_id WHERE s.client_id=? ORDER BY s.end IS NULL, s.end", [$id]);
+// Approval rules: work types with a client approval step can be set to skip it for this file
+$noApproval = array_values(array_filter(array_map('intval', explode(',', (string)$client['no_approval_types']))));
+$approvalTypes = $customerView ? [] : rows("SELECT DISTINCT t.id, t.name FROM task_types t JOIN task_type_steps s ON s.type_id=t.id WHERE s.kind='client_approval' ORDER BY t.name");
+$typeNames = $noApproval ? array_column(rows("SELECT id, name FROM task_types"), 'name', 'id') : [];
 
 // Social media accounts + metric history
 $socialAccounts = rows("SELECT * FROM social_accounts WHERE client_id=? ORDER BY platform, username", [$id]);
@@ -72,6 +77,7 @@ page_start($client['name'], 'clients');
                 <?php if ($p['pm_name']): ?><div class="cell-bottom">PM: <?= e($p['pm_name']) ?></div><?php endif; ?>
                 <div class="progress mt-2"><div class="progress-full" data-rate="<?= $rate ?>" style="width:0"></div></div>
                 <div class="cell-bottom mt-1"><?= $p['is_done_count'] ?>/<?= $p['task_count'] ?> iş · %<?= $rate ?></div>
+                <?php if ($p['type'] === 'monthly'): ?><div class="cell-bottom mt-1"><?= MONTHS[(int)date('n')] ?>: <?= $p['month_phase'] ? MONTH_PHASES[$p['month_phase']] : 'açılmadı' ?></div><?php endif; ?>
             </a>
             <?php endforeach; ?>
         </div>
@@ -250,6 +256,15 @@ page_start($client['name'], 'clients');
             <span class="badge"><?= $archiveCount ?></span>
         </a>
         <?php else: ?>
+        <!-- Strategy, brand kit and approval rules -->
+        <div class="card mb-2">
+            <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px">Strateji & Marka</div><?php if (permission('client_manage')): ?><button class="mini-btn" data-modal="modalStrategy">Düzenle</button><?php endif; ?></div>
+            <?php if (trim((string)$client['strategy']) === '' && trim((string)$client['brand_kit']) === ''): ?><div class="text-muted small">Hedef kitle, ton, ana mesajlar ve marka kiti (renkler, yazı tipleri, logo kullanımı) burada durur; ekip müşteri işlerinde görür.</div><?php endif; ?>
+            <?php if (trim((string)$client['strategy']) !== ''): ?><div class="cell-bottom mt-1">Strateji</div><div class="small text-2" style="white-space:pre-wrap"><?= e($client['strategy']) ?></div><?php endif; ?>
+            <?php if (trim((string)$client['brand_kit']) !== ''): ?><div class="cell-bottom mt-2">Marka kiti</div><div class="small text-2" style="white-space:pre-wrap"><?= e($client['brand_kit']) ?></div><?php endif; ?>
+            <div class="cell-bottom mt-2">Onay kuralları</div>
+            <div class="small text-2">Aylık plan: <?= $client['plan_approval'] ? 'müşteri onayına gider' : 'onaya gitmez' ?><?php if ($noApproval): ?><br>Müşteri onayı atlanan türler: <?= e(implode(', ', array_filter(array_map(fn($t) => $typeNames[$t] ?? null, $noApproval)))) ?><?php endif; ?></div>
+        </div>
         <!-- Contact -->
         <div class="card mb-2">
             <div class="card-title" style="font-size:14px" class="mb-2">İletişim</div>
@@ -359,6 +374,27 @@ if (permission('client_manage')):
             <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Oluştur</button></div>
         </form>
     </div>
+</div>
+
+<!-- Strategy, brand kit and approval rules modal -->
+<div class="modal-overlay" id="modalStrategy">
+    <div class="modal"><div class="modal-top"><div class="modal-title">Strateji & Marka — <?= e($client['name']) ?></div><button class="modal-close" data-modal-close>✕</button></div>
+    <form data-ajax="client_strategy_save">
+        <input type="hidden" name="id" value="<?= $id ?>">
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">Strateji</label><textarea name="strategy" class="text-area" rows="5" placeholder="Hedef kitle, ton, ana mesajlar, bu dönemin hedefleri..."><?= e($client['strategy'] ?? '') ?></textarea></div>
+            <div class="form-group"><label class="form-label">Marka kiti</label><textarea name="brand_kit" class="text-area" rows="5" placeholder="Renk kodları, yazı tipleri, logo kullanımı, kaçınılacak ifadeler, marka klasörünün linki..."><?= e($client['brand_kit'] ?? '') ?></textarea><div class="form-hint">Bu dosyanın müşteri işlerinde ekibe gösterilir.</div></div>
+            <div class="form-group"><label class="row-flex small" style="gap:8px;cursor:pointer"><input type="checkbox" name="plan_approval" value="1" <?= $client['plan_approval'] ? 'checked' : '' ?>> Aylık plan müşteri onayına gitsin</label><div class="form-hint">Açıksa ay planlanırken plan müşteriye gönderilir; müşteri onaylayınca ay üretime geçer.</div></div>
+            <?php if ($approvalTypes): ?>
+            <div class="form-group"><label class="form-label">Müşteri onayı atlanan iş türleri</label>
+                <input type="hidden" name="no_approval_types" data-collect=".no-approval-box">
+                <div class="row-flex wrap" style="gap:6px"><?php foreach ($approvalTypes as $t): ?><label class="row-flex small" style="gap:7px;padding:7px 12px;background:var(--surface-2);border-radius:9px;cursor:pointer"><input type="checkbox" class="no-approval-box" value="<?= $t['id'] ?>" <?= in_array((int)$t['id'], $noApproval, true) ? 'checked' : '' ?>> <?= e($t['name']) ?></label><?php endforeach; ?></div>
+                <div class="form-hint">Bu türlerde yeni açılan işler müşteri onayı adımı olmadan kurulur (ör. günlük story). Açık işler etkilenmez.</div>
+            </div>
+            <?php endif; ?>
+        </div>
+        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button></div>
+    </form></div>
 </div>
 
 <!-- Edit client file modal -->

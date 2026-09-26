@@ -41,6 +41,7 @@ function task_kanban(array $tasks, int $projectId = 0): void {
 /** Kind (client / internal) and publish plan fields, shared by the new-task, edit and calendar forms */
 function task_publish_fields(?array $task = null, bool $withKind = true): void {
     $kind = $task['kind'] ?? 'client';
+    $lane = $task['lane'] ?? 'planned';
     $selected = array_filter(explode(',', (string)($task['platforms'] ?? '')));
 ?>
     <?php if ($withKind): ?>
@@ -55,6 +56,15 @@ function task_publish_fields(?array $task = null, bool $withKind = true): void {
     </div>
     <?php else: ?><input type="hidden" name="kind" value="client"><?php endif; ?>
     <div class="publish-fields" <?= $kind === 'client' ? '' : 'hidden' ?>>
+        <div class="form-group">
+            <label class="form-label">Plan</label>
+            <div class="row-flex wrap" style="gap:8px">
+                <?php foreach (TASK_LANES as $k => $v): ?>
+                <label class="row-flex small" style="gap:7px;padding:7px 12px;background:var(--surface-2);border-radius:9px;cursor:pointer"><input type="radio" name="lane" value="<?= $k ?>" <?= $lane === $k ? 'checked' : '' ?>> <?= $v ?></label>
+                <?php endforeach; ?>
+            </div>
+            <div class="form-hint">Planlı: ayın planındaki iş. Gündem: ay içinde çıkan iş (haber, trend); ay planına ve plan onayına girmez.</div>
+        </div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">Yayın Tarihi</label><input type="date" name="publish_date" class="input" value="<?= e($task['publish_date'] ?? '') ?>"></div>
             <div class="form-group"><label class="form-label">Yayın Saati</label><input type="time" name="publish_time" class="input" value="<?= e(substr((string)($task['publish_time'] ?? ''), 0, 5)) ?>"></div>

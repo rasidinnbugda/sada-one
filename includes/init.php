@@ -422,6 +422,10 @@ const TASK_STATUSES = ['todo' => 'Yapılacak', 'in_progress' => 'Devam Ediyor', 
 // Completed, published and cancelled work is closed: it no longer counts as open, late or pending
 const TASK_CLOSED = ['completed', 'published', 'cancelled'];
 const TASK_KINDS = ['client' => 'Müşteri işi', 'internal' => 'İç iş'];
+// Planned work is the month's plan; agenda work comes up during the month (news, trends)
+const TASK_LANES = ['planned' => 'Planlı', 'agenda' => 'Gündem'];
+const MONTH_PHASES = ['planning' => 'Planlama', 'production' => 'Üretim', 'closing' => 'Kapanış', 'closed' => 'Kapandı'];
+const PLAN_STATUSES = ['none' => 'Gönderilmedi', 'pending' => 'Müşteride', 'approved' => 'Onaylandı', 'revision' => 'Revize istendi'];
 const PRIORITIES = ['low' => 'Düşük', 'normal' => 'Normal', 'high' => 'Yüksek', 'urgent' => 'Acil'];
 const PROJECT_STATUSES = ['active' => 'Aktif', 'on_hold' => 'Beklemede', 'completed' => 'Tamamlandı', 'cancelled' => 'İptal'];
 const APPROVAL_STATUSES = ['pending' => 'Bekliyor', 'approved' => 'Onaylandı', 'revision' => 'Revize İstendi', 'rejected' => 'Reddedildi'];
@@ -447,8 +451,17 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.2';
+const APP_VERSION = '7.3';
 const VERSION_NOTES = [
+    '7.3' => [
+        'Aylar: aylık projenin her ayı artık Planlama → Üretim → Kapanış → Kapandı yolundan geçer. Yeni "Ay" sayfası ayın işlerini, ilerlemesini, plan onayını ve aylık raporunu tek yerde gösterir',
+        'Planlı ve Gündem işler: ayın planındaki işler "Planlı", ay içinde çıkan işler (haber, trend) "Gündem" olarak işaretlenir; gündem işleri plana ve plan onayına girmez',
+        'Plan onayı: ayın planı (yayın tarihleri ve platformlarıyla) tek onay olarak müşteriye gider; müşteri onaylayınca ay kendiliğinden üretime geçer, revize isterse planlamada kalır',
+        'Kapanış: açık işler tek tıkla sonraki aya taşınır (aralıktan ocağa da), aylık rapor aydan açılır; açık iş kalmadan ay kapanmaz, gerekirse yeniden açılır',
+        'Kapsam sinyali: ayın müşteri işi önceki üç ayın ortalamasını belirgin geçerse Ay sayfası uyarır',
+        'Dosyada "Strateji & Marka" kartı: strateji, marka kiti ve onay kuralları (plan onayı, müşteri onayı atlanan iş türleri). Marka kiti müşteri işlerinin sayfasında ekibe gösterilir',
+        'Ay başında bu ayı açılmamış aylık projeler, ayın 5\'inden sonra da kapanmamış geçen ay proje yöneticisine hatırlatılır',
+    ],
     '7.2' => [
         'Adım motoru: Akış Şablonları artık "İş Türleri". Her tür bir adım tarifi taşır; her adımın bir uzmanlığı (Tasarım, Kurgu, Metin, Çekim, Koordinasyon, Geliştirme) ve türü (üretim, iç kontrol, müşteri onayı, yayın) vardır',
         'Adımlı işlerin durumu adımlardan gelir: üretim → Devam Ediyor, iç kontrol → İç Onayda, müşteri onayı → Müşteride, yayın → Tamamlandı (yayın bekliyor), hepsi bitince Tamamlandı / Yayınlandı. Elle yalnızca iptal edilir ya da yeniden açılır',
@@ -920,10 +933,19 @@ function format_size(int $b): string {
 
 function period_name(array $d): string { return MONTHS[(int)$d['month']] . ' ' . $d['year']; }
 
-function get_or_create_period(int $projectId, int $year, int $month): int {
+/** A month created along the way (calendar, recurring work, carrying work over) starts in production when it has
+ *  begun, in planning when it lies ahead; opening a month by hand passes 'planning' */
+function get_or_create_period(int $projectId, int $year, int $month, ?string $phase = null): int {
     $d = row("SELECT id FROM periods WHERE project_id=? AND year=? AND month=?", [$projectId, $year, $month]);
     if ($d) return (int)$d['id'];
-    return insert('periods', ['project_id' => $projectId, 'year' => $year, 'month' => $month, 'status' => 'open', 'created' => date('Y-m-d H:i:s')]);
+    $phase ??= $year * 12 + $month > (int)date('Y') * 12 + (int)date('n') ? 'planning' : 'production';
+    return insert('periods', ['project_id' => $projectId, 'year' => $year, 'month' => $month, 'status' => 'open', 'phase' => $phase, 'created' => date('Y-m-d H:i:s')]);
+}
+
+/** Active customer accounts that see a client file (primary file or an extra file assignment) */
+function client_customer_ids(int $clientId): array {
+    return array_map('intval', array_column(rows("SELECT DISTINCT us.id FROM users us LEFT JOIN customer_clients md ON md.user_id=us.id
+        WHERE us.role='customer' AND us.is_active=1 AND (us.client_id=? OR md.client_id=?)", [$clientId, $clientId]), 'id'));
 }
 
 /* ---------------- Mentions (@mention) & task tags ---------------- */
@@ -1015,7 +1037,7 @@ function run_recurring_jobs(bool $force = false): int {
             'title' => $g['title'],
             'description' => $g['description'],
             'assignee_id' => $g['assignee_id'], 'created_by' => $g['created_by'],
-            'priority' => $g['priority'], 'status' => 'todo', 'kind' => $g['kind'], 'platforms' => $g['platforms'], 'type_id' => $g['type_id'],
+            'priority' => $g['priority'], 'status' => 'todo', 'kind' => $g['kind'], 'platforms' => $g['platforms'], 'type_id' => $g['type_id'], 'lane' => $g['lane'],
             'due_date' => $newLastDate, 'repeat' => 'none',
             'created' => date('Y-m-d H:i:s'),
         ]);
@@ -1127,6 +1149,24 @@ function run_recurring_jobs(bool $force = false): int {
             notify((int)$ya['id'], '⏰ Sözleşme bitiyor: ' . $sz['client_name'], '"' . $sz['title'] . '" sözleşmesi ' . format_date($sz['end']) . ' tarihinde sona eriyor.', 'client.php?id=' . $sz['client_id'], 'task');
         }
         update_row('contracts', ['is_reminded' => 1], 'id=?', [$sz['id']]);
+    }
+
+    /* --- Month rhythm: once a month remind the manager of a monthly project whose month is not open yet,
+     *     and from the 5th on, of last month still not closed --- */
+    if (claim_once('last_month_open_check', date('Y-m'))) {
+        foreach (rows("SELECT p.id, p.name, p.pm_id, c.name client_name FROM projects p JOIN clients c ON c.id=p.client_id
+            WHERE p.type='monthly' AND p.status='active' AND NOT EXISTS (SELECT 1 FROM periods d WHERE d.project_id=p.id AND d.year=? AND d.month=?)", [(int)date('Y'), (int)date('n')]) as $mp) {
+            $who = $mp['pm_id'] ? [(int)$mp['pm_id']] : array_map('intval', array_column(rows("SELECT id FROM users WHERE role='admin' AND is_active=1"), 'id'));
+            foreach ($who as $uid) notify($uid, '📅 ' . MONTHS[(int)date('n')] . ' ayı açılmadı: ' . $mp['client_name'], $mp['name'] . ' projesinde bu ayın planı henüz yok.', 'project.php?id=' . $mp['id'] . '#periods', 'task');
+        }
+    }
+    if ((int)date('j') >= 5 && claim_once('last_month_close_check', date('Y-m'))) {
+        $last = strtotime('first day of last month');
+        foreach (rows("SELECT d.id, d.year, d.month, p.name, p.pm_id FROM periods d JOIN projects p ON p.id=d.project_id
+            WHERE p.status='active' AND d.year=? AND d.month=? AND d.phase!='closed'", [(int)date('Y', $last), (int)date('n', $last)]) as $lm) {
+            $who = $lm['pm_id'] ? [(int)$lm['pm_id']] : array_map('intval', array_column(rows("SELECT id FROM users WHERE role='admin' AND is_active=1"), 'id'));
+            foreach ($who as $uid) notify($uid, '🗂 ' . period_name($lm) . ' kapanmadı', $lm['name'] . ': açık işleri taşıyıp raporu yazdıktan sonra ayı kapatın.', 'month.php?id=' . $lm['id'], 'task');
+        }
     }
 
     require_once __DIR__ . '/mailer.php'; // due/digest/drive mails below need it
@@ -1360,16 +1400,20 @@ function task_has_steps(int $taskId): bool { return (bool)val("SELECT COUNT(*) F
 
 /** Creates a task's steps from its task type; $owners maps a type-step id (or its position) to a user id, 0 = pool */
 function task_steps_setup(int $taskId, int $typeId, array $owners = []): void {
-    $task = row("SELECT t.id, p.pm_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE t.id=?", [$taskId]);
+    $task = row("SELECT t.id, p.pm_id, c.no_approval_types FROM tasks t JOIN projects p ON p.id=t.project_id JOIN clients c ON c.id=p.client_id WHERE t.id=?", [$taskId]);
     $coordination = (int)val("SELECT id FROM skills WHERE name='Koordinasyon'");
+    // The client file may skip client approval for this type of work (e.g. story, daily post)
+    $skipApproval = $task && in_array($typeId, array_map('intval', explode(',', (string)$task['no_approval_types'])), true);
+    $placed = 0;
     foreach (rows("SELECT * FROM task_type_steps WHERE type_id=? ORDER BY sort_order, id", [$typeId]) as $i => $st) {
+        if ($skipApproval && $st['kind'] === 'client_approval') continue;
         $owner = array_key_exists($st['id'], $owners) ? $owners[$st['id']] : ($owners[$i] ?? null);
         // No choice made: the type's default person, else the project manager for coordination steps
         if ($owner === null) $owner = $st['owner_id'] ?: ((int)$st['skill_id'] === $coordination && $task ? $task['pm_id'] : null);
         insert('task_steps', [
             'task_id' => $taskId, 'sort_order' => $st['sort_order'], 'name' => $st['name'],
             'skill_id' => $st['skill_id'], 'kind' => $st['kind'], 'owner_id' => $owner ? (int)$owner : null,
-            'status' => $i === 0 ? 'active' : 'pending',
+            'status' => $placed++ === 0 ? 'active' : 'pending',
         ]);
         if ($owner) q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$taskId, (int)$owner]);
     }

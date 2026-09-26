@@ -10,7 +10,7 @@ $givenRatings = is_customer()
     : [];
 
 if (is_staff()) {
-    $approvals = rows("SELECT o.*, p.name project_name, d.name client_name, ug.name sender_name, g.title task_title FROM approvals o JOIN projects p ON p.id=o.project_id JOIN clients d ON d.id=p.client_id LEFT JOIN users ug ON ug.id=o.sender_id LEFT JOIN tasks g ON g.id=o.task_id ORDER BY FIELD(o.status,'pending','revision','approved','rejected'), o.id DESC");
+    $approvals = rows("SELECT o.*, p.name project_name, d.name client_name, ug.name sender_name, g.title task_title, pr.year period_year, pr.month period_month FROM approvals o JOIN projects p ON p.id=o.project_id JOIN clients d ON d.id=p.client_id LEFT JOIN users ug ON ug.id=o.sender_id LEFT JOIN tasks g ON g.id=o.task_id LEFT JOIN periods pr ON pr.id=o.period_id ORDER BY FIELD(o.status,'pending','revision','approved','rejected'), o.id DESC");
 } else {
     [$in, $p] = in_clause(customer_client_ids());
     $approvals = rows("SELECT o.*, p.name project_name, d.name client_name, ug.name sender_name FROM approvals o JOIN projects p ON p.id=o.project_id JOIN clients d ON d.id=p.client_id LEFT JOIN users ug ON ug.id=o.sender_id WHERE p.client_id IN $in ORDER BY FIELD(o.status,'pending','revision','approved','rejected'), o.id DESC", $p);
@@ -42,9 +42,10 @@ page_start('Onaylar', 'approvals');
 <div class="card mb-2 approval-card" data-filter="<?= $o['status'] ?>">
     <div class="row-flex between wrap" style="gap:16px;align-items:flex-start">
         <div style="flex:1;min-width:0">
-            <div class="row-flex wrap" style="gap:9px"><span class="bold"><?= e($o['title']) ?></span><?= badge($o['status'], APPROVAL_STATUSES) ?></div>
+            <div class="row-flex wrap" style="gap:9px"><span class="bold"><?= e($o['title']) ?></span><?= badge($o['status'], APPROVAL_STATUSES) ?><?php if ($o['period_id']): ?><span class="badge badge-type">Aylık plan</span><?php endif; ?></div>
             <div class="cell-bottom mt-1"><?= e($o['client_name']) ?> · <?= e($o['project_name']) ?> · <?= e($o['sender_name']) ?> tarafından <?= time_ago($o['created']) ?></div>
             <?php if (is_staff() && !empty($o['task_title'])): ?><div class="cell-bottom mt-1">İş: <a href="task.php?id=<?= $o['task_id'] ?>"><?= e($o['task_title']) ?> →</a></div><?php endif; ?>
+            <?php if (is_staff() && !empty($o['period_year'])): ?><div class="cell-bottom mt-1">Ay: <a href="month.php?id=<?= $o['period_id'] ?>"><?= MONTHS[(int)$o['period_month']] . ' ' . $o['period_year'] ?> →</a></div><?php endif; ?>
             <?php if ($o['description']): ?><div class="text-2 small mt-2"><?= nl2br(e($o['description'])) ?></div><?php endif; ?>
             <?php if ($o['drive_link']): ?><a href="<?= e($o['drive_link']) ?>" target="_blank" class="btn btn-sm mt-2" style="margin-right:6px"><?= icon('web', 13) ?> Drive'da Görüntüle</a><?php endif; ?>
             <?php if ($ar): ?>

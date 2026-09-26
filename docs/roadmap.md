@@ -7,7 +7,7 @@ Bu belge, 7.0 temizliğinden sonra SADA One'ı adım adım geliştirme planını
 | Katman | Koddaki adı | Anlamı |
 |---|---|---|
 | Dosya | `clients` | Müşterinin tamamı: ana sorumlu, dosya ekibi, iletişim kişileri, bilgi bankası |
-| Ay | aylık projenin `periods` kaydı | Aylık hizmetin o ayı (3. aşamada plan → üretim → kapanış döngüsü kazanır) |
+| Ay | aylık projenin `periods` kaydı | Aylık hizmetin o ayı: planlama → üretim → kapanış → kapandı |
 | Proje | `projects` | Kendi bütçesi ve takvimi olan ayrı iş (kampanya, web sitesi…) |
 | İş | `tasks` | Tek bir çıktı. Müşteriye gidenler "Müşteri işi", gitmeyenler "İç iş" |
 | Adım | `task_steps` | İş'in içindeki sıralı parçalar; her adımın bir sorumlusu ya da uzmanlık havuzu vardır |
@@ -19,11 +19,23 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 0. **Temizlik** — 7.0 ✅ (7.0.1: dosya yüklemeleri onarıldı)
 1. **İş'i tekleştirme** — 7.1 ✅
 2. **Adım motoru** — 7.2 ✅: iş türü tarifleri, adımlarda uzmanlık etiketi (Tasarım, Kurgu, Metin, Çekim, Koordinasyon), atanmayan adım uzmanlık havuzuna düşer, İş'in durumu adımlardan kendiliğinden hesaplanır.
-3. **Ay ve Proje:** aylık projelerde "Ay" plan → üretim → kapanış; planlı/gündem ayrımı; ay sonu raporu aya bağlanır; kapsam sinyali; dosya bazlı onay kuralları.
+3. **Ay ve Proje** — 7.3 ✅: aylık projelerde "Ay" plan → üretim → kapanış; planlı/gündem ayrımı; ay sonu raporu aya bağlanır; kapsam sinyali; dosya bazlı onay kuralları.
 4. **Eylemden durum:** dosya yüklenince adım ilerler; müşteri hesapsız linkten onaylar, revize üretime döner.
 5. **Yardım eden ekran:** "Şimdi" kartı ve Bugün; işi izleyen Kule (Yönetici Takip'in yerine).
 6. **Sadeleştirme:** menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm:** açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
+
+## 3. aşama — Ay ve Proje (7.3)
+
+**Ay** (aylık projenin `periods` kaydı) dört evreden geçer: **Planlama** (planlı işler kurulur, istenirse plan müşteriye gider), **Üretim**, **Kapanış** (açık işler sonraki aya taşınır, aylık rapor yazılır), **Kapandı**. Evreyi proje yöneticisi bir adım ileri ya da geri alır; açık iş varken ay kapanmaz. Elle açılan ay ve yeni aylık projenin ilk ayı planlamada başlar; takvimden ya da tekrarlayan işten kendiliğinden oluşan ay başladıysa üretimde, ileride ise planlamada açılır.
+
+**Planlı / Gündem:** müşteri işleri ayın planındaysa "Planlı", ay içinde çıktıysa "Gündem"dir. Plan onayı yalnızca planlı müşteri işlerinin listesini taşır. İç işlerin şeridi yoktur.
+
+**Plan onayı:** onaylar tablosunda `period_id` ile tutulur; ayın `plan_status`'u son plan onayının cevabından gelir (eski bir onaya geç gelen cevap ayı oynatmaz). Onay, planlamadaki ayı üretime geçirir.
+
+**Kapsam sinyali:** ayın (iptal edilmemiş) müşteri işi sayısı, önceki üç ayın ortalaması en az 3 iken bu ortalamanın 1,4 katını geçerse uyarı çıkar.
+
+**Dosya:** strateji, marka kiti ve onay kuralları (`plan_approval`, `no_approval_types`) dosyada durur. Onayı atlanan türden yeni açılan işler müşteri onayı adımı olmadan kurulur; açık işler etkilenmez.
 
 ## 2. aşama — Adım motoru (7.2)
 

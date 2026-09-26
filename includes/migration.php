@@ -139,6 +139,18 @@ function migration_commands(): array {
         "ALTER TABLE task_steps ADD COLUMN done_by INT DEFAULT NULL",
         "ALTER TABLE task_steps ADD INDEX pool (status, owner_id, skill_id)",
         "ALTER TABLE tasks ADD COLUMN type_id INT DEFAULT NULL",
+        // 7.3: a month (period of a monthly project) goes planning → production → closing → closed;
+        // work is planned or agenda; clients carry strategy, brand kit and approval rules
+        "ALTER TABLE periods ADD COLUMN phase ENUM('planning','production','closing','closed') NOT NULL DEFAULT 'production'",
+        "ALTER TABLE periods ADD COLUMN plan_status ENUM('none','pending','approved','revision') NOT NULL DEFAULT 'none'",
+        "ALTER TABLE periods ADD COLUMN closed_at DATETIME DEFAULT NULL",
+        "UPDATE periods SET phase='closed' WHERE status='closed'",
+        "ALTER TABLE tasks ADD COLUMN lane ENUM('planned','agenda') NOT NULL DEFAULT 'planned'",
+        "ALTER TABLE clients ADD COLUMN strategy TEXT",
+        "ALTER TABLE clients ADD COLUMN brand_kit TEXT",
+        "ALTER TABLE clients ADD COLUMN plan_approval TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE clients ADD COLUMN no_approval_types VARCHAR(255) DEFAULT NULL",
+        "ALTER TABLE approvals ADD COLUMN period_id INT DEFAULT NULL",
     ];
 }
 

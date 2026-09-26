@@ -27,7 +27,10 @@ $approvals = rows("SELECT o.*, u.name sender_name, g.title task_title FROM appro
 $sendableTasks = is_staff() ? rows("SELECT id, title FROM tasks WHERE project_id=? AND kind='client' AND is_archived=0 AND " . task_open_sql() . " ORDER BY title", [$id]) : [];
 $archives = rows("SELECT a.*, u.name uploader_name FROM archive a LEFT JOIN users u ON u.id=a.uploader_id WHERE a.project_id=? ORDER BY a.id DESC", [$id]);
 $activities = rows("SELECT a.*, u.name FROM activities a JOIN users u ON u.id=a.user_id WHERE (a.ref_type='project' AND a.ref_id=?) ORDER BY a.id DESC LIMIT 30", [$id]);
-$periods = $project['type'] === 'monthly' ? rows("SELECT d.*, (SELECT COUNT(*) FROM tasks g WHERE g.period_id=d.id) task_count FROM periods d WHERE d.project_id=? ORDER BY d.year DESC, d.month DESC", [$id]) : [];
+$periods = $project['type'] === 'monthly' ? rows("SELECT d.*, (SELECT COUNT(*) FROM tasks g WHERE g.period_id=d.id AND g.is_archived=0 AND g.status!='cancelled') task_count,
+    (SELECT COUNT(*) FROM tasks g WHERE g.period_id=d.id AND g.is_archived=0 AND " . task_done_sql('g') . ") done_count
+    FROM periods d WHERE d.project_id=? ORDER BY d.year DESC, d.month DESC", [$id]) : [];
+$currentMonth = current(array_filter($periods, fn($d) => (int)$d['year'] === (int)date('Y') && (int)$d['month'] === (int)date('n'))) ?: null;
 $team = rows("SELECT id, name, color FROM users WHERE role IN ('admin','pm','team') AND is_active=1 ORDER BY name");
 $templates = rows("SELECT * FROM task_types ORDER BY name");
 $projectMembers = rows("SELECT u.id, u.name, u.color, u.avatar, u.job_title FROM project_members pu JOIN users u ON u.id=pu.user_id WHERE pu.project_id=? AND u.is_active=1 ORDER BY u.name", [$id]);
@@ -59,6 +62,7 @@ page_start($project['name'], 'projects');
     </div>
     <?php if (is_staff()): ?>
     <div class="page-top-action">
+        <?php if ($currentMonth): ?><a href="month.php?id=<?= $currentMonth['id'] ?>" class="btn"><?= icon('calendar', 15) ?> <?= MONTHS[(int)$currentMonth['month']] ?> ayı</a><?php endif; ?>
         <a href="report.php?project=<?= $id ?>" target="_blank" class="btn"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 17h6M9 13h6M9 9h1m4 12H7a2 2 0 01-2-2V5a2 2 0 012-2h5.6a1 1 0 01.7.3l5.4 5.4a1 1 0 01.3.7V19a2 2 0 01-2 2z"/></svg> Rapor</a>
         <button class="btn btn-brand" data-modal="modalTask"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> İş Ekle</button>
         <?php if (permission('client_manage')): ?><button class="btn" onclick="modalOpen('modalProjectEdit')"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L12 15l-4 1 1-4 9.6-9.6z"/></svg></button><?php endif; ?>
@@ -70,7 +74,7 @@ page_start($project['name'], 'projects');
     <div class="tabs">
         <button class="tab active" data-tab="summary">Özet</button>
         <button class="tab" data-tab="tasks">İşler <span class="badge" style="padding:1px 7px"><?= count($activeTasks) ?></span></button>
-        <?php if ($project['type'] === 'monthly'): ?><button class="tab" data-tab="periods">Dönemler</button><?php endif; ?>
+        <?php if ($project['type'] === 'monthly'): ?><button class="tab" data-tab="periods">Aylar</button><?php endif; ?>
         <button class="tab" data-tab="approvals">Onaylar <?php if ($b = count(array_filter($approvals, fn($o) => $o['status'] === 'pending'))): ?><span class="badge r-pending" style="padding:1px 7px"><?= $b ?></span><?php endif; ?></button>
         <button class="tab" data-tab="content">Yayın Planı</button>
         <?php if (is_staff()): ?><button class="tab" data-tab="station">İstasyon <?php if ($checkList && ($missingChecks = count(array_filter($checkList, fn($k) => !$k['is_done'])))): ?><span class="badge r-pending" style="padding:1px 7px"><?= $missingChecks ?></span><?php endif; ?></button><?php endif; ?>
@@ -155,17 +159,18 @@ page_start($project['name'], 'projects');
     <!-- PERIODS -->
     <div class="tab-content" id="tab-periods">
         <div class="row-flex between mb-3">
-            <div class="card-title">Aylık Dönemler</div>
-            <?php if (is_staff()): ?><button class="btn btn-brand btn-sm" data-modal="modalPeriod"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Dönem Aç</button><?php endif; ?>
+            <div><div class="card-title">Aylar</div><div class="cell-bottom">Her ay planlama → üretim → kapanış yolundan geçer.</div></div>
+            <?php if (is_staff()): ?><button class="btn btn-brand btn-sm" data-modal="modalPeriod"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Ay Aç</button><?php endif; ?>
         </div>
         <?php if (!$periods): ?>
-        <div class="empty-state"><div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div><div class="empty-title">Henüz dönem açılmamış</div><div class="empty-text">Aylık düzenli hizmet için ilk dönemi açın; şablondan işler otomatik oluşturulabilir.</div></div>
+        <div class="empty-state"><div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div><div class="empty-title">Henüz ay açılmamış</div><div class="empty-text">Aylık hizmetin ilk ayını açın: plan kurulur, üretilir, ay sonunda rapor yazılıp kapanır.</div></div>
         <?php else: ?>
         <div class="grid grid-3">
-            <?php foreach ($periods as $d): ?>
-            <a href="tasks.php?project=<?= $id ?>&period=<?= $d['id'] ?>" class="card card-tick">
-                <div class="row-flex between mb-2"><div class="card-title" style="font-size:15px"><?= period_name($d) ?></div><?= badge($d['status'], PERIOD_STATUSES) ?></div>
-                <div class="cell-bottom"><?= $d['task_count'] ?> iş</div>
+            <?php foreach ($periods as $d): $monthRate = $d['task_count'] ? round($d['done_count'] / $d['task_count'] * 100) : 0; ?>
+            <a href="month.php?id=<?= $d['id'] ?>" class="card card-tick">
+                <div class="row-flex between mb-2"><div class="card-title" style="font-size:15px"><?= period_name($d) ?></div><?= badge($d['phase'], MONTH_PHASES) ?></div>
+                <div class="progress"><div class="progress-full" data-rate="<?= $monthRate ?>" style="width:0"></div></div>
+                <div class="cell-bottom mt-1"><?= $d['done_count'] ?>/<?= $d['task_count'] ?> iş<?= $d['plan_status'] !== 'none' ? ' · Plan: ' . PLAN_STATUSES[$d['plan_status']] : '' ?></div>
             </a>
             <?php endforeach; ?>
         </div>
@@ -410,7 +415,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
 <?php if ($project['type'] === 'monthly' && is_staff()): ?>
 <!-- Open-period modal -->
 <div class="modal-overlay" id="modalPeriod">
-    <div class="modal"><div class="modal-top"><div class="modal-title">Yeni Dönem Aç</div><button class="modal-close" data-modal-close>✕</button></div>
+    <div class="modal"><div class="modal-top"><div class="modal-title">Yeni Ay Aç</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="period_open" data-refresh="yes">
         <input type="hidden" name="project_id" value="<?= $id ?>">
         <div class="modal-body">
@@ -418,9 +423,9 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
                 <div class="form-group"><label class="form-label">Ay</label><select name="month" class="select"><?php foreach (MONTHS as $k => $v): ?><option value="<?= $k ?>" <?= $k == date('n') ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-group"><label class="form-label">Yıl</label><select name="year" class="select"><?php for ($y = date('Y') - 1; $y <= date('Y') + 1; $y++): ?><option value="<?= $y ?>" <?= $y == date('Y') ? 'selected' : '' ?>><?= $y ?></option><?php endfor; ?></select></div>
             </div>
-            <div class="form-group"><label class="form-label">İş Türünden İş Oluştur</label><select name="type_id" class="select"><option value="">Boş dönem</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen şablonun adımları iş akışı olarak eklenir.</div></div>
+            <div class="form-group"><label class="form-label">İş Türünden İş Oluştur</label><select name="type_id" class="select"><option value="">Boş ay</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen türden ayın ilk işi adımlarıyla kurulur. Ay planlama aşamasında açılır.</div></div>
         </div>
-        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Dönemi Aç</button></div>
+        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Ayı Aç</button></div>
     </form></div>
 </div>
 <?php endif; ?>

@@ -861,6 +861,33 @@ table.table { width: 100%; border-collapse: collapse; }
 .flow-owner { font-size: 11px; color: var(--muted); }
 
 /* ============================================================
+   MONTH (phase band, work rows, scope signal)
+   ============================================================ */
+.month-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
+.month-band { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 14px; margin-top: 6px; }
+.month-list { display: flex; flex-direction: column; }
+.month-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto 32px; align-items: center; gap: 12px; padding: 10px 6px; border-bottom: 1px solid var(--border); color: inherit; border-radius: 8px; transition: background var(--transition); }
+.month-row:last-child { border-bottom: 0; }
+.month-row:hover { background: var(--surface-2); }
+.month-row.is-cancelled { opacity: .5; }
+.month-row.is-cancelled .cell-main { text-decoration: line-through; }
+.month-date { font-size: 12px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.month-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.month-platforms { display: inline-flex; gap: 3px; vertical-align: middle; }
+.month-state { text-align: right; white-space: nowrap; }
+.month-who { display: flex; justify-content: flex-end; }
+.scope-signal { border-left: 3px solid var(--warning); }
+.scope-signal svg { color: var(--warning); flex-shrink: 0; }
+.brand-kit summary { list-style: none; }
+.brand-kit summary::after { content: ' ▾'; color: var(--muted); }
+.brand-kit[open] summary::after { content: ' ▴'; }
+.r-planning { background: rgba(147,110,240,.15); color: #a58bf0; }
+.r-production { background: rgba(59,157,240,.15); color: var(--info); }
+.r-closing { background: rgba(245,165,36,.15); color: var(--warning); }
+.r-agenda { background: rgba(232,116,60,.14); color: #e8743c; }
+@media (max-width: 900px) { .month-layout { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .month-row { grid-template-columns: 52px minmax(0, 1fr) 28px; } .month-state { display: none; } }
+/* ============================================================
    SEKMELER
    ============================================================ */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; overflow-x: auto; }
