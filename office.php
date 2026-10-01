@@ -95,12 +95,15 @@ page_start('Ofis Günleri', 'office');
 
 <script>
 (() => {
-    // A day without the tick has no hours; the change form asks for hours only when coming
+    // A day without the tick is only shown faded — its hours stay editable (the panel swaps time inputs for its own
+    // picker after this script, so disabling them here could never be undone). Picking an hour ticks the day.
     document.querySelectorAll('.office-day').forEach(row => {
         const box = row.querySelector('input[type=checkbox]');
-        const sync = () => { row.classList.toggle('is-off', !box.checked); row.querySelectorAll('input[type=time]').forEach(t => { t.disabled = !box.checked; }); };
-        box.addEventListener('change', sync); sync();
+        const sync = () => row.classList.toggle('is-off', !box.checked);
+        row.addEventListener('change', e => { if (e.target !== box && !box.checked) box.checked = true; sync(); });
+        sync();
     });
+    // the change form asks for hours only when coming
     const form = document.getElementById('officeDay');
     const hours = form.querySelector('.office-day-hours');
     const syncKind = () => { hours.hidden = form.querySelector('input[name=kind]:checked').value !== 'in'; };

@@ -455,8 +455,11 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.8';
+const APP_VERSION = '7.8.1';
 const VERSION_NOTES = [
+    '7.8.1' => [
+        'Ofis Günleri: haftalık düzende işaretli olmayan bir günü işaretleyince saatleri değiştirilemiyordu; düzeltildi. Saat seçince o gün kendiliğinden işaretlenir',
+    ],
     '7.8' => [
         'Ofis Günleri (menüde Ekip & Fikir altında): herkes haftalık ofis düzenini bir kez girer (hangi günler, kaçta gelip kaçta çıkıyor); gelemeyeceği, farklı saatte ya da fazladan geleceği günleri tek tek değiştirir',
         'Onay gerekmez: değişiklik hemen geçerli olur, yöneticilere bildirim gider (Profil\'de "Ofis günü değişiklikleri" bildirimi kapatılabilir). Yöneticiler bir kişinin yerine de düzenleyebilir; o kişiye haber verilir',
