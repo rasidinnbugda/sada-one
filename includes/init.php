@@ -455,8 +455,11 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.8.1';
+const APP_VERSION = '7.8.2';
 const VERSION_NOTES = [
+    '7.8.2' => [
+        'Proje sayfasında "Projeyi Düzenle", "Onaya Gönder", "Dosya Yükle" ve "Ay Aç" pencereleri açılmıyordu (yeni iş penceresinin kapanış etiketi eksikti, sonraki pencereler onun içinde gizli kalıyordu); düzeltildi',
+    ],
     '7.8.1' => [
         'Ofis Günleri: haftalık düzende işaretli olmayan bir günü işaretleyince saatleri değiştirilemiyordu; düzeltildi. Saat seçince o gün kendiliğinden işaretlenir',
     ],

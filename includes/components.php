@@ -134,6 +134,7 @@ function task_modal(int $projectId, array $team, array $templates, array $period
                 <div class="form-group"><label class="form-label">Bağlı Olduğu İş</label><select name="depends_on_id" class="select"><option value="">— Bağımsız</option><?php foreach ($projectTasks as $pg): ?><option value="<?= $pg['id'] ?>"><?= e($pg['title']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen iş bitmeden bu iş ilerleyemez.</div></div>
                 <?php endif; ?>
             </div>
+        </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Oluştur</button></div>
     </form></div>
 </div>
