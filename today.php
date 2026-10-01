@@ -7,6 +7,7 @@
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/now.php';
+require_once __DIR__ . '/includes/office.php';
 $u = require_staff();
 
 $steps = now_my_steps($u, 30);
@@ -16,6 +17,7 @@ $shoots = now_shoots_today($u);
 $publish = now_publish_today();
 $recent = now_recent($u, 8);
 $todos = rows("SELECT id, name FROM personal_todos WHERE user_id=? AND is_done=0 ORDER BY sort_order LIMIT 8", [$u['id']]);
+$office = office_today();
 
 page_start('Bugün', 'today');
 ?>
@@ -64,6 +66,18 @@ page_start('Bugün', 'today');
     </div>
 
     <div>
+        <div class="card mb-2">
+            <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px">Bugün ofiste <span class="badge" style="padding:1px 8px"><?= count($office['in']) ?></span></div><a href="office.php" class="mini-btn">Ofis günleri →</a></div>
+            <?php if (!$office['in']): ?><div class="text-muted small">Bugün ofiste kimse görünmüyor.</div>
+            <?php else: foreach ($office['in'] as $o): ?>
+            <div class="row-flex between" style="padding:6px 0;border-bottom:1px solid var(--border);gap:8px">
+                <span class="row-flex" style="gap:8px;min-width:0"><?= avatar($o['person'], 24) ?><span class="small bold"><?= e($o['person']['name']) ?></span></span>
+                <span class="office-slot is-<?= $o['kind'] ?>"><?= office_hours($o['start'], $o['end']) ?></span>
+            </div>
+            <?php endforeach; endif; ?>
+            <?php if ($office['out']): ?><div class="cell-bottom mt-2">Bugün gelmiyor: <?= e(implode(', ', array_map(fn($o) => $o['person']['name'], $office['out']))) ?></div><?php endif; ?>
+        </div>
+
         <div class="card mb-2">
             <div class="card-title mb-2" style="font-size:14px"><?= icon('camera', 15) ?> Bugünün çekimleri</div>
             <?php if (!$shoots): ?><div class="text-muted small">Bugün çekim yok.</div>

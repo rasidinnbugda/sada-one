@@ -25,6 +25,12 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 6. **Sadeleştirme** — 7.6 ✅: menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm** — 7.7 ✅: açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
 
+## Ek — Ofis günleri (7.8)
+
+- **Veri:** `office_schedule` kişinin haftalık düzenidir (gün başına bir saat aralığı); `office_days` tek gün değişikliğidir: `out` (o gün gelmiyor, yalnızca düzende olan gün için) ya da `in` (bu saatlerde geliyor — düzendeki günde farklı saat ya da fazladan gün). Günün cevabı: değişiklik varsa o, yoksa düzen (`office_range`, `includes/office.php`).
+- **Kural:** onay yok; her değişiklik yöneticilere (admin, PM) `office` kategorisinde bildirilir. Herkes kendi günlerini, yöneticiler herkesinkini düzenler (o kişiye haber gider). Saatler 15 dakikalık adımlarla; değişiklik bugünden itibaren bir yıl içinde.
+- **Görünüm:** tüm ekip haftayı görür (Ofis Günleri ve Ekip sayfasında pano; hafta sonu sütunları yalnızca o gün gelen biri varsa); Bugün'de "Bugün ofiste" kartı, Şimdi kartında "Ofiste N kişi".
+
 ## 7. aşama — Görünüm (7.7)
 
 - **SADA Açık** (`studio`) varsayılan tema: soğuk kâğıt zemin (`#eceff3`), beyaz sayfalar, SADA laciverti (`#182f5d`) mürekkep ve ana renk; SADA yeşili (`#b1fb01`) yalnızca "fosforlu kalem" olarak — aktif menü öğesi, Şimdi etiketi, bugünün tarihi, sıradaki adım, seçili mercek. Başlıklar Bricolage Grotesque, metin Instrument Sans, rakamlar JetBrains Mono.

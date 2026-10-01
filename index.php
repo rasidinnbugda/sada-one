@@ -97,6 +97,8 @@ $nowPool = now_pool($u, 30);
 $nowShoots = now_shoots_today($u);
 $nowPublish = array_filter(now_publish_today(), fn($p) => $p['status'] !== 'published');
 $nowUnread = count(now_recent($u, 50));
+require_once __DIR__ . '/includes/office.php';
+$nowOffice = office_today()['in'];
 $nowQueue = array_merge(array_map(fn($s) => ['id' => $s['task_id'], 'head' => $s['step_name'], 'title' => $s['title'], 'where' => $s['client_name'], 'row' => $s, 'waiting' => now_waiting($s['activated_at'])], $nowSteps),
     array_map(fn($t) => ['id' => $t['task_id'], 'head' => TASK_STATUSES[$t['status']] ?? '', 'title' => $t['title'], 'where' => $t['project_name'], 'row' => $t, 'waiting' => ''], $nowPlain));
 $nowHead = $nowQueue[0] ?? null;
@@ -121,6 +123,7 @@ $nowHead = $nowQueue[0] ?? null;
     <?php endif; ?>
     <div class="now-chips">
         <?php if ($nowPool): ?><a href="today.php" class="now-chip"><?= count($nowPool) ?> havuzda</a><?php endif; ?>
+        <?php if ($nowOffice): ?><a href="office.php" class="now-chip" title="<?= e(implode(', ', array_map(fn($o) => $o['person']['name'] . ' ' . office_hours($o['start'], $o['end']), $nowOffice))) ?>">Ofiste <?= count($nowOffice) ?> kişi</a><?php endif; ?>
         <?php if ($nowShoots): ?><a href="shoot-list.php" class="now-chip"><?= count($nowShoots) ?> çekim bugün</a><?php endif; ?>
         <?php if ($nowPublish): ?><a href="content-calendar.php" class="now-chip"><?= count($nowPublish) ?> yayın bugün</a><?php endif; ?>
         <?php if ($nowUnread): ?><a href="today.php" class="now-chip"><?= $nowUnread ?> yeni gelişme</a><?php endif; ?>

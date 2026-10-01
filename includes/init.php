@@ -362,6 +362,7 @@ function json_out($data, int $code = 200): void {
 
 const MONTHS = [1=>'Ocak',2=>'Şubat',3=>'Mart',4=>'Nisan',5=>'Mayıs',6=>'Haziran',7=>'Temmuz',8=>'Ağustos',9=>'Eylül',10=>'Ekim',11=>'Kasım',12=>'Aralık'];
 const DAYS = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+const DAYS_SHORT = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz']; // cutting DAYS to 3 letters would give Paz twice and Cum twice
 
 function format_date(?string $dt, bool $timed = false): string {
     if (!$dt || $dt === '0000-00-00') return '—';
@@ -424,6 +425,8 @@ const TASK_CLOSED = ['completed', 'published', 'cancelled'];
 const TASK_KINDS = ['client' => 'Müşteri işi', 'internal' => 'İç iş'];
 // Planned work is the month's plan; agenda work comes up during the month (news, trends)
 const TASK_LANES = ['planned' => 'Planlı', 'agenda' => 'Gündem'];
+// A single-day change to someone's office pattern
+const OFFICE_DAY_KINDS = ['in' => 'Bu saatlerde geliyor', 'out' => 'Gelmiyor'];
 // One calendar, several views (page key => [page, label]); the team menu shows a single "Takvim"
 const CALENDAR_VIEWS = ['calendar' => ['calendar.php', 'Ay'], 'content' => ['content-calendar.php', 'Yayın planı'], 'meetings' => ['meetings.php', 'Toplantılar'], 'appointments' => ['appointments.php', 'Randevular'], 'timeline' => ['timeline.php', 'Zaman çizelgesi']];
 const MONTH_PHASES = ['planning' => 'Planlama', 'production' => 'Üretim', 'closing' => 'Kapanış', 'closed' => 'Kapandı'];
@@ -452,8 +455,13 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.7';
+const APP_VERSION = '7.8';
 const VERSION_NOTES = [
+    '7.8' => [
+        'Ofis Günleri (menüde Ekip & Fikir altında): herkes haftalık ofis düzenini bir kez girer (hangi günler, kaçta gelip kaçta çıkıyor); gelemeyeceği, farklı saatte ya da fazladan geleceği günleri tek tek değiştirir',
+        'Onay gerekmez: değişiklik hemen geçerli olur, yöneticilere bildirim gider (Profil\'de "Ofis günü değişiklikleri" bildirimi kapatılabilir). Yöneticiler bir kişinin yerine de düzenleyebilir; o kişiye haber verilir',
+        'Tüm ekip haftayı görür: Ekip sayfasında ve Ofis Günleri\'nde "Ofiste kim, ne zaman" panosu; Bugün sayfasında "Bugün ofiste" kartı, Şimdi kartında "Ofiste N kişi"',
+    ],
     '7.7' => [
         'Yeni görünüm "SADA Açık" varsayılan tema oldu: açık zemin üzerinde SADA laciverti; SADA yeşili yalnızca fosforlu kalem gibi sizin olanı ve şu anı işaretler (menüde bulunduğunuz yer, Şimdi etiketi, bugün, sıradaki adım). Rakamlar zaman kodu gibi eş genişlikte',
         'Eski varsayılan temada (Lime) kalan herkes yeni temaya geçti; isteyen Profil → Tema Seçimi\'nden eski temasına dönebilir. Diğer temalar olduğu gibi duruyor',
@@ -856,6 +864,7 @@ const NOTIFICATION_CATEGORIES = [
     'approval' => 'Onay talepleri ve yanıtları',
     'request' => 'Yeni talepler',
     'message' => 'Mesajlar',
+    'office' => 'Ofis günü değişiklikleri',
 ];
 
 function notification_pref(array $recipient, string $category): array {

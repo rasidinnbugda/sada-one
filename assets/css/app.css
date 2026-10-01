@@ -1048,6 +1048,26 @@ a.now-row:hover, .now-row:hover { background: var(--surface-2); }
 .health-dot.is-amber { background: var(--warning); }
 .health-dot.is-red { background: var(--danger); box-shadow: 0 0 0 3px rgba(240,79,79,.18); }
 @media (max-width: 900px) { .today-layout, .tower-grid { grid-template-columns: 1fr; } }
+/* Office days */
+.office-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.office-days { display: flex; flex-direction: column; gap: 6px; }
+.office-day { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: var(--surface-2); }
+.office-day.is-off input[type=time] { opacity: .35; }
+.office-day-hours[hidden] { display: none; }
+.office-choice { gap: 7px; padding: 7px 12px; background: var(--surface-2); border-radius: 9px; cursor: pointer; }
+.office-change { padding: 7px 0; border-bottom: 1px solid var(--border); gap: 8px; }
+.office-table th, .office-table td { text-align: center; white-space: nowrap; }
+.office-table th:first-child, .office-table td:first-child { text-align: left; }
+.office-table .is-today { background: var(--bright); }
+.office-date { font-family: var(--font-mono); color: var(--muted); font-weight: 500; }
+.office-slot { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; font-family: var(--font-mono); font-variant-numeric: tabular-nums; background: var(--surface-3); color: var(--text); }
+.office-slot.is-changed { background: rgba(59,157,240,.14); color: var(--info); }
+.office-slot.is-extra { background: rgba(53,198,107,.15); color: var(--success); }
+.office-slot.is-out { background: transparent; color: var(--muted); text-decoration: line-through; font-family: inherit; font-weight: 500; }
+.office-none { color: var(--muted); opacity: .5; }
+.office-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+@media (max-width: 900px) { .office-layout { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .office-day { grid-template-columns: 1fr 1fr; } .office-day > label { grid-column: 1 / -1; } .office-day > .cell-bottom { display: none; } }
 @media (max-width: 560px) { .now-row { grid-template-columns: minmax(0, 1fr) auto; } .now-kind { display: none; } .now-title { font-size: 19px; } }
 
 /* ============================================================

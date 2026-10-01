@@ -163,6 +163,9 @@ function migration_commands(): array {
         "UPDATE users SET theme='studio' WHERE theme='lime'",
         "ALTER TABLE users MODIFY theme VARCHAR(20) NOT NULL DEFAULT 'studio'",
         "UPDATE settings SET setting_value='studio' WHERE setting_key='default_theme' AND setting_value='lime'",
+        // 7.8: office days — each person's weekly pattern and single-day changes on top of it
+        "CREATE TABLE IF NOT EXISTS office_schedule (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, weekday TINYINT NOT NULL, start_time TIME NOT NULL, end_time TIME NOT NULL, updated DATETIME NOT NULL, UNIQUE KEY office_weekday (user_id, weekday)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
+        "CREATE TABLE IF NOT EXISTS office_days (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, date DATE NOT NULL, kind ENUM('in','out') NOT NULL, start_time TIME DEFAULT NULL, end_time TIME DEFAULT NULL, note VARCHAR(255) DEFAULT NULL, created_by INT NOT NULL, created DATETIME NOT NULL, UNIQUE KEY office_day (user_id, date), INDEX(date)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
     ];
 }
 

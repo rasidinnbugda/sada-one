@@ -1681,6 +1681,69 @@ case 'appointment_accept':
     json_out(['ok' => true, 'message' => 'Yeni saat kabul edildi; ajans onayı bekleniyor.']);
 
 /* ==================== RELEASE NOTES ==================== */
+/* ==================== OFFICE DAYS ==================== */
+case 'office_pattern_save':
+case 'office_day_save':
+case 'office_day_delete':
+    // Office days need no approval: they take effect at once and the managers are told.
+    // Everyone keeps their own; managers may keep someone else's (that person is told too).
+    require_staff();
+    require_once __DIR__ . '/includes/office.php';
+    if ($action === 'office_day_delete') {
+        $change = row("SELECT d.*, us.name FROM office_days d JOIN users us ON us.id=d.user_id WHERE d.id=?", [(int)$g('id')]);
+        if (!$change) json_out(['ok' => false, 'error' => 'Değişiklik bulunamadı.']);
+        if ((int)$change['user_id'] !== (int)$u['id'] && !is_pm()) json_out(['ok' => false, 'error' => 'Başkasının ofis günlerini yalnızca yönetici değiştirebilir.']);
+        q("DELETE FROM office_days WHERE id=?", [$change['id']]);
+        if ($change['date'] >= date('Y-m-d')) office_tell_managers((int)$u['id'], '🏢 ' . $change['name'], format_date($change['date']) . ' için değişiklik kaldırıldı; her zamanki düzen geçerli.');
+        json_out(['ok' => true, 'message' => 'Değişiklik kaldırıldı.']);
+    }
+    $uid = (int)$g('user_id') ?: (int)$u['id'];
+    if ($uid !== (int)$u['id'] && !is_pm()) json_out(['ok' => false, 'error' => 'Başkasının ofis günlerini yalnızca yönetici değiştirebilir.']);
+    $person = row("SELECT id, name FROM users WHERE id=? AND is_active=1 AND role!='customer'", [$uid]);
+    if (!$person) json_out(['ok' => false, 'error' => 'Kişi bulunamadı.']);
+    $byManager = $uid !== (int)$u['id'];
+    if ($action === 'office_pattern_save') {
+        $days = [];
+        for ($d = 1; $d <= 7; $d++) {
+            if (!$g("day_{$d}_on")) continue;
+            $start = office_time((string)$g("day_{$d}_start"));
+            $end = office_time((string)$g("day_{$d}_end"));
+            if (!$start || !$end || $start >= $end) json_out(['ok' => false, 'error' => DAYS[$d - 1] . ' için geçerli bir saat aralığı girin: geliş çıkıştan önce, 15 dakikalık adımlarla.']);
+            $days[$d] = ['start' => $start, 'end' => $end];
+        }
+        $before = office_pattern($uid);
+        q("DELETE FROM office_schedule WHERE user_id=?", [$uid]);
+        foreach ($days as $d => $h) insert('office_schedule', ['user_id' => $uid, 'weekday' => $d, 'start_time' => $h['start'], 'end_time' => $h['end'], 'updated' => $now]);
+        if ($before != $days) {
+            $summary = $days ? implode(', ', array_map(fn($d, $h) => DAYS_SHORT[$d - 1] . ' ' . office_hours($h['start'], $h['end']), array_keys($days), $days)) : 'Haftalık düzende ofis günü yok';
+            office_tell_managers((int)$u['id'], '🏢 Ofis düzeni: ' . $person['name'], $summary);
+            if ($byManager) notify($uid, 'Ofis düzenin güncellendi', $summary . ' — ' . $u['name'], 'office.php', 'office');
+        }
+        json_out(['ok' => true, 'message' => 'Haftalık düzen kaydedildi.']);
+    }
+    // A single day: won't come, or will come at these hours (other hours than usual, or an extra day)
+    $date = (string)$g('date');
+    if (!preg_match('~^\d{4}-\d{2}-\d{2}$~', $date) || $date < date('Y-m-d') || $date > date('Y-m-d', strtotime('+1 year'))) json_out(['ok' => false, 'error' => 'Bugünden itibaren bir yıl içinde bir tarih seçin.']);
+    $kind = $g('kind') === 'in' ? 'in' : 'out';
+    $usual = office_pattern($uid)[(int)date('N', strtotime($date))] ?? null;
+    $start = $end = null;
+    if ($kind === 'in') {
+        $start = office_time((string)$g('start'));
+        $end = office_time((string)$g('end'));
+        if (!$start || !$end || $start >= $end) json_out(['ok' => false, 'error' => 'Geçerli bir saat aralığı girin: geliş çıkıştan önce, 15 dakikalık adımlarla.']);
+    } elseif (!$usual) {
+        json_out(['ok' => false, 'error' => 'O gün zaten haftalık düzende yok; gelmeyeceğini ayrıca yazmana gerek yok.']);
+    }
+    $note = mb_substr(trim((string)$g('note')), 0, 255) ?: null;
+    q("INSERT INTO office_days (user_id, date, kind, start_time, end_time, note, created_by, created) VALUES (?,?,?,?,?,?,?,?)
+        ON DUPLICATE KEY UPDATE kind=VALUES(kind), start_time=VALUES(start_time), end_time=VALUES(end_time), note=VALUES(note), created_by=VALUES(created_by), created=VALUES(created)",
+        [$uid, $date, $kind, $start, $end, $note, $u['id'], $now]);
+    $label = format_date($date) . ' ' . DAYS[(int)date('N', strtotime($date)) - 1];
+    $text = ($kind === 'out' ? "$label ofise gelmiyor" : "$label " . office_hours($start, $end) . ($usual ? ' (her zamanki ' . office_hours($usual['start'], $usual['end']) . ')' : ' — fazladan gün')) . ($note ? ' · ' . $note : '');
+    office_tell_managers((int)$u['id'], '🏢 ' . $person['name'], $text);
+    if ($byManager) notify($uid, 'Ofis günün değiştirildi', $text . ' — ' . $u['name'], 'office.php', 'office');
+    json_out(['ok' => true, 'message' => $kind === 'out' ? 'Kaydedildi: o gün gelmiyorsun.' : 'Kaydedildi.']);
+
 case 'mikasa_lines':
     // The day's lines of the corner assistant, built from the person's own work
     require_staff();
@@ -2170,7 +2233,7 @@ case 'user_delete':
     // pages LEFT JOIN users, so history stays readable without the account.
     foreach (['customer_clients', 'task_assignees', 'task_watchers', 'channel_members',
               'project_members', 'client_members', 'notifications',
-              'personal_todos', 'personal_links', 'personal_notes'] as $t)
+              'personal_todos', 'personal_links', 'personal_notes', 'office_schedule', 'office_days'] as $t)
         q("DELETE FROM `$t` WHERE user_id=?", [$id]);
     q("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", [$id]);
     q("UPDATE clients SET manager_id=NULL WHERE manager_id=?", [$id]);

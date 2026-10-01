@@ -38,6 +38,7 @@ function page_start(string $title, string $activePage = ''): void {
         // The team's own things: announcements, requests, ideas, growth, personal space
         $teamItems = [['announcements.php', 'announcements', 'Duyurular', 'M11 5.88V19.24a1.76 1.76 0 01-3.42.6L5.44 14M18.7 4a9 9 0 01.3 13.3M5.44 14A2 2 0 015 10h1a8 8 0 005-2l3-2v12l-3-2a8 8 0 00-5-2H5.44z']];
         if (!is_intern()) $teamItems[] = ['requests.php', 'requests', 'Talepler', 'M8 10h8m-8 4h4m9-2a9 9 0 11-18 0 9 9 0 0118 0zM12 3v1m0 16v1'];
+        $teamItems[] = ['office.php', 'office', 'Ofis Günleri', 'M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1M9 13h1m4 0h1M9 17h1m4 0h1'];
         $teamItems[] = ['ideas.php', 'ideas', 'Fikir Panosu', 'M9.66 18h4.68M10 21h4m-2-18a7 7 0 00-4 12.7c.6.5 1 1.2 1 2v.3h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 3z'];
         $teamItems[] = ['growth.php', 'growth', 'Gelişim & Mentörlük', 'M12 14l9-5-9-5-9 5 9 5zm0 0v6m-6-3.5V12m12 4.5V12'];
         if (!is_intern()) $teamItems[] = ['talent-pool.php', 'pool', 'Çalışan Havuzu', 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z'];

@@ -5,6 +5,7 @@
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
+require_once __DIR__ . '/includes/office.php';
 require_staff();
 
 $weekHead = date('Y-m-d', strtotime('monday this week'));
@@ -32,7 +33,10 @@ page_start('Ekip', 'team');
 ?>
 <div class="page-top">
     <div><div class="page-title">Ekip Panosu</div><div class="page-bottom">Şu an kim ne üzerinde çalışıyor — <?= $busyCount ?> meşgul, <?= $idleCount ?> boşta</div></div>
+    <div class="page-top-action"><a href="office.php" class="btn">Ofis günlerimi düzenle</a></div>
 </div>
+
+<div class="mb-3"><?php office_week_board(date('Y-m-d', strtotime('monday this week', strtotime(preg_match('~^\d{4}-\d{2}-\d{2}$~', $_GET['week'] ?? '') ? $_GET['week'] : 'today'))), true, 'team.php'); ?></div>
 
 <div class="grid grid-auto">
     <?php foreach ($members as $member):
