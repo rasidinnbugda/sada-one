@@ -976,6 +976,13 @@ table.table { width: 100%; border-collapse: collapse; }
 .flow-step:last-child .flow-line { display: none; }
 .flow-name { font-size: 12.5px; font-weight: 600; }
 .flow-owner { font-size: 11px; color: var(--muted); }
+/* Optional steps: a dashed ring; skipped ones fade and are struck through */
+.flow-step.optional:not(.done) .flow-circle { border-style: dashed; }
+.flow-step.skipped .flow-circle, [data-theme] .flow-step.skipped .flow-circle { background: var(--surface-2); border: 2px dashed var(--border-2); color: var(--muted); box-shadow: none; }
+.flow-step.skipped .flow-name { color: var(--muted); text-decoration: line-through; }
+.flow-step.skipped .flow-line, [data-theme] .flow-step.skipped .flow-line { background: var(--border-2); }
+.ts-optional-label, .step-omit-label { gap: 6px; white-space: nowrap; cursor: pointer; color: var(--text-2); }
+.step-omit-label { display: inline-flex; align-items: center; margin-left: 6px; font-size: 12px; }
 
 /* ============================================================
    MONTH (phase band, work rows, scope signal)

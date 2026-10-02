@@ -159,6 +159,10 @@ function migration_commands(): array {
         "CREATE TABLE IF NOT EXISTS event_tasks (event_id INT NOT NULL, task_id INT NOT NULL, PRIMARY KEY (event_id, task_id), INDEX(task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
         // 7.5: when a step became active — how long work has been waiting on it
         "ALTER TABLE task_steps ADD COLUMN activated_at DATETIME DEFAULT NULL",
+        // 7.9: optional steps — marked on the task type, copied to the task; a skipped step is done + skipped
+        "ALTER TABLE task_type_steps ADD COLUMN optional TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE task_steps ADD COLUMN optional TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE task_steps ADD COLUMN skipped TINYINT(1) NOT NULL DEFAULT 0",
         // 7.7: the light "SADA Açık" theme becomes the default; whoever kept the old default (lime) moves with it
         "UPDATE users SET theme='studio' WHERE theme='lime'",
         "ALTER TABLE users MODIFY theme VARCHAR(20) NOT NULL DEFAULT 'studio'",

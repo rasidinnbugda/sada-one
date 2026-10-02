@@ -13,7 +13,7 @@ $skillName = array_column($skills, 'name', 'id');
 $team = rows("SELECT id, name FROM users WHERE role IN ('admin','pm','team','intern') AND is_active=1 ORDER BY name");
 $teamName = array_column($team, 'name', 'id');
 $types = rows("SELECT t.*, (SELECT COUNT(*) FROM tasks g WHERE g.type_id=t.id) usage_count FROM task_types t ORDER BY t.kind, t.name");
-foreach ($types as &$t) $t['steps'] = rows("SELECT id, name, skill_id, kind, owner_id FROM task_type_steps WHERE type_id=? ORDER BY sort_order, id", [$t['id']]);
+foreach ($types as &$t) $t['steps'] = rows("SELECT id, name, skill_id, kind, owner_id, optional FROM task_type_steps WHERE type_id=? ORDER BY sort_order, id", [$t['id']]);
 unset($t);
 $kindIcon = ['work' => '●', 'review' => '◆', 'client_approval' => '✓', 'publish' => '↗'];
 
@@ -43,12 +43,12 @@ page_start('İş Türleri', 'task_types');
             <?php if ($t['steps']): ?>
             <div class="flow-rail" style="margin-top:14px">
                 <?php foreach ($t['steps'] as $i => $s): ?>
-                <div class="flow-step">
+                <div class="flow-step<?= $s['optional'] ? ' optional' : '' ?>">
                     <div class="flow-line"></div>
                     <div class="flow-step-inner">
                         <div class="flow-circle" title="<?= STEP_KINDS[$s['kind']] ?>"><?= $s['kind'] === 'work' ? $i + 1 : $kindIcon[$s['kind']] ?></div>
                         <div class="flow-name"><?= e($s['name']) ?></div>
-                        <div class="cell-bottom" style="font-size:11px"><?= $s['skill_id'] ? e($skillName[$s['skill_id']] ?? '—') : 'Uzmanlık yok' ?><?= $s['owner_id'] ? ' · ' . e(explode(' ', $teamName[$s['owner_id']] ?? '')[0]) : '' ?></div>
+                        <div class="cell-bottom" style="font-size:11px"><?= $s['skill_id'] ? e($skillName[$s['skill_id']] ?? '—') : 'Uzmanlık yok' ?><?= $s['owner_id'] ? ' · ' . e(explode(' ', $teamName[$s['owner_id']] ?? '')[0]) : '' ?><?= $s['optional'] ? ' · atlanabilir' : '' ?></div>
                     </div>
                 </div>
                 <?php endforeach; ?>
@@ -120,6 +120,7 @@ function typeStepRow(step = {}) {
     <select class="select native-select ts-skill" style="flex:1">${opts(skillOptions, step.skill_id, 'Uzmanlık yok')}</select>
     <select class="select native-select ts-kind" style="flex:1">${Object.entries(stepKinds).map(([k, v]) => `<option value="${k}" ${(step.kind || 'work') === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
     <select class="select native-select ts-owner" style="flex:1">${opts(teamOptions, step.owner_id, 'Kişi: havuz')}</select>
+    <label class="row-flex small ts-optional-label" title="Zorunlu değil: iş açılırken çıkarılabilir, sırası gelince atlanabilir"><input type="checkbox" class="ts-optional" ${Number(step.optional) ? 'checked' : ''}> Atlanabilir</label>
     <button type="button" class="icon-action danger" onclick="this.parentElement.remove()" title="Adımı kaldır"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="16"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
     document.getElementById('typeSteps').appendChild(div);
 }
@@ -146,7 +147,7 @@ function typeEdit(t) {
 }
 document.getElementById('typeForm').addEventListener('submit', () => {
     document.getElementById('t_steps').value = JSON.stringify(Array.from(document.querySelectorAll('.type-step')).map(r => ({
-        name: r.querySelector('.ts-name').value.trim(), skill_id: r.querySelector('.ts-skill').value, kind: r.querySelector('.ts-kind').value, owner_id: r.querySelector('.ts-owner').value,
+        name: r.querySelector('.ts-name').value.trim(), skill_id: r.querySelector('.ts-skill').value, kind: r.querySelector('.ts-kind').value, owner_id: r.querySelector('.ts-owner').value, optional: r.querySelector('.ts-optional').checked ? 1 : 0,
     })).filter(s => s.name));
 });
 async function skillRename(id, name) {

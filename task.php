@@ -84,17 +84,17 @@ page_start($task['title'], 'tasks');
     $canClaim = $activeStep && !$activeStep['owner_id'] && $activeStep['skill_id'] && (is_pm() || in_array((int)$activeStep['skill_id'], $mySkills, true)); ?>
 <!-- WORKFLOW STEPS -->
 <div class="card mb-3">
-    <div class="row-flex between mb-3"><div class="card-title">Adımlar<?= $task['type_name'] ? ' <span class="cell-bottom" style="font-weight:400">· ' . e($task['type_name']) . '</span>' : '' ?></div><span class="text-muted small" id="stepCounter"><?= count(array_filter($steps, fn($a) => $a['status'] === 'done')) ?>/<?= count($steps) ?> adım tamamlandı</span></div>
+    <div class="row-flex between mb-3"><div class="card-title">Adımlar<?= $task['type_name'] ? ' <span class="cell-bottom" style="font-weight:400">· ' . e($task['type_name']) . '</span>' : '' ?></div><span class="text-muted small" id="stepCounter"><?= count(array_filter($steps, fn($a) => $a['status'] === 'done')) ?>/<?= count($steps) ?> adım tamamlandı<?= ($skippedCount = count(array_filter($steps, fn($a) => $a['skipped']))) ? " ({$skippedCount} atlandı)" : '' ?></span></div>
     <div class="flow-rail">
         <?php foreach ($steps as $i => $a): ?>
-        <div class="flow-step <?= $a['status'] === 'done' ? 'done' : ($a['status'] === 'active' ? 'active' : '') ?>" data-step="<?= $a['id'] ?>" data-sort_order="<?= $i + 1 ?>">
+        <div class="flow-step <?= $a['status'] === 'done' ? 'done' : ($a['status'] === 'active' ? 'active' : '') ?><?= $a['skipped'] ? ' skipped' : ($a['optional'] ? ' optional' : '') ?>" data-step="<?= $a['id'] ?>" data-sort_order="<?= $i + 1 ?>">
             <div class="flow-line"></div>
             <div class="flow-step-inner">
-                <button class="flow-circle" onclick="stepComplete(<?= $a['id'] ?>)" title="<?= $a['status'] === 'done' ? 'Geri aç' : STEP_KINDS[$a['kind']] ?>">
-                    <?php if ($a['status'] === 'done'): ?><svg width="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg><?php else: ?><?= $i + 1 ?><?php endif; ?>
+                <button class="flow-circle" onclick="stepComplete(<?= $a['id'] ?>)" title="<?= $a['skipped'] ? 'Atlandı — geri al' : ($a['status'] === 'done' ? 'Geri aç' : STEP_KINDS[$a['kind']]) ?>">
+                    <?php if ($a['skipped']): ?>»<?php elseif ($a['status'] === 'done'): ?><svg width="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg><?php else: ?><?= $i + 1 ?><?php endif; ?>
                 </button>
                 <div class="flow-name"><?= e($a['name']) ?></div>
-                <div class="cell-bottom" style="font-size:11px"><?= e($a['skill_name'] ?? '') ?><?= $a['kind'] !== 'work' ? ($a['skill_name'] ? ' · ' : '') . STEP_KINDS[$a['kind']] : '' ?></div>
+                <div class="cell-bottom" style="font-size:11px"><?= e($a['skill_name'] ?? '') ?><?= $a['kind'] !== 'work' ? ($a['skill_name'] ? ' · ' : '') . STEP_KINDS[$a['kind']] : '' ?><?= $a['skipped'] ? ' · atlandı' : ($a['optional'] ? ' · atlanabilir' : '') ?></div>
                 <button class="flow-owner" onclick="stepOwner(<?= $a['id'] ?>)" style="cursor:pointer"><?= $a['owner_name'] ? e(explode(' ', $a['owner_name'])[0]) : ($a['skill_name'] ? 'Havuz' : '+ sorumlu') ?></button>
             </div>
         </div>
@@ -119,6 +119,7 @@ page_start($task['title'], 'tasks');
             <?php if (is_pm()): ?><button class="btn btn-sm" onclick="if (confirm('Müşteri onayını onun adına kaydediyorsunuz. Devam edilsin mi?')) stepComplete(<?= $activeStep['id'] ?>)" title="Müşteri onayı telefonda/e-postada geldiyse">Onay geldi</button><button class="btn btn-sm" onclick="stepReturn(<?= $activeStep['id'] ?>)">Revize geldi</button><?php endif; ?>
             <?php endif; ?>
             <?php if ($canAct && $activeStep['kind'] === 'publish'): ?><button class="btn btn-sm btn-brand" onclick="stepComplete(<?= $activeStep['id'] ?>)"><?= icon('rocket', 13) ?> Yayınlandı</button><?php endif; ?>
+            <?php if ($activeStep['optional'] && ($canAct || is_pm())): ?><button class="btn btn-sm btn-ghost" onclick="stepSkip(<?= $activeStep['id'] ?>)" title="Bu adım zorunlu değil">Atla</button><?php endif; ?>
             <?php if (is_pm() || (int)$activeStep['owner_id'] === (int)$u['id']): ?><button class="btn btn-sm btn-ghost" onclick="stepOwner(<?= $activeStep['id'] ?>)">Devret</button><?php endif; ?>
         </div>
     </div>
@@ -456,6 +457,14 @@ page_start($task['title'], 'tasks');
 </div>
 
 <!-- Send back with the reason -->
+<div class="modal-overlay" id="modalStepSkip">
+    <div class="modal"><div class="modal-top"><div class="modal-title">Adımı Atla</div><button class="modal-close" data-modal-close>✕</button></div>
+    <form data-ajax="step_skip" data-refresh="yes">
+        <input type="hidden" name="id" id="stepSkipId">
+        <div class="modal-body"><div class="form-group"><label class="form-label">Not <span class="text-muted" style="font-weight:400">(isteğe bağlı)</span></label><textarea name="note" class="text-area" placeholder="Örn. bu işte çekim gerekmedi, arşivden görsel kullanıldı"></textarea><div class="form-hint">Adım atlanmış olarak işaretlenir ve iş sıradaki adıma geçer; not işin yorumlarına düşer. Atlanan adımın simgesine basarak geri alabilirsiniz.</div></div></div>
+        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Atla</button></div>
+    </form></div>
+</div>
 <div class="modal-overlay" id="modalStepReturn">
     <div class="modal"><div class="modal-top"><div class="modal-title">Geri Gönder</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="step_return" data-refresh="yes">
@@ -475,6 +484,7 @@ async function statusChange(status) {
 }
 function stepOwner(id) { document.getElementById('stepOwnerId').value = id; modalOpen('modalStepOwner'); }
 function stepReturn(id) { document.getElementById('stepReturnId').value = id; modalOpen('modalStepReturn'); }
+function stepSkip(id) { document.getElementById('stepSkipId').value = id; modalOpen('modalStepSkip'); }
 
 /* Workflow step: a step changes who holds the work and its status, so the page reloads */
 async function stepComplete(id) {

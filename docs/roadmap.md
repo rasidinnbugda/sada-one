@@ -25,6 +25,12 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 6. **Sadeleştirme** — 7.6 ✅: menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm** — 7.7 ✅: açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
 
+## Ek — Atlanabilir adımlar (7.9)
+
+- **İş türünde işaret:** her adım "Atlanabilir" (`task_type_steps.optional`) olabilir; işaret işe kopyalanır (`task_steps.optional`). İşaretsiz adımlar zorunludur.
+- **İş açarken:** atlanabilir adımın "bu işte atla" kutusu işaretlenirse adım o işte hiç kurulmaz (`step_omit`); zorunlu adım gönderilse de kurulur.
+- **Sırası gelince:** adımı yapabilen kişi (sahibi, havuzdaysa uzmanı) ya da yönetici "Atla" der (`step_skip`); isteğe bağlı not işin yorumlarına düşer. Atlanan adım `status=done` + `skipped=1` olarak tutulur, böylece sıradaki adım, işin durumu ve kilitler değişmeden çalışır. Geri gönderme atlanan adıma dönmez ve onu yeniden açmaz; yayın adımı atlanırsa iş "Yayınlandı" değil "Tamamlandı" olur. Atlanan adımın simgesine basmak onu yeniden açar.
+
 ## Ek — Ofis günleri (7.8)
 
 - **Veri:** `office_schedule` kişinin haftalık düzenidir (gün başına bir saat aralığı); `office_days` tek gün değişikliğidir: `out` (o gün gelmiyor, yalnızca düzende olan gün için) ya da `in` (bu saatlerde geliyor — düzendeki günde farklı saat ya da fazladan gün). Günün cevabı: değişiklik varsa o, yoksa düzen (`office_range`, `includes/office.php`).

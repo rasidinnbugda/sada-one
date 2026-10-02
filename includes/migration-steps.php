@@ -138,7 +138,8 @@ function step_status_for(array $steps): ?string {
         if ($s['status'] === 'done') { $anyDone = true; continue; }
         if ($active === null) $active = $s;
     }
-    if ($active === null) return end($steps)['kind'] === 'publish' ? 'published' : 'completed';
+    // a skipped publish step means the work was not published
+    if ($active === null) { $last = end($steps); return $last['kind'] === 'publish' && empty($last['skipped']) ? 'published' : 'completed'; }
     return match ($active['kind']) {
         'review' => 'in_review',
         'client_approval' => 'awaiting_approval',

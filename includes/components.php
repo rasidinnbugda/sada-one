@@ -100,6 +100,7 @@ function task_modal(int $projectId, array $team, array $templates, array $period
                 <label class="form-label">İş Türü</label>
                 <select name="type_id" class="select native-select task-type-select"><option value="">Adımsız iş — durumu elle yönetilir</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select>
                 <input type="hidden" name="step_owners" class="step-owners-json">
+                <input type="hidden" name="step_omit" data-collect=".step-omit">
                 <div class="type-steps vertical mt-2" style="gap:6px"></div>
                 <div class="form-hint type-hint">Tür seçilirse iş, türün adımlarından geçer; durumu adımlar belirler. Kişi seçilmeyen adım uzmanlığın havuzuna düşer.</div>
             </div>
@@ -148,7 +149,7 @@ function task_type_picker_script(array $team): void {
     $printed = true;
     $types = [];
     foreach (rows("SELECT id, name, kind FROM task_types ORDER BY name") as $t) {
-        $t['steps'] = rows("SELECT s.id, s.name, s.kind, s.owner_id, s.skill_id, k.name skill FROM task_type_steps s LEFT JOIN skills k ON k.id=s.skill_id WHERE s.type_id=? ORDER BY s.sort_order, s.id", [$t['id']]);
+        $t['steps'] = rows("SELECT s.id, s.name, s.kind, s.owner_id, s.skill_id, s.optional, k.name skill FROM task_type_steps s LEFT JOIN skills k ON k.id=s.skill_id WHERE s.type_id=? ORDER BY s.sort_order, s.id", [$t['id']]);
         $types[$t['id']] = $t;
     }
     $holders = [];
@@ -183,7 +184,7 @@ function task_type_picker_script(array $team): void {
             const row = document.createElement('div');
             row.className = 'row-flex between';
             row.style.cssText = 'gap:8px;padding:6px 10px;background:var(--surface-2);border-radius:9px';
-            row.innerHTML = `<span class="small" style="min-width:0"><b>${esc(step.name)}</b> <span class="cell-bottom">· ${esc(step.skill || 'uzmanlık yok')}</span></span>
+            row.innerHTML = `<span class="small" style="min-width:0"><b>${esc(step.name)}</b> <span class="cell-bottom">· ${esc(step.skill || 'uzmanlık yok')}</span>${Number(step.optional) ? ` <label class="step-omit-label" title="Bu adım zorunlu değil: bu işte hiç kurulmaz"><input type="checkbox" class="step-omit" value="${step.id}"> bu işte atla</label>` : ''}</span>
                 <select class="select native-select step-owner" data-step="${step.id}" style="width:auto;max-width:200px;padding:5px 28px 5px 10px;font-size:12px">
                     <option value="0">${step.skill ? 'Havuz — ' + esc(step.skill) : 'Kişisiz'}</option>
                     ${people.map(p => `<option value="${p.id}" ${String(p.id) === preset ? 'selected' : ''}>${skilled.has(String(p.id)) ? '★ ' : ''}${esc(p.name)}</option>`).join('')}

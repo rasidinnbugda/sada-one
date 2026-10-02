@@ -646,6 +646,17 @@ case 'month_plan_send':
     json_out(['ok' => true, 'message' => 'Plan müşteriye gönderildi.']);
 
 /* ==================== TASKS ==================== */
+case 'step_skip':
+    // An optional step whose turn has come is skipped by whoever may act on it, or a manager
+    require_staff();
+    $step = row("SELECT * FROM task_steps WHERE id=?", [(int)$g('id')]);
+    if (!$step) json_out(['ok' => false, 'error' => 'Adım bulunamadı.']);
+    if ((string)val("SELECT status FROM tasks WHERE id=?", [$step['task_id']]) === 'cancelled') json_out(['ok' => false, 'error' => 'İptal edilmiş işin adımları değiştirilemez.']);
+    if (!step_can_act($step, $u) && !is_pm()) json_out(['ok' => false, 'error' => 'Bu adımı yalnızca sahibi ya da bir yönetici atlayabilir.']);
+    if ($error = step_skip($step, (int)$u['id'], (string)$g('note'))) json_out(['ok' => false, 'error' => $error]);
+    $next = task_active_step((int)$step['task_id']);
+    json_out(['ok' => true, 'message' => $step['name'] . ' atlandı' . ($next ? '; sıra: ' . $next['name'] . '.' : '; tüm adımlar bitti.')]);
+
 case 'step_deliver':
     // The maker hands in the work: files and / or a link go on the work and its step finishes in one go
     require_staff();
@@ -750,7 +761,8 @@ case 'task_save':
             $owners = [];
             foreach ((json_decode($g('step_owners', ''), true) ?: []) as $typeStepId => $ownerId) $owners[(int)$typeStepId] = (int)$ownerId;
             if (!array_key_exists('kind', $_POST)) update_row('tasks', ['kind' => val("SELECT kind FROM task_types WHERE id=?", [$typeId])], 'id=?', [$id]);
-            task_steps_setup($id, $typeId, $owners);
+            $omit = array_map('intval', json_decode($g('step_omit', '[]'), true) ?: []);
+            task_steps_setup($id, $typeId, $owners, $omit);
         }
         if (is_array($assignees)) {
             foreach ($assignees as $aid) {
@@ -2251,6 +2263,7 @@ case 'task_type_save':
         'skill_id' => (int)($s['skill_id'] ?? 0) ?: null,
         'kind' => isset(STEP_KINDS[$s['kind'] ?? '']) ? $s['kind'] : 'work',
         'owner_id' => (int)($s['owner_id'] ?? 0) ?: null,
+        'optional' => empty($s['optional']) ? 0 : 1,
     ], $steps), fn($s) => $s['name'] !== ''));
     if ($name === '') json_out(['ok' => false, 'error' => 'İş türünün adı gerekli.']);
     $data = ['name' => $name, 'description' => $g('description'), 'kind' => isset(TASK_KINDS[$g('kind')]) ? $g('kind') : 'client'];

@@ -455,8 +455,13 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.8.2';
+const APP_VERSION = '7.9';
 const VERSION_NOTES = [
+    '7.9' => [
+        'Atlanabilir adımlar: İş Türleri\'nde her adım "Atlanabilir" olarak işaretlenebilir; işaretsiz adımlar zorunlu kalır',
+        'Yeni iş açarken atlanabilir adımların yanında "bu işte atla" kutusu var: işaretlenen adım o işte hiç kurulmaz',
+        'İş ilerlerken sırası gelen atlanabilir adımda "Atla" butonu çıkar (adımın sahibi ya da yönetici): adım atlandı olarak işaretlenir, iş sıradaki adıma geçer; isteğe bağlı not işin yorumlarına düşer. Atlanan adım, simgesine basılarak geri alınabilir',
+    ],
     '7.8.2' => [
         'Proje sayfasında "Projeyi Düzenle", "Onaya Gönder", "Dosya Yükle" ve "Ay Aç" pencereleri açılmıyordu (yeni iş penceresinin kapanış etiketi eksikti, sonraki pencereler onun içinde gizli kalıyordu); düzeltildi',
     ],
@@ -1162,7 +1167,7 @@ function run_recurring_jobs(bool $force = false): int {
         foreach ($steps as $i => $a) {
             insert('task_steps', [
                 'task_id' => $newId, 'sort_order' => $a['sort_order'], 'name' => $a['name'], 'skill_id' => $a['skill_id'], 'kind' => $a['kind'],
-                'owner_id' => $a['owner_id'], 'status' => $i === 0 ? 'active' : 'pending', 'activated_at' => $i === 0 ? date('Y-m-d H:i:s') : null,
+                'owner_id' => $a['owner_id'], 'optional' => (int)$a['optional'], 'status' => $i === 0 ? 'active' : 'pending', 'activated_at' => $i === 0 ? date('Y-m-d H:i:s') : null,
             ]);
         }
         if ($steps) { if ($first = task_active_step($newId)) step_announce($first); task_sync_from_steps($newId); }
@@ -1527,7 +1532,7 @@ function user_skill_ids(int $userId): array { return array_map('intval', array_c
 function task_has_steps(int $taskId): bool { return (bool)val("SELECT COUNT(*) FROM task_steps WHERE task_id=?", [$taskId]); }
 
 /** Creates a task's steps from its task type; $owners maps a type-step id (or its position) to a user id, 0 = pool */
-function task_steps_setup(int $taskId, int $typeId, array $owners = []): void {
+function task_steps_setup(int $taskId, int $typeId, array $owners = [], array $omit = []): void {
     $task = row("SELECT t.id, p.pm_id, c.no_approval_types FROM tasks t JOIN projects p ON p.id=t.project_id JOIN clients c ON c.id=p.client_id WHERE t.id=?", [$taskId]);
     $coordination = (int)val("SELECT id FROM skills WHERE name='Koordinasyon'");
     // The client file may skip client approval for this type of work (e.g. story, daily post)
@@ -1535,12 +1540,14 @@ function task_steps_setup(int $taskId, int $typeId, array $owners = []): void {
     $placed = 0;
     foreach (rows("SELECT * FROM task_type_steps WHERE type_id=? ORDER BY sort_order, id", [$typeId]) as $i => $st) {
         if ($skipApproval && $st['kind'] === 'client_approval') continue;
+        // optional steps the person opening the work left out are not set up at all
+        if ($st['optional'] && in_array((int)$st['id'], $omit, true)) continue;
         $owner = array_key_exists($st['id'], $owners) ? $owners[$st['id']] : ($owners[$i] ?? null);
         // No choice made: the type's default person, else the project manager for coordination steps
         if ($owner === null) $owner = $st['owner_id'] ?: ((int)$st['skill_id'] === $coordination && $task ? $task['pm_id'] : null);
         insert('task_steps', [
             'task_id' => $taskId, 'sort_order' => $st['sort_order'], 'name' => $st['name'],
-            'skill_id' => $st['skill_id'], 'kind' => $st['kind'], 'owner_id' => $owner ? (int)$owner : null,
+            'skill_id' => $st['skill_id'], 'kind' => $st['kind'], 'owner_id' => $owner ? (int)$owner : null, 'optional' => (int)$st['optional'],
             'status' => $placed === 0 ? 'active' : 'pending', 'activated_at' => $placed++ === 0 ? date('Y-m-d H:i:s') : null,
         ]);
         if ($owner) q("INSERT IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)", [$taskId, (int)$owner]);
@@ -1554,7 +1561,7 @@ function task_steps_setup(int $taskId, int $typeId, array $owners = []): void {
 function task_sync_from_steps(int $taskId): void {
     $task = row("SELECT * FROM tasks WHERE id=?", [$taskId]);
     if (!$task || $task['status'] === 'cancelled') return;
-    $steps = rows("SELECT status, kind, owner_id FROM task_steps WHERE task_id=? ORDER BY sort_order, id", [$taskId]);
+    $steps = rows("SELECT status, kind, owner_id, skipped FROM task_steps WHERE task_id=? ORDER BY sort_order, id", [$taskId]);
     if (!$steps) return;
     $status = step_status_for($steps);
     if ($status && $status !== $task['status']) task_set_status($task, $status, false);
@@ -1598,11 +1605,11 @@ function step_finish(array $step, int $userId): ?string {
 /** Sends the work back from a review / client-approval step to the last finished production step. */
 function step_send_back(array $step, string $note, int $userId, string $who = ''): ?string {
     if ($step['status'] !== 'active') return 'Yalnızca sıradaki adım geri gönderilebilir.';
-    $target = row("SELECT * FROM task_steps WHERE task_id=? AND kind='work' AND status='done' AND sort_order<=? AND id!=? ORDER BY sort_order DESC, id DESC LIMIT 1", [$step['task_id'], $step['sort_order'], $step['id']])
+    $target = row("SELECT * FROM task_steps WHERE task_id=? AND kind='work' AND status='done' AND skipped=0 AND sort_order<=? AND id!=? ORDER BY sort_order DESC, id DESC LIMIT 1", [$step['task_id'], $step['sort_order'], $step['id']])
         ?: row("SELECT * FROM task_steps WHERE task_id=? ORDER BY sort_order, id LIMIT 1", [$step['task_id']]);
     if (!$target || (int)$target['id'] === (int)$step['id']) return 'Geri gönderilecek bir üretim adımı yok.';
-    q("UPDATE task_steps SET status='pending', done_date=NULL, done_by=NULL WHERE task_id=? AND sort_order>? AND sort_order<=?", [$step['task_id'], $target['sort_order'], $step['sort_order']]);
-    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null, 'activated_at' => date('Y-m-d H:i:s')], 'id=?', [$target['id']]);
+    q("UPDATE task_steps SET status='pending', done_date=NULL, done_by=NULL WHERE task_id=? AND skipped=0 AND sort_order>? AND sort_order<=?", [$step['task_id'], $target['sort_order'], $step['sort_order']]);
+    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null, 'skipped' => 0, 'activated_at' => date('Y-m-d H:i:s')], 'id=?', [$target['id']]);
     // The reason lands in the task's discussion, so the maker sees it next to the work
     insert('comments', ['ref_type' => 'task', 'ref_id' => $step['task_id'], 'user_id' => $userId, 'created' => date('Y-m-d H:i:s'),
         'message' => '↩ ' . ($who !== '' ? $who . ' — ' : '') . $step['name'] . ' adımından "' . $target['name'] . '" adımına geri gönderildi' . (trim($note) !== '' ? ': ' . trim($note) : '')]);
@@ -1612,11 +1619,25 @@ function step_send_back(array $step, string $note, int $userId, string $who = ''
     return null;
 }
 
+/** Skips an optional active step: it counts as finished (marked skipped) and the work moves on. The note, if any,
+ *  and who skipped it land in the task's discussion. Returns an error or null. */
+function step_skip(array $step, int $userId, string $note = ''): ?string {
+    if ($step['status'] !== 'active') return 'Yalnızca sıradaki adım atlanabilir.';
+    if (!$step['optional']) return 'Bu adım zorunlu; atlanamaz.';
+    if ($error = step_finish($step, $userId)) return $error;
+    update_row('task_steps', ['skipped' => 1], 'id=?', [$step['id']]);
+    insert('comments', ['ref_type' => 'task', 'ref_id' => $step['task_id'], 'user_id' => $userId, 'created' => date('Y-m-d H:i:s'),
+        'message' => '⏭ ' . $step['name'] . ' adımı atlandı' . (trim($note) !== '' ? ': ' . trim($note) : '')]);
+    task_sync_from_steps((int)$step['task_id']); // a skipped last step changes how the work ends (not published)
+    return null;
+}
+
 /** Reopens a finished step (undo); the steps after it wait again. */
 function step_reopen(array $step): ?string {
     if ($step['status'] !== 'done') return 'Bu adım zaten açık.';
-    q("UPDATE task_steps SET status='pending', done_date=NULL, done_by=NULL WHERE task_id=? AND status IN ('done','active') AND (sort_order>? OR (sort_order=? AND id>?))", [$step['task_id'], $step['sort_order'], $step['sort_order'], $step['id']]);
-    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null, 'activated_at' => date('Y-m-d H:i:s')], 'id=?', [$step['id']]);
+    q("UPDATE task_steps SET status='pending', done_date=NULL, done_by=NULL WHERE task_id=? AND skipped=0 AND status IN ('done','active') AND (sort_order>? OR (sort_order=? AND id>?))", [$step['task_id'], $step['sort_order'], $step['sort_order'], $step['id']]);
+    // reopening a skipped step brings it back into the work
+    update_row('task_steps', ['status' => 'active', 'done_date' => null, 'done_by' => null, 'skipped' => 0, 'activated_at' => date('Y-m-d H:i:s')], 'id=?', [$step['id']]);
     $task = row("SELECT * FROM tasks WHERE id=?", [$step['task_id']]);
     if ($task && in_array($task['status'], ['completed', 'published'], true)) task_set_status($task, 'in_progress', false);
     task_sync_from_steps((int)$step['task_id']);
