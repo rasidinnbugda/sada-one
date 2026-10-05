@@ -7,7 +7,7 @@ $u = require_permission('finance');
 $weekHead = date('Y-m-d', strtotime('monday this week'));
 $weekEnd = date('Y-m-d', strtotime('sunday this week'));
 $capacities = permission('capacity') ? rows("SELECT us.id, us.name, us.color, us.avatar, us.job_title, us.weekly_capacity,
-    (SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z WHERE z.user_id=us.id AND z.date BETWEEN ? AND ?) week_minutes,
+    (SELECT COALESCE(SUM(w.minutes),0) FROM work_logs w WHERE w.user_id=us.id AND w.date BETWEEN ? AND ?) week_minutes,
     (SELECT COUNT(*) FROM tasks g WHERE g.is_archived=0 AND " . task_open_sql('g') . " AND (g.assignee_id=us.id OR EXISTS(SELECT 1 FROM task_assignees ga WHERE ga.task_id=g.id AND ga.user_id=us.id))) open_task
     FROM users us WHERE us.role IN ('admin','pm','team','finance') AND us.is_active=1 ORDER BY us.name", [$weekHead, $weekEnd]) : [];
 
@@ -63,9 +63,9 @@ $accounts = rows("SELECT d.id, d.name, d.color,
     COALESCE((SELECT SUM(o.amount) FROM payments o JOIN projects p ON p.id=o.project_id WHERE p.client_id=d.id AND o.type='collection' AND o.status='paid'),0) collect
     FROM clients d HAVING debt>0 OR collect>0 ORDER BY (debt-collect) DESC");
 
-// Project profitability: contract amount − labor cost (logged time × person's hourly cost; hourly cost = salary/172)
+// Project profitability: contract amount − labor cost (work log hours on the project × person's hourly cost; hourly cost = salary/172)
 $profitability = rows("SELECT p.id, p.name, p.contract_amount, d.name client_name, d.color client_color,
-    COALESCE((SELECT SUM(z.minutes/60 * (us.salary/172)) FROM time_entries z JOIN tasks g ON g.id=z.task_id JOIN users us ON us.id=z.user_id WHERE g.project_id=p.id AND us.salary>0), 0) labor
+    COALESCE((SELECT SUM(w.minutes/60 * (us.salary/172)) FROM work_logs w JOIN users us ON us.id=w.user_id WHERE w.project_id=p.id AND us.salary>0), 0) labor
     FROM projects p JOIN clients d ON d.id=p.client_id WHERE p.status IN ('active','completed') AND p.contract_amount>0 ORDER BY p.contract_amount DESC LIMIT 20");
 
 $projectFilter = (int)($_GET['project'] ?? 0);
@@ -308,9 +308,9 @@ page_start('Finans', 'finance');
         <div class="row-flex between mb-3">
             <div>
                 <div class="card-title">Haftalık Doluluk — <?= format_date($weekHead) ?> / <?= format_date($weekEnd) ?></div>
-                <div class="cell-bottom mt-1">Kayıtlı çalışma süresi, kişinin haftalık kapasite hedefine oranlanır.</div>
+                <div class="cell-bottom mt-1">Çalışma Defteri'ndeki bu haftaki süre, kişinin haftalık kapasite hedefine oranlanır.</div>
             </div>
-            <a href="export.php?type=time" class="btn btn-sm">Zaman Raporu CSV</a>
+            <a href="export.php?type=worklog&amp;month=<?= date('Y-m') ?>" class="btn btn-sm">Çalışma Defteri CSV</a>
         </div>
         <?php if (!$capacities): ?><div class="text-muted small">Ekip üyesi yok.</div>
         <?php else: foreach ($capacities as $kp):
@@ -325,7 +325,7 @@ page_start('Finans', 'finance');
             </div>
             <div class="capacity-bar">
                 <div class="progress"><div class="progress-full <?= $class ?>" data-rate="<?= min(100, $rate) ?>" style="width:0"></div></div>
-                <div class="cell-bottom mt-1"><?= format_minutes((int)$kp['week_minutes']) ?> kayıtlı</div>
+                <div class="cell-bottom mt-1"><?= format_minutes((int)$kp['week_minutes']) ?> defterde</div>
             </div>
             <div class="capacity-percent" style="<?= $rate > 100 ? 'color:var(--danger)' : ($rate > 80 ? 'color:var(--warning)' : '') ?>">%<?= $rate ?></div>
         </div>

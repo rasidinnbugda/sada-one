@@ -163,6 +163,8 @@ function migration_commands(): array {
         "ALTER TABLE task_type_steps ADD COLUMN optional TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE task_steps ADD COLUMN optional TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE task_steps ADD COLUMN skipped TINYINT(1) NOT NULL DEFAULT 0",
+        // 8.0: the work log — days, hours and what was done; replaces logging time on tasks (time_entries is kept as an archive)
+        "CREATE TABLE IF NOT EXISTS work_logs (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, date DATE NOT NULL, category ENUM('meeting','office','remote','event') NOT NULL DEFAULT 'office', start_time TIME NOT NULL, end_time TIME NOT NULL, minutes SMALLINT NOT NULL, client_id INT DEFAULT NULL, project_id INT DEFAULT NULL, note TEXT, created DATETIME NOT NULL, updated DATETIME DEFAULT NULL, INDEX user_date (user_id, date), INDEX(project_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
         // 7.7: the light "SADA Açık" theme becomes the default; whoever kept the old default (lime) moves with it
         "UPDATE users SET theme='studio' WHERE theme='lime'",
         "ALTER TABLE users MODIFY theme VARCHAR(20) NOT NULL DEFAULT 'studio'",

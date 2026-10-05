@@ -20,7 +20,7 @@ $completed = rows("SELECT g.*, u.name assignee_name FROM tasks g LEFT JOIN users
 $ongoing = rows("SELECT g.* FROM tasks g WHERE g.project_id=? AND g.kind='client' AND g.is_archived=0 AND " . task_open_sql('g') . " ORDER BY g.due_date IS NULL, g.due_date", [$projectId]);
 $approvals = rows("SELECT * FROM approvals WHERE project_id=? AND created BETWEEN ? AND ? ORDER BY id", [$projectId, $monthInitial . ' 00:00:00', $monthLast . ' 23:59:59']);
 $publishPlan = rows("SELECT title, platforms, publish_date, status FROM tasks WHERE project_id=? AND kind='client' AND status!='cancelled' AND publish_date BETWEEN ? AND ? ORDER BY publish_date", [$projectId, $monthInitial, $monthLast]);
-$totalMin = (int)val("SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z JOIN tasks g ON g.id=z.task_id WHERE g.project_id=? AND z.date BETWEEN ? AND ?", [$projectId, $monthInitial, $monthLast]);
+$totalMin = (int)val("SELECT COALESCE(SUM(minutes),0) FROM work_logs WHERE project_id=? AND date BETWEEN ? AND ?", [$projectId, $monthInitial, $monthLast]);
 $satisfaction = row("SELECT AVG(rating) average, COUNT(*) qty FROM ratings WHERE project_id=?", [$projectId]);
 ?>
 <!DOCTYPE html>

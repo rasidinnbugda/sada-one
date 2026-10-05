@@ -1040,15 +1040,40 @@ case 'step_return':
     if ($error = step_send_back($step, $g('note'), (int)$u['id'])) json_out(['ok' => false, 'error' => $error]);
     json_out(['ok' => true, 'message' => 'Geri gönderildi.']);
 /* ==================== TIME TRACKING ==================== */
-case 'time_add':
+/* ==================== WORK LOG ==================== */
+case 'worklog_save':
+case 'worklog_delete':
+    // Everyone keeps their own work log; managers may keep anyone's
     require_staff();
-    $min = (int)$g('time') * 60 + (int)$g('minutes');
-    if ($min <= 0) json_out(['ok' => false, 'error' => 'Süre girin.']);
-    insert('time_entries', [
-        'task_id' => (int)$g('task_id'), 'user_id' => $u['id'], 'minutes' => $min,
-        'date' => $g('date') ?: date('Y-m-d'), 'description' => $g('description'), 'created' => $now,
-    ]);
-    json_out(['ok' => true, 'message' => format_minutes($min) . ' zaman kaydedildi.']);
+    require_once __DIR__ . '/includes/worklog.php';
+    $id = (int)$g('id');
+    $entry = $id ? row("SELECT * FROM work_logs WHERE id=?", [$id]) : null;
+    if ($id && !$entry) json_out(['ok' => false, 'error' => 'Kayıt bulunamadı.']);
+    $uid = $entry ? (int)$entry['user_id'] : ((int)$g('user_id') ?: (int)$u['id']);
+    if (!worklog_can($uid)) json_out(['ok' => false, 'error' => 'Başkasının defterini yalnızca yönetici düzenleyebilir.']);
+    if ($action === 'worklog_delete') {
+        q("DELETE FROM work_logs WHERE id=?", [$id]);
+        json_out(['ok' => true, 'message' => 'Kayıt silindi.']);
+    }
+    if (!val("SELECT id FROM users WHERE id=? AND is_active=1 AND role!='customer'", [$uid])) json_out(['ok' => false, 'error' => 'Kişi bulunamadı.']);
+    $date = (string)$g('date');
+    if (!preg_match('~^\d{4}-\d{2}-\d{2}$~', $date) || $date < '2020-01-01' || $date > date('Y-m-d')) json_out(['ok' => false, 'error' => 'Bugün ya da geçmiş bir tarih seçin.']);
+    $category = isset(WORK_LOG_CATEGORIES[$g('category')]) ? $g('category') : 'office';
+    $start = worklog_time((string)$g('start'));
+    $end = worklog_time((string)$g('end'));
+    $minutes = $start && $end ? worklog_minutes($start, $end) : null;
+    if (!$minutes) json_out(['ok' => false, 'error' => 'Geçerli bir saat aralığı girin: bitiş başlangıçtan farklı olmalı (gece yarısını geçebilir, en fazla 18 saat).']);
+    // What it was for: a client file ("c:ID") or one of its projects ("p:ID")
+    $clientId = $projectId = null;
+    if (preg_match('~^([cp]):(\d+)$~', (string)$g('target'), $t)) {
+        if ($t[1] === 'p' && ($p = row("SELECT id, client_id FROM projects WHERE id=?", [(int)$t[2]]))) { $projectId = (int)$p['id']; $clientId = (int)$p['client_id']; }
+        elseif ($t[1] === 'c' && val("SELECT id FROM clients WHERE id=?", [(int)$t[2]])) $clientId = (int)$t[2];
+    }
+    $data = ['date' => $date, 'category' => $category, 'start_time' => $start, 'end_time' => $end, 'minutes' => $minutes,
+        'client_id' => $clientId, 'project_id' => $projectId, 'note' => mb_substr(trim((string)$g('note')), 0, 5000) ?: null];
+    if ($entry) update_row('work_logs', $data + ['updated' => $now], 'id=?', [$id]);
+    else insert('work_logs', $data + ['user_id' => $uid, 'created' => $now]);
+    json_out(['ok' => true, 'message' => 'Kaydedildi: ' . worklog_hm($minutes) . ' · ' . worklog_status($category, $minutes)[1] . '.']);
 
 /* ==================== COMMENTS ==================== */
 case 'comment_add':

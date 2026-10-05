@@ -66,6 +66,8 @@ function mikasa_lines(array $u): array {
 
     // 5. Publishing today
     $toGo = array_filter($publish, fn($p) => $p['status'] !== 'published');
+    if ($hour >= 17 && $weekday <= 5 && !(int)val("SELECT COUNT(*) FROM work_logs WHERE user_id=? AND date=CURDATE()", [$u['id']]))
+        $add('Gün bitmeden bugün yaptıklarını Çalışma Defteri\'ne yazmayı unutma.', 'worklog.php');
     if ($toGo) $add('Bugün yayına çıkacak ' . count($toGo) . ' iş var' . (($t = current($toGo)['publish_time']) ? '; ilki ' . mikasa_at(substr($t, 0, 5)) . '.' : '.'), 'content-calendar.php');
 
     // 6. Managers: the month and the client

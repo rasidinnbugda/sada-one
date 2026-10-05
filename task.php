@@ -15,8 +15,6 @@ if (!$task) { header('Location: tasks.php'); exit; }
 $steps = rows("SELECT ga.*, u.name owner_name, u.color owner_color, k.name skill_name FROM task_steps ga LEFT JOIN users u ON u.id=ga.owner_id LEFT JOIN skills k ON k.id=ga.skill_id WHERE ga.task_id=? ORDER BY ga.sort_order, ga.id", [$id]);
 // Open steps per person, shown when handing a step on
 $stepLoad = array_column(rows("SELECT owner_id, COUNT(*) n FROM task_steps WHERE status='active' AND owner_id IS NOT NULL GROUP BY owner_id"), 'n', 'owner_id');
-$times = rows("SELECT z.*, u.name FROM time_entries z JOIN users u ON u.id=z.user_id WHERE z.task_id=? ORDER BY z.date DESC, z.id DESC", [$id]);
-$totalMin = (int)val("SELECT COALESCE(SUM(minutes),0) FROM time_entries WHERE task_id=?", [$id]);
 $team = rows("SELECT id, name, color FROM users WHERE role IN ('admin','pm','team') AND is_active=1 ORDER BY name");
 $checks = rows("SELECT * FROM task_checklist WHERE task_id=? ORDER BY sort_order", [$id]);
 $dependent = $task['depends_on_id'] ? row("SELECT id, title, status FROM tasks WHERE id=?", [$task['depends_on_id']]) : null;
@@ -208,7 +206,7 @@ page_start($task['title'], 'tasks');
                 <div class="row-flex between"><span class="cell-bottom">Başlangıç</span><span class="small"><?= format_date($task['start_date']) ?></span></div>
                 <div class="row-flex between"><span class="cell-bottom">Son Tarih</span><span class="small bold" style="<?= $task['due_date'] && $task['due_date'] < date('Y-m-d') && task_is_open($task['status']) ? 'color:var(--danger)' : '' ?>"><?= format_date($task['due_date']) ?></span></div>
                 <?php if ($task['estimated_minutes'] > 0): ?>
-                <div class="row-flex between"><span class="cell-bottom">Tahmin / Gerçek</span><span class="small bold" style="<?= $totalMin > $task['estimated_minutes'] ? 'color:var(--danger)' : '' ?>"><?= format_minutes((int)$task['estimated_minutes']) ?> / <?= format_minutes($totalMin) ?></span></div>
+                <div class="row-flex between"><span class="cell-bottom">Tahmini süre</span><span class="small bold"><?= format_minutes((int)$task['estimated_minutes']) ?></span></div>
                 <?php endif; ?>
                 <div class="row-flex between"><span class="cell-bottom">Oluşturan</span><span class="small"><?= e($task['creator_name'] ?? '—') ?></span></div>
                 <div class="row-flex between"><span class="cell-bottom">Oluşturulma</span><span class="small"><?= format_date($task['created']) ?></span></div>
@@ -299,16 +297,6 @@ page_start($task['title'], 'tasks');
             <?php endforeach; endif; ?>
         </div>
 
-        <!-- Time tracking -->
-        <div class="card">
-            <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px">Zaman Takibi</div><button class="btn btn-sm" data-modal="modalTime"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div>
-            <div class="orta" style="padding:8px 0"><div class="stat-value" style="font-size:26px"><?= format_minutes($totalMin) ?></div><div class="cell-bottom">toplam kayıtlı süre</div></div>
-            <?php if ($times): ?><div class="vertical mt-2" style="gap:8px;max-height:200px;overflow-y:auto">
-                <?php foreach ($times as $z): ?>
-                <div class="row-flex between small" style="padding:7px 0;border-bottom:1px solid var(--border)"><div><div class="bold"><?= format_minutes($z['minutes']) ?></div><div class="cell-bottom"><?= e($z['name']) ?> · <?= format_date($z['date']) ?></div></div></div>
-                <?php endforeach; ?>
-            </div><?php endif; ?>
-        </div>
     </div>
 </div>
 
@@ -380,22 +368,6 @@ page_start($task['title'], 'tasks');
 </div>
 
 <!-- Modals -->
-<div class="modal-overlay" id="modalTime">
-    <div class="modal"><div class="modal-top"><div class="modal-title">Zaman Kaydı Ekle</div><button class="modal-close" data-modal-close>✕</button></div>
-    <form data-ajax="time_add" data-refresh="yes">
-        <input type="hidden" name="task_id" value="<?= $id ?>">
-        <div class="modal-body">
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">Saat</label><input type="number" name="time" class="input" min="0" value="0"></div>
-                <div class="form-group"><label class="form-label">Dakika</label><input type="number" name="minutes" class="input" min="0" max="59" value="30"></div>
-            </div>
-            <div class="form-group"><label class="form-label">Tarih</label><input type="date" name="date" class="input" value="<?= date('Y-m-d') ?>"></div>
-            <div class="form-group"><label class="form-label">Açıklama</label><input name="description" class="input" placeholder="Ne üzerinde çalıştınız?"></div>
-        </div>
-        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button></div>
-    </form></div>
-</div>
-
 <div class="modal-overlay" id="modalTaskEdit">
     <div class="modal"><div class="modal-top"><div class="modal-title">İşi Düzenle</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="task_save">

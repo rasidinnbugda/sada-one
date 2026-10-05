@@ -18,6 +18,7 @@ $publish = now_publish_today();
 $recent = now_recent($u, 8);
 $todos = rows("SELECT id, name FROM personal_todos WHERE user_id=? AND is_done=0 ORDER BY sort_order LIMIT 8", [$u['id']]);
 $office = office_today();
+$loggedToday = (int)val("SELECT COALESCE(SUM(minutes),0) FROM work_logs WHERE user_id=? AND date=CURDATE()", [$u['id']]);
 
 page_start('Bugün', 'today');
 ?>
@@ -66,6 +67,10 @@ page_start('Bugün', 'today');
     </div>
 
     <div>
+        <div class="card mb-2">
+            <div class="row-flex between"><div><div class="card-title" style="font-size:14px">Çalışma defterin</div><div class="cell-bottom">Bugün <?= $loggedToday ? intdiv($loggedToday, 60) . ':' . str_pad((string)($loggedToday % 60), 2, '0', STR_PAD_LEFT) . ' kayıtlı' : 'henüz kayıt yok' ?></div></div><a href="worklog.php" class="btn btn-sm<?= $loggedToday ? '' : ' btn-brand' ?>"><?= $loggedToday ? 'Deftere git' : 'Bugünü yaz' ?></a></div>
+        </div>
+
         <div class="card mb-2">
             <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px">Bugün ofiste <span class="badge" style="padding:1px 8px"><?= count($office['in']) ?></span></div><a href="office.php" class="mini-btn">Ofis günleri →</a></div>
             <?php if (!$office['in']): ?><div class="text-muted small">Bugün ofiste kimse görünmüyor.</div>

@@ -10,8 +10,8 @@ require_staff();
 
 $weekHead = date('Y-m-d', strtotime('monday this week'));
 $members = rows("SELECT us.id, us.name, us.color, us.avatar, us.job_title, us.role, us.weekly_capacity,
-    (SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z WHERE z.user_id=us.id AND z.date=CURDATE()) today_min,
-    (SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z WHERE z.user_id=us.id AND z.date>=?) week_min
+    (SELECT COALESCE(SUM(w.minutes),0) FROM work_logs w WHERE w.user_id=us.id AND w.date=CURDATE()) today_min,
+    (SELECT COALESCE(SUM(w.minutes),0) FROM work_logs w WHERE w.user_id=us.id AND w.date>=?) week_min
     FROM users us WHERE us.role IN ('admin','pm','team','finance') AND us.is_active=1 ORDER BY us.name", [$weekHead]);
 
 // Each member's ongoing tasks (via assignee_id OR multi-assignment)
@@ -88,5 +88,5 @@ page_start('Ekip', 'team');
     </div>
     <?php endforeach; ?>
 </div>
-<div class="form-hint mt-2 orta">Haftalık doluluk çubuğu, kayıtlı süre ÷ haftalık kapasite hedefine göre hesaplanır.</div>
+<div class="form-hint mt-2 orta">Bugün ve haftalık doluluk Çalışma Defteri'ndeki kayıtlardan gelir: haftalık süre ÷ haftalık kapasite hedefi.</div>
 <?php page_end(); ?>

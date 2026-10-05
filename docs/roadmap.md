@@ -25,6 +25,13 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 6. **Sadeleştirme** — 7.6 ✅: menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm** — 7.7 ✅: açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
 
+## Ek — Çalışma Defteri (8.0)
+
+- **Kayıt:** `work_logs` — kişi, tarih, kategori (`meeting` Toplantı, `office` Ofis, `remote` Uzaktan, `event` Etkinlik), başlangıç ve bitiş saati, dakika (bitiş başlangıçtan önceyse ertesi güne sarkar; en fazla 18 saat), isteğe bağlı dosya ya da proje, notlar ve çıktılar. Tarih bugün ya da geçmiş.
+- **Durum yazılmaz, hesaplanır:** toplantı → Katıldım; 6 saat ve üzeri → Tam gün; daha azı → Yarım gün (`worklog_status`).
+- **Görünürlük:** herkes kendi defterini; yöneticiler herkesinkini, kişi başı ay özetini ve CSV'yi (`export.php?type=worklog`).
+- **Eski sistem:** işe süre girme (`time_entries`, İş sayfasındaki Zaman Takibi, Tahmin / Gerçek) kaldırıldı; tablo veritabanında arşiv olarak durur, okunmaz ve yazılmaz. Ekip sayfası, Ekip Kapasitesi, proje kârlılığı (emek = defterdeki proje saatleri × saatlik maliyet), aylık proje raporu, raporlar ve CSV defterden hesaplanır.
+
 ## Ek — Atlanabilir adımlar (7.9)
 
 - **İş türünde işaret:** her adım "Atlanabilir" (`task_type_steps.optional`) olabilir; işaret işe kopyalanır (`task_steps.optional`). İşaretsiz adımlar zorunludur.

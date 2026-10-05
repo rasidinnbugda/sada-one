@@ -1055,6 +1055,26 @@ a.now-row:hover, .now-row:hover { background: var(--surface-2); }
 .health-dot.is-amber { background: var(--warning); }
 .health-dot.is-red { background: var(--danger); box-shadow: 0 0 0 3px rgba(240,79,79,.18); }
 @media (max-width: 900px) { .today-layout, .tower-grid { grid-template-columns: 1fr; } }
+/* Work log */
+.wl-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; align-items: start; }
+.wl-total { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 44px; font-weight: 600; letter-spacing: -.03em; line-height: 1.1; margin: 6px 0 2px; }
+.wl-total-sm { font-family: var(--font-mono); font-size: 20px; font-weight: 600; }
+.wl-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.wl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.wl-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.wl-table td { vertical-align: top; }
+.wl-note { min-width: 220px; max-width: 420px; white-space: normal; }
+.wl-cat, .wl-status { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.wl-cat b { font-family: var(--font-mono); margin-left: 3px; }
+.wl-cat.is-meeting { background: #1e3a5f; color: #fff; }
+.wl-cat.is-office { background: rgba(59,157,240,.16); color: var(--info); }
+.wl-cat.is-remote { background: rgba(53,198,107,.16); color: var(--success); }
+.wl-cat.is-event { background: rgba(165,139,240,.18); color: #8a6fe0; }
+.wl-status.is-attended { background: rgba(53,198,107,.16); color: var(--success); }
+.wl-status.is-full { background: rgba(245,165,36,.18); color: var(--warning); }
+.wl-status.is-half { background: rgba(232,116,60,.16); color: #d8642c; }
+@media (max-width: 900px) { .wl-layout { grid-template-columns: 1fr; } .wl-fields { grid-template-columns: 1fr 1fr; } }
+
 /* Office days */
 .office-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .office-days { display: flex; flex-direction: column; gap: 6px; }

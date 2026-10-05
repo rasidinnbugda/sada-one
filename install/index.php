@@ -529,6 +529,23 @@ CREATE TABLE IF NOT EXISTS event_participants (
     PRIMARY KEY (event_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
+CREATE TABLE IF NOT EXISTS work_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    date DATE NOT NULL,
+    category ENUM('meeting','office','remote','event') NOT NULL DEFAULT 'office',
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    minutes SMALLINT NOT NULL,
+    client_id INT DEFAULT NULL,
+    project_id INT DEFAULT NULL,
+    note TEXT,
+    created DATETIME NOT NULL,
+    updated DATETIME DEFAULT NULL,
+    INDEX user_date (user_id, date),
+    INDEX(project_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
+
 CREATE TABLE IF NOT EXISTS office_schedule (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,

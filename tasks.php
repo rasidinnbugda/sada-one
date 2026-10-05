@@ -29,7 +29,6 @@ $tasks = rows("SELECT g.*, p.name project_name, d.color client_color, uu.name as
     (SELECT COUNT(*) FROM task_checklist k WHERE k.task_id=g.id AND k.is_done=1) check_is_done,
     (SELECT COUNT(*) FROM task_steps ga WHERE ga.task_id=g.id) step_total,
     (SELECT COUNT(*) FROM task_steps ga WHERE ga.task_id=g.id AND ga.status='done') step_is_done,
-    (SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z WHERE z.task_id=g.id) spent_min,
     (SELECT COUNT(*) FROM task_assignees gaa WHERE gaa.task_id=g.id) assignee_count,
     (SELECT GROUP_CONCAT(u3.name SEPARATOR ', ') FROM task_assignees ga3 JOIN users u3 ON u3.id=ga3.user_id WHERE ga3.task_id=g.id) assignee_names
     FROM tasks g JOIN projects p ON p.id=g.project_id JOIN clients d ON d.id=p.client_id
@@ -182,7 +181,6 @@ page_start('İşler', 'tasks');
         </td>
         <td class="small" data-sort="<?= $gr['estimated_minutes'] ?>">
             <span class="cell-edit"><input class="input" style="width:56px" value="<?= $gr['estimated_minutes'] ? round($gr['estimated_minutes'] / 60, 1) : '' ?>" placeholder="sa" onchange="cellSave(this, <?= $gr['id'] ?>, 'estimated_minutes')"></span>
-            <span class="text-muted">/ <?= $gr['spent_min'] ? format_minutes((int)$gr['spent_min']) : '—' ?></span>
         </td>
         <td data-sort="<?= $workflowRate ?? -1 ?>">
             <?php if ($workflowRate !== null): ?>

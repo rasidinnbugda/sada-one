@@ -1,7 +1,7 @@
 <?php
 /**
  * SADA One — CSV Export
- * type=tasks | finance | time
+ * type=tasks | finance | worklog (time = old links)
  * UTF-8 BOM + semicolon delimiter are used so Excel opens Turkish characters correctly.
  */
 require __DIR__ . '/includes/init.php';
@@ -35,13 +35,21 @@ case 'finance':
     csv_send('finance', ['Kayıt', 'Proje', 'Dosya', 'Tür', 'Tutar (TL)', 'Tarih', 'Durum', 'Açıklama'],
         array_map(fn($r) => [$r['title'], $r['project'], $r['client'], (PAYMENT_TYPES[$r['type']] ?? $r['type']), number_format((float)$r['amount'], 2, ',', ''), $r['date'], PAYMENT_STATUSES[$r['status']], $r['description'] ?? ''], $rows));
 
-case 'time':
-    if (!permission('capacity') && !permission('report')) deny();
-    $rows = rows("SELECT u.name person, g.title task, p.name project, z.minutes, z.date, z.description
-        FROM time_entries z JOIN users u ON u.id=z.user_id JOIN tasks g ON g.id=z.task_id JOIN projects p ON p.id=g.project_id
-        ORDER BY z.date DESC");
-    csv_send('time_report', ['Kişi', 'İş', 'Proje', 'Süre (dk)', 'Süre', 'Tarih', 'Açıklama'],
-        array_map(fn($r) => [$r['person'], $r['task'], $r['project'], $r['minutes'], format_minutes((int)$r['minutes']), $r['date'], $r['description'] ?? ''], $rows));
+case 'time': // old links: the work log replaced logging time on tasks
+case 'worklog':
+    // A month of the work log (everyone, or one person); managers and report / capacity holders
+    require_once __DIR__ . '/includes/worklog.php';
+    $month = preg_match('~^\d{4}-\d{2}$~', $_GET['month'] ?? '') ? $_GET['month'] : date('Y-m');
+    $only = (int)($_GET['user'] ?? 0);
+    if (!is_pm() && !permission('capacity') && !permission('report') && $only !== (int)$u['id']) deny();
+    $params = [$month . '-01', date('Y-m-t', strtotime($month . '-01'))];
+    if ($only) $params[] = $only;
+    $rows = rows("SELECT u.name person, w.date, w.category, w.start_time, w.end_time, w.minutes, c.name client, p.name project, w.note
+        FROM work_logs w JOIN users u ON u.id=w.user_id LEFT JOIN clients c ON c.id=w.client_id LEFT JOIN projects p ON p.id=w.project_id
+        WHERE w.date BETWEEN ? AND ?" . ($only ? ' AND w.user_id=?' : '') . " ORDER BY u.name, w.date, w.start_time", $params);
+    csv_send('calisma_defteri_' . $month, ['Kişi', 'Tarih', 'Kategori', 'Başlangıç', 'Bitiş', 'Toplam', 'Durum', 'Dosya', 'Proje', 'Notlar ve çıktılar'],
+        array_map(fn($r) => [$r['person'], $r['date'], WORK_LOG_CATEGORIES[$r['category']] ?? $r['category'], substr($r['start_time'], 0, 5), substr($r['end_time'], 0, 5),
+            worklog_hm((int)$r['minutes']), worklog_status($r['category'], (int)$r['minutes'])[1], $r['client'] ?? '', $r['project'] ?? '', $r['note'] ?? ''], $rows));
 
 default:
     header('Location: index.php');

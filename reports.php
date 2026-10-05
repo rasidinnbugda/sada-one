@@ -18,7 +18,7 @@ $maxStatus = max(1, max($statusDistribution));
 $people = rows("SELECT u.id, u.name, u.color,
     (SELECT COUNT(*) FROM tasks g WHERE g.assignee_id=u.id) total,
     (SELECT COUNT(*) FROM tasks g WHERE g.assignee_id=u.id AND " . task_done_sql('g') . ") is_done,
-    (SELECT COALESCE(SUM(z.minutes),0) FROM time_entries z WHERE z.user_id=u.id) minutes
+    (SELECT COALESCE(SUM(w.minutes),0) FROM work_logs w WHERE w.user_id=u.id) minutes
     FROM users u WHERE u.role IN ('admin','pm','team') AND u.is_active=1 ORDER BY total DESC");
 
 // Project count per client file
@@ -36,7 +36,7 @@ page_start('Raporlar', 'reports');
     <div><div class="page-title">Raporlar & Analiz</div><div class="page-bottom">Performans ve iş yükü özeti</div></div>
     <div class="page-top-action">
         <a href="export.php?type=tasks" class="btn btn-sm"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="15"><path d="M12 15V3m0 12l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg> İşler CSV</a>
-        <a href="export.php?type=time" class="btn btn-sm"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="15"><path d="M12 15V3m0 12l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg> Zaman CSV</a>
+        <a href="export.php?type=worklog&amp;month=<?= date('Y-m') ?>" class="btn btn-sm"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="15"><path d="M12 15V3m0 12l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg> Çalışma Defteri CSV</a>
     </div>
 </div>
 

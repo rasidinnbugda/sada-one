@@ -427,6 +427,8 @@ const TASK_KINDS = ['client' => 'Müşteri işi', 'internal' => 'İç iş'];
 const TASK_LANES = ['planned' => 'Planlı', 'agenda' => 'Gündem'];
 // A single-day change to someone's office pattern
 const OFFICE_DAY_KINDS = ['in' => 'Bu saatlerde geliyor', 'out' => 'Gelmiyor'];
+// Work log categories (as on the old timesheet)
+const WORK_LOG_CATEGORIES = ['meeting' => 'Toplantı', 'office' => 'Ofis', 'remote' => 'Uzaktan', 'event' => 'Etkinlik'];
 // One calendar, several views (page key => [page, label]); the team menu shows a single "Takvim"
 const CALENDAR_VIEWS = ['calendar' => ['calendar.php', 'Ay'], 'content' => ['content-calendar.php', 'Yayın planı'], 'meetings' => ['meetings.php', 'Toplantılar'], 'appointments' => ['appointments.php', 'Randevular'], 'timeline' => ['timeline.php', 'Zaman çizelgesi']];
 const MONTH_PHASES = ['planning' => 'Planlama', 'production' => 'Üretim', 'closing' => 'Kapanış', 'closed' => 'Kapandı'];
@@ -455,8 +457,14 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '7.9';
+const APP_VERSION = '8.0';
 const VERSION_NOTES = [
+    '8.0' => [
+        'Çalışma Defteri (menüde Bugün\'ün altında): herkes geldiği günü, kategoriyi (Toplantı, Ofis, Uzaktan, Etkinlik), başlangıç ve bitiş saatini, isteğe bağlı dosya / projeyi ve o sürede ne yaptığını yazar. Toplam süre ve durum (Katıldım, Tam gün, Yarım gün) kendiliğinden hesaplanır; gece yarısını geçen kayıtlar da olur',
+        'Aylar sekme sekme; ayın toplamı ve kategori dağılımı üstte. Herkes kendi defterini görür; yöneticiler herkesinkini, "Herkes — ay özeti" ile kişi başı toplamları ve CSV\'yi',
+        'İşlere süre girme kaldırıldı: İş sayfasındaki "Zaman Takibi" ve "Tahmin / Gerçek" yok (tahmini süre duruyor). Ekip sayfası, Ekip Kapasitesi, proje kârlılığındaki emek maliyeti, raporlar ve CSV artık Çalışma Defteri\'nden hesaplanır. Eski süre kayıtları veritabanında arşiv olarak duruyor',
+        'Bugün sayfasında "Çalışma defterin" kartı; Mikasa akşam, o gün kayıt yoksa hatırlatır',
+    ],
     '7.9' => [
         'Atlanabilir adımlar: İş Türleri\'nde her adım "Atlanabilir" olarak işaretlenebilir; işaretsiz adımlar zorunlu kalır',
         'Yeni iş açarken atlanabilir adımların yanında "bu işte atla" kutusu var: işaretlenen adım o işte hiç kurulmaz',
