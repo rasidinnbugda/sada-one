@@ -141,7 +141,8 @@ CREATE TABLE IF NOT EXISTS clients (
     brand_kit TEXT,
     plan_approval TINYINT(1) NOT NULL DEFAULT 0,
     no_approval_types VARCHAR(255) DEFAULT NULL,
-    created DATETIME NOT NULL
+    created DATETIME NOT NULL,
+    brand_data TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -177,7 +178,9 @@ CREATE TABLE IF NOT EXISTS task_types (
     name VARCHAR(120) NOT NULL,
     description VARCHAR(255) DEFAULT NULL,
     kind ENUM('client','internal') NOT NULL DEFAULT 'client',
-    created DATETIME NOT NULL
+    created DATETIME NOT NULL,
+    folder VARCHAR(80) DEFAULT NULL,
+    client_id INT DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 
 CREATE TABLE IF NOT EXISTS task_type_steps (
@@ -482,6 +485,17 @@ CREATE TABLE IF NOT EXISTS social_accounts (
     platform VARCHAR(20) NOT NULL DEFAULT 'instagram',
     username VARCHAR(100) NOT NULL,
     url VARCHAR(255) DEFAULT NULL,
+    created DATETIME NOT NULL,
+    INDEX(client_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
+
+CREATE TABLE IF NOT EXISTS client_links (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id INT NOT NULL,
+    kind VARCHAR(20) NOT NULL DEFAULT 'website',
+    label VARCHAR(120) DEFAULT NULL,
+    url VARCHAR(500) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
     created DATETIME NOT NULL,
     INDEX(client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;

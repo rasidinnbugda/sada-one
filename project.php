@@ -423,7 +423,7 @@ if (is_staff()) task_modal($id, $team, $templates, $periods);
                 <div class="form-group"><label class="form-label">Ay</label><select name="month" class="select"><?php foreach (MONTHS as $k => $v): ?><option value="<?= $k ?>" <?= $k == date('n') ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-group"><label class="form-label">Yıl</label><select name="year" class="select"><?php for ($y = date('Y') - 1; $y <= date('Y') + 1; $y++): ?><option value="<?= $y ?>" <?= $y == date('Y') ? 'selected' : '' ?>><?= $y ?></option><?php endfor; ?></select></div>
             </div>
-            <div class="form-group"><label class="form-label">İş Türünden İş Oluştur</label><select name="type_id" class="select"><option value="">Boş ay</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select><div class="form-hint">Seçilen türden ayın ilk işi adımlarıyla kurulur. Ay planlama aşamasında açılır.</div></div>
+            <div class="form-group"><label class="form-label">İş Türünden İş Oluştur</label><select name="type_id" class="select"><?= task_type_options($templates, (int)$project['client_id'], 'Boş ay') ?></select><div class="form-hint">Seçilen türden ayın ilk işi adımlarıyla kurulur. Ay planlama aşamasında açılır.</div></div>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Ayı Aç</button></div>
     </form></div>

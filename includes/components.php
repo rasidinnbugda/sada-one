@@ -84,21 +84,52 @@ function task_publish_fields(?array $task = null, bool $withKind = true): void {
     </div>
 <?php }
 
+/**
+ * <option>s of the task types in <optgroup>s: a file's own types first, then each folder, then the rest ("Genel").
+ * $clientId: the work's file — types made for another file are left out. null: the file is picked in the form, so
+ * file-only types carry data-client and task_type_picker_script() keeps the picked project's file's types only.
+ */
+function task_type_options(array $types, ?int $clientId, string $placeholder, $selected = null): string {
+    static $clientNames = null;
+    $clientNames ??= array_column(rows("SELECT id, name FROM clients"), 'name', 'id');
+    usort($types, fn($a, $b) => [empty($a['client_id']), $clientNames[$a['client_id'] ?? 0] ?? '', empty($a['folder']), mb_strtolower((string)($a['folder'] ?? '')), mb_strtolower($a['name'])]
+        <=> [empty($b['client_id']), $clientNames[$b['client_id'] ?? 0] ?? '', empty($b['folder']), mb_strtolower((string)($b['folder'] ?? '')), mb_strtolower($b['name'])]);
+    $groups = [];
+    foreach ($types as $t) {
+        $owner = (int)($t['client_id'] ?? 0);
+        if ($owner && $clientId !== null && $owner !== $clientId) continue;
+        $key = $owner ? 'c' . $owner : 'f' . trim((string)($t['folder'] ?? ''));
+        $groups[$key] ??= ['label' => $owner ? ($clientNames[$owner] ?? 'Dosya') . ' — bu dosyaya özel' : (trim((string)($t['folder'] ?? '')) ?: 'Genel'), 'client' => $owner, 'types' => []];
+        $groups[$key]['types'][] = $t;
+    }
+    $option = fn($t) => '<option value="' . (int)$t['id'] . '"' . ((string)$selected === (string)$t['id'] ? ' selected' : '')
+        . (!empty($t['client_id']) && $clientId === null ? ' data-client="' . (int)$t['client_id'] . '"' : '') . '>' . e($t['name']) . '</option>';
+    $h = '<option value="">' . e($placeholder) . '</option>';
+    // No folders and no file-only types: a plain list, as before
+    if (array_keys($groups) === ['f'] || !$groups) return $h . implode('', array_map($option, $groups['f']['types'] ?? []));
+    foreach ($groups as $gr) {
+        $h .= '<optgroup label="' . e($gr['label']) . '"' . ($gr['client'] && $clientId === null ? ' data-client="' . $gr['client'] . '"' : '') . '>'
+            . implode('', array_map($option, $gr['types'])) . '</optgroup>';
+    }
+    return $h;
+}
+
 /** Renders the task creation modal */
 function task_modal(int $projectId, array $team, array $templates, array $periods = []): void {
 ?>
 <div class="modal-overlay" id="modalTask">
     <div class="modal"><div class="modal-top"><div class="modal-title">Yeni İş</div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="task_save">
-        <input type="hidden" name="project_id" value="<?= $projectId ?>" <?= $projectId ? '' : 'disabled' ?> id="taskProjectId" data-pm="<?= $projectId ? (int)val("SELECT pm_id FROM projects WHERE id=?", [$projectId]) : '' ?>">
+        <?php $projectClient = $projectId ? (int)val("SELECT client_id FROM projects WHERE id=?", [$projectId]) : null; ?>
+        <input type="hidden" name="project_id" value="<?= $projectId ?>" <?= $projectId ? '' : 'disabled' ?> id="taskProjectId" data-pm="<?= $projectId ? (int)val("SELECT pm_id FROM projects WHERE id=?", [$projectId]) : '' ?>" data-client="<?= (int)$projectClient ?>">
         <div class="modal-body">
             <?php if (!$projectId): ?>
-            <div class="form-group"><label class="form-label">Proje <span class="required">*</span></label><select name="project_id" class="select" required id="taskProjectSelect"><option value="">Seçin...</option><?php foreach (rows("SELECT id, name, pm_id FROM projects WHERE status='active' ORDER BY name") as $pr): ?><option value="<?= $pr['id'] ?>" data-pm="<?= (int)$pr['pm_id'] ?>"><?= e($pr['name']) ?></option><?php endforeach; ?></select></div>
+            <div class="form-group"><label class="form-label">Proje <span class="required">*</span></label><select name="project_id" class="select" required id="taskProjectSelect"><option value="">Seçin...</option><?php foreach (rows("SELECT id, name, pm_id, client_id FROM projects WHERE status='active' ORDER BY name") as $pr): ?><option value="<?= $pr['id'] ?>" data-pm="<?= (int)$pr['pm_id'] ?>" data-client="<?= (int)$pr['client_id'] ?>"><?= e($pr['name']) ?></option><?php endforeach; ?></select></div>
             <?php endif; ?>
             <div class="form-group"><label class="form-label">İş Başlığı <span class="required">*</span></label><input name="title" class="input" required></div>
             <div class="form-group">
                 <label class="form-label">İş Türü</label>
-                <select name="type_id" class="select native-select task-type-select"><option value="">Adımsız iş — durumu elle yönetilir</option><?php foreach ($templates as $s): ?><option value="<?= $s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select>
+                <select name="type_id" class="select native-select task-type-select"><?= task_type_options($templates, $projectId ? $projectClient : null, 'Adımsız iş — durumu elle yönetilir') ?></select>
                 <input type="hidden" name="step_owners" class="step-owners-json">
                 <input type="hidden" name="step_omit" data-collect=".step-omit">
                 <div class="type-steps vertical mt-2" style="gap:6px"></div>
@@ -167,6 +198,28 @@ function task_type_picker_script(array $team): void {
         if (fixed && fixed.dataset.pm) return fixed.dataset.pm;
         return form.querySelector('select[name=project_id]')?.selectedOptions[0]?.dataset.pm || '';
     };
+    const clientOf = form => {
+        const fixed = form.querySelector('input[name=project_id]:not([disabled])');
+        if (fixed) return fixed.dataset.client || '';
+        return form.querySelector('select[name=project_id]')?.selectedOptions[0]?.dataset.client || '';
+    };
+    // File-only types: the full list is kept once, then the other files' types are taken out on every project change
+    const fullLists = new WeakMap();
+    const filterTypes = form => {
+        const select = form.querySelector('.task-type-select');
+        if (!select) return;
+        if (!fullLists.has(select)) {
+            if (!select.querySelector('[data-client]')) return;
+            fullLists.set(select, select.innerHTML);
+        }
+        const keep = select.value, client = clientOf(form);
+        const full = document.createElement('select');
+        full.innerHTML = fullLists.get(select);
+        full.querySelectorAll('[data-client]').forEach(el => { if (el.dataset.client !== client) el.remove(); });
+        select.innerHTML = full.innerHTML;
+        select.value = [...select.options].some(o => o.value === keep) ? keep : '';
+    };
+    document.querySelectorAll('.task-type-select').forEach(s => s.form && filterTypes(s.form));
     const render = form => {
         const box = form.querySelector('.type-steps'), select = form.querySelector('.task-type-select');
         if (!box || !select) return;
@@ -193,6 +246,7 @@ function task_type_picker_script(array $team): void {
         });
     };
     document.addEventListener('change', e => {
+        if (e.target.matches('select[name=project_id]')) filterTypes(e.target.form);
         if (e.target.matches('.task-type-select') || e.target.matches('select[name=project_id]')) render(e.target.form);
     });
 })();

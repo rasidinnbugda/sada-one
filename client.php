@@ -2,6 +2,7 @@
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/components.php';
+require_once __DIR__ . '/includes/brand.php';
 $u = require_login();
 
 $id = (int)($_GET['id'] ?? 0);
@@ -20,7 +21,7 @@ $archiveCount = (int)val("SELECT COUNT(*) FROM archive WHERE client_id=?", [$id]
 $contracts = rows("SELECT s.*, a.file_path, a.name ek_name FROM contracts s LEFT JOIN archive a ON a.id=s.archive_id WHERE s.client_id=? ORDER BY s.end IS NULL, s.end", [$id]);
 // Approval rules: work types with a client approval step can be set to skip it for this file
 $noApproval = array_values(array_filter(array_map('intval', explode(',', (string)$client['no_approval_types']))));
-$approvalTypes = $customerView ? [] : rows("SELECT DISTINCT t.id, t.name FROM task_types t JOIN task_type_steps s ON s.type_id=t.id WHERE s.kind='client_approval' ORDER BY t.name");
+$approvalTypes = $customerView ? [] : rows("SELECT DISTINCT t.id, t.name FROM task_types t JOIN task_type_steps s ON s.type_id=t.id WHERE s.kind='client_approval' AND (t.client_id IS NULL OR t.client_id=?) ORDER BY t.name", [$id]);
 $typeNames = $noApproval ? array_column(rows("SELECT id, name FROM task_types"), 'name', 'id') : [];
 
 // Social media accounts + metric history
@@ -29,6 +30,9 @@ foreach ($socialAccounts as &$sh) {
     $sh['metrics'] = rows("SELECT * FROM social_metrics WHERE account_id=? ORDER BY date DESC LIMIT 10", [$sh['id']]);
 }
 unset($sh);
+// Web site, shop, link page…: addresses, not accounts
+$links = rows("SELECT * FROM client_links WHERE client_id=? ORDER BY sort_order, id", [$id]);
+$linkIcon = ['website' => 'web', 'shop' => 'box', 'linkpage' => 'paperclip', 'maps' => 'pin', 'app' => 'rocket', 'other' => 'web'];
 
 page_start($client['name'], 'clients');
 ?>
@@ -134,6 +138,34 @@ page_start($client['name'], 'clients');
                     <span class="cell-bottom"><?= $last ? 'Son veri: ' . format_date($last['date']) : 'Henüz veri girilmedi' ?></span>
                     <?php if (is_staff()): ?><button class="mini-btn" onclick="metricEnter(<?= $sh['id'] ?>, '<?= e($sh['username']) ?>')">+ Veri Gir</button><?php endif; ?>
                 </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- Links: web site, online shop, link page… (no followers, so not social accounts) -->
+        <div class="row-flex between mb-2 mt-3">
+            <div class="card-title"><?= icon('web', 16) ?> Bağlantılar (<?= count($links) ?>)</div>
+            <?php if (permission('content_manage')): ?><button class="btn btn-sm btn-brand" onclick="linkEdit()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Bağlantı Ekle</button><?php endif; ?>
+        </div>
+        <?php if (!$links): ?>
+        <div class="card orta text-muted small" style="padding:18px">Web sitesi, online mağaza, link sayfası, Google İşletme gibi adresler burada durur.</div>
+        <?php else: ?>
+        <div class="link-grid">
+            <?php foreach ($links as $ln): $host = preg_replace('~^www\.~', '', (string)(parse_url($ln['url'], PHP_URL_HOST) ?: $ln['url'])); ?>
+            <div class="link-tile">
+                <span class="link-icon"><?= icon($linkIcon[$ln['kind']] ?? 'web', 17) ?></span>
+                <a href="<?= e($ln['url']) ?>" target="_blank" rel="noopener" class="link-body">
+                    <span class="link-label"><?= e($ln['label'] ?: (LINK_KINDS[$ln['kind']] ?? 'Bağlantı')) ?></span>
+                    <span class="link-host"><?= $ln['label'] ? e(LINK_KINDS[$ln['kind']] ?? '') . ' · ' : '' ?><?= e($host) ?> ↗</span>
+                </a>
+                <span class="link-tools">
+                    <button type="button" class="icon-action" data-copy="<?= e($ln['url']) ?>" title="Linki kopyala"><?= icon('paperclip', 13) ?></button>
+                    <?php if (permission('content_manage')): ?>
+                    <button type="button" class="icon-action" onclick='linkEdit(<?= json_encode($ln, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS) ?>)' title="Düzenle"><?= icon('item', 13) ?></button>
+                    <button type="button" class="icon-action danger" data-action="client_link_delete" data-id="<?= $ln['id'] ?>" data-confirm="Bağlantı silinsin mi?" title="Sil"><?= icon('cop', 13) ?></button>
+                    <?php endif; ?>
+                </span>
             </div>
             <?php endforeach; ?>
         </div>
@@ -256,12 +288,18 @@ page_start($client['name'], 'clients');
             <span class="badge"><?= $archiveCount ?></span>
         </a>
         <?php else: ?>
-        <!-- Strategy, brand kit and approval rules -->
+        <!-- Brand kit: colours, logos, typefaces at a glance; the full board on brand.php -->
+        <?php $brand = brand_data($client); ?>
         <div class="card mb-2">
-            <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px">Strateji & Marka</div><?php if (permission('client_manage')): ?><button class="mini-btn" data-modal="modalStrategy">Düzenle</button><?php endif; ?></div>
-            <?php if (trim((string)$client['strategy']) === '' && trim((string)$client['brand_kit']) === ''): ?><div class="text-muted small">Hedef kitle, ton, ana mesajlar ve marka kiti (renkler, yazı tipleri, logo kullanımı) burada durur; ekip müşteri işlerinde görür.</div><?php endif; ?>
+            <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px">Marka Kiti</div><a class="mini-btn" href="brand.php?id=<?= $id ?>"><?= brand_is_empty($brand) && permission('client_manage') ? 'Oluştur' : 'Aç' ?> →</a></div>
+            <?php if (brand_is_empty($brand)): ?><div class="text-muted small">Renkler, logolar, yazı tipleri ve ses tonu tek yerde; ekip bu dosyanın işlerinde görür.</div>
+            <?php else: ?><?= brand_kit_compact($client, false) ?><?php endif; ?>
+        </div>
+        <!-- Strategy and approval rules -->
+        <div class="card mb-2">
+            <div class="row-flex between mb-2"><div class="card-title" style="font-size:14px">Strateji & Onay</div><?php if (permission('client_manage')): ?><button class="mini-btn" data-modal="modalStrategy">Düzenle</button><?php endif; ?></div>
+            <?php if (trim((string)$client['strategy']) === ''): ?><div class="text-muted small">Hedef kitle, ana mesajlar ve bu dönemin hedefleri burada durur.</div><?php endif; ?>
             <?php if (trim((string)$client['strategy']) !== ''): ?><div class="cell-bottom mt-1">Strateji</div><div class="small text-2" style="white-space:pre-wrap"><?= e($client['strategy']) ?></div><?php endif; ?>
-            <?php if (trim((string)$client['brand_kit']) !== ''): ?><div class="cell-bottom mt-2">Marka kiti</div><div class="small text-2" style="white-space:pre-wrap"><?= e($client['brand_kit']) ?></div><?php endif; ?>
             <div class="cell-bottom mt-2">Onay kuralları</div>
             <div class="small text-2">Aylık plan: <?= $client['plan_approval'] ? 'müşteri onayına gider' : 'onaya gitmez' ?><?php if ($noApproval): ?><br>Müşteri onayı atlanan türler: <?= e(implode(', ', array_filter(array_map(fn($t) => $typeNames[$t] ?? null, $noApproval)))) ?><?php endif; ?></div>
         </div>
@@ -376,14 +414,13 @@ if (permission('client_manage')):
     </div>
 </div>
 
-<!-- Strategy, brand kit and approval rules modal -->
+<!-- Strategy and approval rules modal (the brand kit has its own page) -->
 <div class="modal-overlay" id="modalStrategy">
-    <div class="modal"><div class="modal-top"><div class="modal-title">Strateji & Marka — <?= e($client['name']) ?></div><button class="modal-close" data-modal-close>✕</button></div>
+    <div class="modal"><div class="modal-top"><div class="modal-title">Strateji & Onay — <?= e($client['name']) ?></div><button class="modal-close" data-modal-close>✕</button></div>
     <form data-ajax="client_strategy_save">
         <input type="hidden" name="id" value="<?= $id ?>">
         <div class="modal-body">
             <div class="form-group"><label class="form-label">Strateji</label><textarea name="strategy" class="text-area" rows="5" placeholder="Hedef kitle, ton, ana mesajlar, bu dönemin hedefleri..."><?= e($client['strategy'] ?? '') ?></textarea></div>
-            <div class="form-group"><label class="form-label">Marka kiti</label><textarea name="brand_kit" class="text-area" rows="5" placeholder="Renk kodları, yazı tipleri, logo kullanımı, kaçınılacak ifadeler, marka klasörünün linki..."><?= e($client['brand_kit'] ?? '') ?></textarea><div class="form-hint">Bu dosyanın müşteri işlerinde ekibe gösterilir.</div></div>
             <div class="form-group"><label class="row-flex small" style="gap:8px;cursor:pointer"><input type="checkbox" name="plan_approval" value="1" <?= $client['plan_approval'] ? 'checked' : '' ?>> Aylık plan müşteri onayına gitsin</label><div class="form-hint">Açıksa ay planlanırken plan müşteriye gönderilir; müşteri onaylayınca ay üretime geçer.</div></div>
             <?php if ($approvalTypes): ?>
             <div class="form-group"><label class="form-label">Müşteri onayı atlanan iş türleri</label>
@@ -456,14 +493,43 @@ document.getElementById('colorSelect2')?.addEventListener('change', () => {
         <input type="hidden" name="client_id" value="<?= $id ?>">
         <div class="modal-body">
             <div class="form-row">
-                <div class="form-group"><label class="form-label">Platform</label><select name="platform" class="select"><?php foreach (PLATFORMS as $k => $v): if ($k === 'other') continue; ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-group"><label class="form-label">Platform</label><select name="platform" class="select"><?php foreach (PLATFORMS as $k => $v): if (in_array($k, NON_ACCOUNT_PLATFORMS, true)) continue; ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
                 <div class="form-group"><label class="form-label">Kullanıcı Adı <span class="required">*</span></label><input name="username" class="input" required placeholder="@markaadi"></div>
             </div>
-            <div class="form-group"><label class="form-label">Profil Linki</label><input name="url" class="input" placeholder="instagram.com/markaadi"></div>
+            <div class="form-group"><label class="form-label">Profil Linki</label><input name="url" class="input" placeholder="instagram.com/markaadi"><div class="form-hint">Web sitesi, mağaza gibi adresler hesap değildir; onları Bağlantılar'a ekleyin.</div></div>
         </div>
         <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Ekle</button></div>
     </form></div>
 </div>
+<?php endif; ?>
+
+<?php if (permission('content_manage')): ?>
+<!-- Add / edit a link -->
+<div class="modal-overlay" id="modalLink">
+    <div class="modal"><div class="modal-top"><div class="modal-title" id="linkTitle">Bağlantı Ekle</div><button class="modal-close" data-modal-close>✕</button></div>
+    <form data-ajax="client_link_save">
+        <input type="hidden" name="client_id" value="<?= $id ?>"><input type="hidden" name="id" id="ln_id">
+        <div class="modal-body">
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Tür</label><select name="kind" id="ln_kind" class="select native-select"><?php foreach (LINK_KINDS as $k => $v): ?><option value="<?= $k ?>"><?= $v ?></option><?php endforeach; ?></select></div>
+                <div class="form-group"><label class="form-label">Adı</label><input name="label" id="ln_label" class="input" maxlength="120" placeholder="Boşsa türü yazılır"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Adres <span class="required">*</span></label><input name="url" id="ln_url" class="input" required placeholder="markaadi.com"></div>
+        </div>
+        <div class="modal-alt"><button type="button" class="btn btn-ghost" data-modal-close>İptal</button><button type="submit" class="btn btn-brand">Kaydet</button></div>
+    </form></div>
+</div>
+<script>
+function linkEdit(l) {
+    l = l || {};
+    document.getElementById('ln_id').value = l.id || '';
+    document.getElementById('ln_kind').value = l.kind || 'website';
+    document.getElementById('ln_label').value = l.label || '';
+    document.getElementById('ln_url').value = l.url || '';
+    document.getElementById('linkTitle').textContent = l.id ? 'Bağlantıyı Düzenle' : 'Bağlantı Ekle';
+    modalOpen('modalLink');
+}
+</script>
 <?php endif; ?>
 
 <?php if (is_staff()): ?>

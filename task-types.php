@@ -3,6 +3,7 @@
  * SADA One — Task types (step recipes) and skills
  * A task type is a recipe: the ordered steps a deliverable goes through. Each step has a skill (who can
  * do it), a kind (production / internal review / client approval / publish) and optionally a default person.
+ * Types sit in folders; a type can be made for one client file only — it is then offered on that file's work alone.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
@@ -12,9 +13,19 @@ $skills = rows("SELECT s.id, s.name, (SELECT COUNT(*) FROM user_skills us JOIN u
 $skillName = array_column($skills, 'name', 'id');
 $team = rows("SELECT id, name FROM users WHERE role IN ('admin','pm','team','intern') AND is_active=1 ORDER BY name");
 $teamName = array_column($team, 'name', 'id');
-$types = rows("SELECT t.*, (SELECT COUNT(*) FROM tasks g WHERE g.type_id=t.id) usage_count FROM task_types t ORDER BY t.kind, t.name");
+$types = rows("SELECT t.*, c.name client_name, (SELECT COUNT(*) FROM tasks g WHERE g.type_id=t.id) usage_count FROM task_types t LEFT JOIN clients c ON c.id=t.client_id
+    ORDER BY t.client_id IS NULL, c.name, t.folder IS NULL, t.folder, t.kind, t.name");
 foreach ($types as &$t) $t['steps'] = rows("SELECT id, name, skill_id, kind, owner_id, optional FROM task_type_steps WHERE type_id=? ORDER BY sort_order, id", [$t['id']]);
 unset($t);
+// Sections: each file's own types, then each folder, then the types without a folder
+$typeGroups = [];
+foreach ($types as $t) {
+    $key = $t['client_id'] ? 'c' . $t['client_id'] : 'f' . ($t['folder'] ?? '');
+    $typeGroups[$key] ??= ['label' => $t['client_id'] ? ($t['client_name'] ?? 'Dosya') : (($t['folder'] ?? '') ?: 'Genel'), 'client' => (bool)$t['client_id'], 'types' => []];
+    $typeGroups[$key]['types'][] = $t;
+}
+$folders = array_values(array_unique(array_filter(array_map(fn($t) => (string)$t['folder'], $types))));
+$clientList = rows("SELECT id, name FROM clients WHERE status='active' OR id IN (SELECT client_id FROM task_types WHERE client_id IS NOT NULL) ORDER BY name");
 $kindIcon = ['work' => '●', 'review' => '◆', 'client_approval' => '✓', 'publish' => '↗'];
 
 page_start('İş Türleri', 'task_types');
@@ -28,11 +39,15 @@ page_start('İş Türleri', 'task_types');
     <div>
         <?php if (!$types): ?>
         <div class="empty-state"><div class="empty-icon"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div><div class="empty-title">Henüz iş türü yok</div><div class="empty-text">"Reels", "Gönderi", "Video" gibi türler tanımlayın; yeni işler adımlarını buradan alır.</div></div>
-        <?php else: foreach ($types as $t): ?>
+        <?php else: foreach ($typeGroups as $groupKey => $group):
+            if (count($typeGroups) > 1 || $groupKey !== 'f'): ?>
+        <div class="type-folder"><?= icon($group['client'] ? 'handshake' : 'folder', 16) ?> <span><?= e($group['label']) ?></span><?= $group['client'] ? '<span class="badge badge-type">bu dosyaya özel</span>' : '' ?><span class="cell-bottom"><?= count($group['types']) ?> tür</span></div>
+        <?php endif;
+            foreach ($group['types'] as $t): ?>
         <div class="card mb-3">
             <div class="row-flex between mb-2">
                 <div>
-                    <div class="row-flex" style="gap:8px"><span class="card-title" style="font-size:16px"><?= e($t['name']) ?></span><?php if ($t['kind'] === 'internal'): ?><span class="badge badge-type">İç iş</span><?php endif; ?></div>
+                    <div class="row-flex" style="gap:8px"><span class="card-title" style="font-size:16px"><?= e($t['name']) ?></span><?php if ($t['kind'] === 'internal'): ?><span class="badge badge-type">İç iş</span><?php endif; ?><?php if ($t['client_id'] && $t['folder']): ?><span class="badge badge-type"><?= e($t['folder']) ?></span><?php endif; ?></div>
                     <div class="cell-bottom mt-1"><?= $t['description'] ? e($t['description']) . ' · ' : '' ?><?= count($t['steps']) ?> adım · <?= (int)$t['usage_count'] ?> işte kullanıldı</div>
                 </div>
                 <div class="row-flex" style="gap:4px">
@@ -55,7 +70,7 @@ page_start('İş Türleri', 'task_types');
             </div>
             <?php else: ?><div class="text-muted small">Adımsız tür: işler durumlarıyla elle yönetilir.</div><?php endif; ?>
         </div>
-        <?php endforeach; endif; ?>
+        <?php endforeach; endforeach; endif; ?>
     </div>
 
     <div class="card">
@@ -84,6 +99,13 @@ page_start('İş Türleri', 'task_types');
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Adı <span class="required">*</span></label><input name="name" id="t_name" class="input" required placeholder="Örn. Reels"></div>
                 <div class="form-group"><label class="form-label">Açıklama</label><input name="description" id="t_description" class="input" placeholder="Kısa not (opsiyonel)"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Klasör</label><input name="folder" id="t_folder" class="input" list="typeFolders" maxlength="80" placeholder="Örn. Sosyal Medya, Video, Basılı" autocomplete="off">
+                    <datalist id="typeFolders"><?php foreach ($folders as $f): ?><option value="<?= e($f) ?>"><?php endforeach; ?></datalist>
+                    <div class="form-hint">Yeni iş açarken türler klasörlerine göre gruplanır.</div></div>
+                <div class="form-group"><label class="form-label">Hangi dosyalar</label><select name="client_id" id="t_client" class="select"><option value="">Tüm dosyalar</option><?php foreach ($clientList as $c): ?><option value="<?= $c['id'] ?>">Sadece <?= e($c['name']) ?></option><?php endforeach; ?></select>
+                    <div class="form-hint">Bir dosyaya özel tür, yalnızca o dosyanın işlerinde çıkar.</div></div>
             </div>
             <div class="form-group">
                 <label class="form-label">Varsayılan tür</label>
@@ -128,6 +150,7 @@ function typeReset() {
     const f = document.getElementById('typeForm');
     f.reset();
     document.getElementById('t_id').value = '';
+    formFieldSet(f, 'client_id', '');
     document.getElementById('typeTitle').textContent = 'Yeni İş Türü';
     document.getElementById('typeSteps').innerHTML = '';
     const skill = n => (skillOptions.find(s => s.name === n) || {}).id;
@@ -140,6 +163,8 @@ function typeEdit(t) {
     document.getElementById('t_id').value = t.id;
     document.getElementById('t_name').value = t.name;
     document.getElementById('t_description').value = t.description || '';
+    document.getElementById('t_folder').value = t.folder || '';
+    formFieldSet(document.getElementById('typeForm'), 'client_id', t.client_id || '');
     document.querySelectorAll('#typeForm input[name=kind]').forEach(r => { r.checked = r.value === t.kind; });
     document.getElementById('typeSteps').innerHTML = '';
     t.steps.forEach(s => typeStepRow(s));

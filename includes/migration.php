@@ -172,6 +172,11 @@ function migration_commands(): array {
         // 7.8: office days — each person's weekly pattern and single-day changes on top of it
         "CREATE TABLE IF NOT EXISTS office_schedule (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, weekday TINYINT NOT NULL, start_time TIME NOT NULL, end_time TIME NOT NULL, updated DATETIME NOT NULL, UNIQUE KEY office_weekday (user_id, weekday)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
         "CREATE TABLE IF NOT EXISTS office_days (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, date DATE NOT NULL, kind ENUM('in','out') NOT NULL, start_time TIME DEFAULT NULL, end_time TIME DEFAULT NULL, note VARCHAR(255) DEFAULT NULL, created_by INT NOT NULL, created DATETIME NOT NULL, UNIQUE KEY office_day (user_id, date), INDEX(date)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
+        // 8.1: a file's web site, shop, link page… — links, not accounts; the structured brand kit; task type folders and file-only types
+        "CREATE TABLE IF NOT EXISTS client_links (id INT AUTO_INCREMENT PRIMARY KEY, client_id INT NOT NULL, kind VARCHAR(20) NOT NULL DEFAULT 'website', label VARCHAR(120) DEFAULT NULL, url VARCHAR(500) NOT NULL, sort_order INT NOT NULL DEFAULT 0, created DATETIME NOT NULL, INDEX(client_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci",
+        "ALTER TABLE clients ADD COLUMN brand_data TEXT",
+        "ALTER TABLE task_types ADD COLUMN folder VARCHAR(80) DEFAULT NULL",
+        "ALTER TABLE task_types ADD COLUMN client_id INT DEFAULT NULL",
     ];
 }
 
@@ -321,5 +326,35 @@ function run_migrations(PDO $pdo): array {
             }
         }
     } catch (Throwable $e) { $results[] = ['error', 'legacy: ' . $e->getMessage()]; }
+    // 8.1, once: "Web Sitesi" entries were social accounts with follower counts — they become the file's links. Chats are
+    // no longer opened for every project; the ones opened that way and never written in go.
+    try {
+        $linksDone = $pdo->query("SELECT setting_value FROM settings WHERE setting_key='links_and_chats'")->fetchColumn() === '1';
+        if (!$linksDone && $pdo->query("SHOW TABLES LIKE 'client_links'")->fetchColumn()) {
+            $webCount = (int)$pdo->query("SELECT COUNT(*) FROM social_accounts WHERE platform='web'")->fetchColumn();
+            $emptyChats = (int)$pdo->query("SELECT COUNT(*) FROM channels c WHERE c.type IN ('project','customer') AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.channel_id=c.id)")->fetchColumn();
+            if ($webCount || $emptyChats) {
+                require_once __DIR__ . '/migration-backup.php';
+                $results[] = ['ok', 'links: backup ' . migration_db_backup($pdo, 'v8.1-links', '8.1 move of web sites to links and removal of empty project chats')];
+            }
+            if ($webCount) {
+                $add = $pdo->prepare("INSERT INTO client_links (client_id, kind, label, url, sort_order, created) VALUES (?, 'website', ?, ?, ?, ?)");
+                foreach ($pdo->query("SELECT * FROM social_accounts WHERE platform='web' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC) as $i => $acc) {
+                    $url = trim((string)$acc['url']) ?: trim(ltrim((string)$acc['username'], '@'));
+                    if ($url !== '' && !preg_match('#^https?://#i', $url)) $url = 'https://' . $url;
+                    if ($url !== '') $add->execute([$acc['client_id'], null, mb_substr($url, 0, 500), $i, $acc['created']]);
+                }
+                $pdo->exec("DELETE m FROM social_metrics m JOIN social_accounts a ON a.id=m.account_id WHERE a.platform='web'");
+                $pdo->exec("DELETE FROM social_accounts WHERE platform='web'");
+                $results[] = ['ok', "links: $webCount web sites moved from social accounts to links"];
+            }
+            if ($emptyChats) {
+                $pdo->exec("DELETE cm FROM channel_members cm JOIN channels c ON c.id=cm.channel_id WHERE c.type IN ('project','customer') AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.channel_id=c.id)");
+                $pdo->exec("DELETE c FROM channels c LEFT JOIN messages m ON m.channel_id=c.id WHERE c.type IN ('project','customer') AND m.id IS NULL");
+                $results[] = ['ok', "links: $emptyChats empty project chats removed"];
+            }
+            $pdo->exec("INSERT INTO settings (setting_key, setting_value) VALUES ('links_and_chats', '1') ON DUPLICATE KEY UPDATE setting_value='1'");
+        }
+    } catch (Throwable $e) { $results[] = ['error', 'links: ' . $e->getMessage()]; }
     return $results;
 }

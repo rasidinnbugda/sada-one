@@ -46,6 +46,18 @@
         catch { window.prompt('Onay linki:', j.link); }
     };
 
+    /* ---------- Click to copy: any element with data-copy (brand colour codes, links) ---------- */
+    document.addEventListener('click', async e => {
+        const el = e.target.closest('[data-copy]');
+        if (!el) return;
+        e.preventDefault();
+        try { await navigator.clipboard.writeText(el.dataset.copy); }
+        catch { window.prompt('Kopyalayın:', el.dataset.copy); return; }
+        el.classList.add('copied');
+        setTimeout(() => el.classList.remove('copied'), 1300);
+        toast('Kopyalandı: ' + el.dataset.copy, 'success', 1600);
+    });
+
     /* ---------- Toast ---------- */
     window.toast = function (message, type = 'info', duration = 3800) {
         const field = $('#toastField');
@@ -671,12 +683,25 @@
                     search.addEventListener('input', () => {
                         const q = search.value.toLocaleLowerCase('tr');
                         panel.querySelectorAll('.ui-select-item').forEach(o => o.style.display = o.textContent.toLocaleLowerCase('tr').includes(q) ? '' : 'none');
+                        // a group heading stays only while one of its items does
+                        panel.querySelectorAll('.ui-select-group').forEach(h => {
+                            let n = h.nextElementSibling, any = false;
+                            while (n && !n.classList.contains('ui-select-group')) { if (n.style.display !== 'none') any = true; n = n.nextElementSibling; }
+                            h.style.display = any ? '' : 'none';
+                        });
                     });
                     panel.appendChild(search);
                 }
                 const list = document.createElement('div');
                 list.className = 'ui-select-list';
                 ops.forEach(op => {
+                    // <optgroup>: its label heads its options
+                    if (op.parentElement.tagName === 'OPTGROUP' && op === op.parentElement.querySelector('option')) {
+                        const head = document.createElement('div');
+                        head.className = 'ui-select-group';
+                        head.textContent = op.parentElement.label;
+                        list.appendChild(head);
+                    }
                     const b = document.createElement('button');
                     b.type = 'button';
                     b.className = 'ui-select-item' + (op.selected ? ' selected' : '');

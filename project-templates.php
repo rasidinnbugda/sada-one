@@ -8,7 +8,7 @@ require_once __DIR__ . '/includes/layout.php';
 $u = require_admin();
 
 $templates = rows("SELECT * FROM project_templates ORDER BY name");
-$types = rows("SELECT id, name FROM task_types ORDER BY name");
+$types = rows("SELECT id, name FROM task_types WHERE client_id IS NULL ORDER BY name");
 
 page_start('Proje Şablonları', 'ptemplates');
 ?>

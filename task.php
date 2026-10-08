@@ -2,10 +2,11 @@
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/components.php';
+require_once __DIR__ . '/includes/brand.php';
 $u = require_staff();
 
 $id = (int)($_GET['id'] ?? 0);
-$task = row("SELECT g.*, p.name project_name, p.client_id, d.name client_name, d.brand_kit client_brand_kit, d.contact_email client_email, uu.name assignee_name, uu.color assignee_color, ol.name creator_name, tt.name type_name,
+$task = row("SELECT g.*, p.name project_name, p.client_id, d.name client_name, d.brand_kit client_brand_kit, d.brand_data client_brand_data, d.contact_email client_email, uu.name assignee_name, uu.color assignee_color, ol.name creator_name, tt.name type_name,
     pd.year period_year, pd.month period_month
     FROM tasks g JOIN projects p ON p.id=g.project_id JOIN clients d ON d.id=p.client_id
     LEFT JOIN users uu ON uu.id=g.assignee_id LEFT JOIN users ol ON ol.id=g.created_by LEFT JOIN task_types tt ON tt.id=g.type_id
@@ -215,12 +216,13 @@ page_start($task['title'], 'tasks');
             </div>
         </div>
 
-        <?php if ($task['kind'] === 'client' && trim((string)$task['client_brand_kit']) !== ''): ?>
-        <!-- The client's brand kit, where the work is done -->
-        <details class="card mb-2 brand-kit">
+        <?php $taskBrand = ['brand_data' => $task['client_brand_data'] ?? null, 'brand_kit' => $task['client_brand_kit'] ?? null];
+        if ($task['kind'] === 'client' && !brand_is_empty(brand_data($taskBrand))): ?>
+        <!-- The client's brand kit, where the work is done: colours copy with a click, logos download -->
+        <details class="card mb-2 brand-kit" open>
             <summary class="card-title" style="font-size:14px;cursor:pointer">Marka Kiti</summary>
-            <div class="small text-2 mt-2" style="white-space:pre-wrap"><?= e($task['client_brand_kit']) ?></div>
-            <a href="client.php?id=<?= $task['client_id'] ?>" class="mini-btn mt-2" style="display:inline-block">Dosyada gör →</a>
+            <div class="mt-2"><?= brand_kit_compact($taskBrand) ?></div>
+            <a href="brand.php?id=<?= $task['client_id'] ?>" class="mini-btn mt-2" style="display:inline-block">Kitin tamamı →</a>
         </details>
         <?php endif; ?>
 

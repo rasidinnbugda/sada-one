@@ -1,10 +1,13 @@
 <?php
 /**
  * SADA One — Monthly Reports
- * Monthly work reports per client file are filled in on the panel.
+ * The report is written in the client mail itself: click a text and type, click a picture to change it, add or
+ * remove number tiles. A new report opens as a draft already filled with the month's data (published and finished
+ * work, shoots, follower counts, next month's plan). Saved, it goes to the client from here.
  */
 require __DIR__ . '/includes/init.php';
 require_once __DIR__ . '/includes/layout.php';
+require_once __DIR__ . '/includes/report-mail.php';
 $u = require_staff();
 if (is_intern()) { header('Location: index.php'); exit; }
 
@@ -17,25 +20,24 @@ $reports = rows("SELECT r.*, d.name client_name, y.name author_name FROM monthly
 
 // Report to edit (if client file + period are selected)
 $selectClient = (int)($_GET['client'] ?? 0);
-$selectPeriod = preg_match('/^\d{4}-\d{2}$/', $_GET['period'] ?? '') ? $_GET['period'] : date('Y-m');
-$current = $selectClient ? row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [$selectClient, $selectPeriod]) : null;
+$selectPeriod = preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $_GET['period'] ?? '') ? $_GET['period'] : date('Y-m');
+$clientRow = $selectClient ? row("SELECT * FROM clients WHERE id=?", [$selectClient]) : null;
+$current = $clientRow ? row("SELECT r.*, y.name author_name FROM monthly_reports r LEFT JOIN users y ON y.id=r.author_id WHERE r.client_id=? AND r.period=?", [$selectClient, $selectPeriod]) : null;
+// What the editor opens with: the saved report, or a draft filled from the month's data
+$reportState = $clientRow ? ($current ? report_state_clean($current, true) : report_draft($clientRow, $selectPeriod)) : null;
 
-$periodName = function (string $d): string {
-    $months = [1 => 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-    [$y, $a] = explode('-', $d);
-    return $months[(int)$a] . ' ' . $y;
-};
+$periodName = fn(string $d) => MONTHS[(int)substr($d, 5, 2)] . ' ' . substr($d, 0, 4);
 
 page_start('Aylık Raporlar', 'mreports');
 ?>
 <div class="page-top">
-    <div><div class="page-title">Aylık Raporlar</div><div class="page-bottom">Müşteri dosyaları için dönem raporları — özet, yapılanlar, metrikler, gelecek plan</div></div>
+    <div><div class="page-title">Aylık Raporlar</div><div class="page-bottom">Her dosyaya ayın raporu: doğrudan müşteriye gidecek mailin üzerinde yazılır</div></div>
 </div>
 
 <!-- This month at a glance: who has filled in, who has not -->
 <div class="card mb-3">
     <div class="row-flex between mb-2">
-        <div class="card-title" style="font-size:15px">Bu Ay (<?= e($currentPeriod) ?>) Doldurma Durumu</div>
+        <div class="card-title" style="font-size:15px">Bu Ay (<?= e($periodName($currentPeriod)) ?>) Doldurma Durumu</div>
         <span class="small text-muted"><?= count(array_filter($periodStatus, fn($s) => $s === 'completed')) ?>/<?= count($clients) ?> tamamlandı</span>
     </div>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px">
@@ -50,7 +52,7 @@ page_start('Aylık Raporlar', 'mreports');
     </div>
 </div>
 
-<div class="grid" style="grid-template-columns:340px 1fr;align-items:start">
+<div class="grid rp-layout">
     <div class="card">
         <div class="card-title mb-2">Rapor Seç / Başlat</div>
         <form method="get">
@@ -75,130 +77,78 @@ page_start('Aylık Raporlar', 'mreports');
         </div>
     </div>
 
-    <div class="card">
-        <?php if (!$selectClient): ?>
+    <div class="card rp-card">
+        <?php if (!$clientRow): ?>
         <div class="empty-state" style="padding:60px 20px">
             <div class="empty-icon">📊</div>
             <div class="empty-title">Rapor seçin</div>
-            <div class="empty-text">Soldan dosya ve dönem seçerek yeni rapor başlatın ya da mevcut raporu açın.</div>
+            <div class="empty-text">Soldan dosya ve dönem seçin: rapor, müşteriye gidecek mailin kendisi olarak açılır. Yeni raporlar ayın verileriyle dolu gelir.</div>
         </div>
-        <?php else:
-            $clientName = val("SELECT name FROM clients WHERE id=?", [$selectClient]); ?>
-        <div class="row-flex between mb-3">
-            <div class="card-title"><?= e($clientName) ?> — <?= $periodName($selectPeriod) ?> Raporu</div>
-            <?php if ($current): ?><span class="small text-muted">Son güncelleme: <?= e($current['author_name'] ?? '') ?: '' ?> <?= format_date($current['updated'] ?? $current['created'], true) ?></span><?php endif; ?>
+        <?php else: ?>
+        <div class="rp-head">
+            <div class="card-title"><?= e($clientRow['name']) ?> — <?= $periodName($selectPeriod) ?> raporu</div>
+            <div class="row-flex wrap mt-1" style="gap:8px">
+                <span id="rp_status"><?php if (!$current): ?><span class="badge r-pending">Yeni taslak · kaydedilmedi</span><?php elseif ($current['status'] === 'completed'): ?><span class="badge r-completed">Tamamlandı</span><?php else: ?><span class="badge r-in_progress">Taslak</span><?php endif; ?></span>
+                <?php if (!empty($current['sent_at'])): ?><span class="badge r-completed" title="<?= e($current['sent_to'] ?? '') ?>">Gönderildi: <?= format_date($current['sent_at'], true) ?></span><?php endif; ?>
+                <span class="small text-muted" id="rp_saved"><?= $current ? 'Son kayıt: ' . e($current['author_name'] ?? '') . ' · ' . format_date($current['updated'] ?? $current['created'], true) : '' ?></span>
+            </div>
         </div>
+
+        <div class="rp-bar">
+            <div class="rp-mode" role="group" aria-label="Görünüm">
+                <button type="button" class="rp-mode-btn active" data-mode="edit"><?= icon('item', 14) ?> Düzenle</button>
+                <button type="button" class="rp-mode-btn" data-mode="preview"><?= icon('person', 14) ?> Müşterinin göreceği</button>
+            </div>
+            <span class="rp-dirty" id="rp_dirty" hidden>Kaydedilmemiş değişiklik</span>
+            <div class="rp-actions">
+                <?php if (permission('ai_use')): ?><button type="button" class="btn btn-sm btn-ghost" id="rp_ai" onclick="rpAi()">🪄 AI ile yaz</button><?php endif; ?>
+                <button type="button" class="btn btn-sm" onclick="rpSave()">Kaydet</button>
+                <button type="button" class="btn btn-sm" id="rp_complete" onclick="rpComplete()"><?= ($current['status'] ?? '') === 'completed' ? 'Taslağa çevir' : 'Tamamla ✓' ?></button>
+                <?php if (permission('report')): ?><button type="button" class="btn btn-sm btn-brand" onclick="reportMailOpen()">📧 Gönder…</button><?php endif; ?>
+            </div>
+        </div>
+        <div class="rp-hint"><?= $current
+            ? 'Bir metne tıklayıp yazın, görsele tıklayıp değiştirin. Boş bıraktığınız bölümler maile girmez.'
+            : 'Bu taslak ' . e(report_month_in((int)substr($selectPeriod, 5, 2))) . 'ki verilerle dolduruldu: yayınlanan ve biten işler, çekimler, hesapların takipçi sayıları. Okuyun, düzeltin, kaydedin.' ?></div>
+        <iframe id="rp_frame" class="rp-frame" title="Rapor maili"></iframe>
+        <input type="file" id="rp_file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+
         <?php
-        // Automatic financial summary for the selected client + period (live, not stored)
-        [$pYear, $pMonth] = explode('-', $selectPeriod);
+        // Internal finance summary for the selected client + period (live, never in the mail)
         $pStart = "$selectPeriod-01"; $pEnd = date('Y-m-t', strtotime($pStart));
         $finBudget = (float)val("SELECT COALESCE(SUM(budget),0) FROM projects WHERE client_id=? AND status='active'", [$selectClient]);
         $finExtra = (float)val("SELECT COALESCE(SUM(t.amount),0) FROM project_extra_requests t JOIN projects p ON p.id=t.project_id WHERE p.client_id=? AND t.status='approved' AND t.created BETWEEN ? AND ?", [$selectClient, "$pStart 00:00:00", "$pEnd 23:59:59"]);
         $finIncome = (float)val("SELECT COALESCE(SUM(o.amount),0) FROM payments o JOIN projects p ON p.id=o.project_id WHERE p.client_id=? AND o.date BETWEEN ? AND ?", [$selectClient, $pStart, $pEnd]);
         $finShoot = (float)val("SELECT COALESCE(SUM(e.cost),0) FROM events e LEFT JOIN projects p ON p.id=e.project_id WHERE (e.client_id=? OR p.client_id=?) AND e.start BETWEEN ? AND ?", [$selectClient, $selectClient, "$pStart 00:00:00", "$pEnd 23:59:59"]);
         ?>
-        <div class="grid mb-3" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
-            <div style="padding:11px 13px;background:var(--surface-2);border-radius:11px"><div class="cell-bottom">Aktif Proje Bütçesi</div><div class="bold"><?= number_format($finBudget, 0, ',', '.') ?> ₺</div></div>
-            <div style="padding:11px 13px;background:var(--surface-2);border-radius:11px"><div class="cell-bottom">Bu Ay Onaylı Ek Talep</div><div class="bold">+<?= number_format($finExtra, 0, ',', '.') ?> ₺</div></div>
-            <div style="padding:11px 13px;background:var(--surface-2);border-radius:11px"><div class="cell-bottom">Bu Ay Tahsilat</div><div class="bold" style="color:var(--success)"><?= number_format($finIncome, 0, ',', '.') ?> ₺</div></div>
-            <div style="padding:11px 13px;background:var(--surface-2);border-radius:11px"><div class="cell-bottom">Bu Ay Çekim Maliyeti</div><div class="bold" style="color:var(--danger)"><?= number_format($finShoot, 0, ',', '.') ?> ₺</div></div>
-        </div>
-        <div class="form-hint mb-2">Finansal özet panel verilerinden otomatik hesaplanır; rapora elle geçirmenize gerek yok.</div>
-        <div class="row-flex mb-2" style="gap:10px">
-            <button type="button" class="btn btn-sm" id="aiDraftBtn" onclick="aiDraft(<?= $selectClient ?>, '<?= e($selectPeriod) ?>')">🪄 AI ile Taslak Doldur</button>
-            <span class="small text-muted" id="aiDraftStatus"></span>
-        </div>
-        <form data-ajax="monthly_report_save" data-refresh="no" id="reportForm">
-            <input type="hidden" name="client_id" value="<?= $selectClient ?>">
-            <input type="hidden" name="period" value="<?= e($selectPeriod) ?>">
-            <div class="form-group"><label class="form-label">Genel Özet</label><textarea name="summary" class="text-area" rows="3" placeholder="Bu ay genel olarak..."><?= e($current['summary'] ?? '') ?></textarea></div>
-            <div class="form-group"><label class="form-label">Yapılan Çalışmalar</label><textarea name="work_done" class="text-area" rows="5" placeholder="- 12 içerik üretildi ve yayınlandı&#10;- 2 çekim gerçekleştirildi..."><?= e($current['work_done'] ?? '') ?></textarea></div>
-            <div class="form-group"><label class="form-label">Metrikler & Sonuçlar</label><textarea name="metrics" class="text-area" rows="4" placeholder="Erişim, etkileşim, takipçi değişimi, öne çıkan içerikler..."><?= e($current['metrics'] ?? '') ?></textarea></div>
-            <div class="form-group"><label class="form-label">Gelecek Ay Planı</label><textarea name="plan" class="text-area" rows="3" placeholder="Önümüzdeki dönem hedefleri..."><?= e($current['plan'] ?? '') ?></textarea></div>
-            <div class="row-flex" style="gap:10px">
-                <button type="submit" class="btn" onclick="this.form.querySelectorAll('input[name=status]').forEach(x => x.remove())">Taslak Kaydet</button>
-                <button type="submit" class="btn btn-brand" onclick="this.form.querySelectorAll('input[name=status]').forEach(x => x.remove()); const i = document.createElement('input'); i.type = 'hidden'; i.name = 'status'; i.value = 'completed'; this.form.appendChild(i)">Tamamlandı Olarak Kaydet</button>
-                <?php if ($current): ?>
-                <button type="button" class="btn" onclick="reportMailOpen(<?= $selectClient ?>, '<?= e($selectPeriod) ?>')">📧 Müşteri Maili</button>
-                <?php if (!empty($current['sent_at'])): ?><span class="badge r-completed small" title="<?= e($current['sent_to'] ?? '') ?>">Gönderildi: <?= format_date($current['sent_at'], true) ?></span><?php endif; ?>
-                <?php endif; ?>
+        <details class="rp-finance">
+            <summary>İç özet — müşteriye gitmez</summary>
+            <div class="grid mt-2" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+                <div style="padding:11px 13px;background:var(--surface-2);border-radius:11px"><div class="cell-bottom">Aktif Proje Bütçesi</div><div class="bold"><?= number_format($finBudget, 0, ',', '.') ?> ₺</div></div>
+                <div style="padding:11px 13px;background:var(--surface-2);border-radius:11px"><div class="cell-bottom">Bu Ay Onaylı Ek Talep</div><div class="bold">+<?= number_format($finExtra, 0, ',', '.') ?> ₺</div></div>
+                <div style="padding:11px 13px;background:var(--surface-2);border-radius:11px"><div class="cell-bottom">Bu Ay Tahsilat</div><div class="bold" style="color:var(--success)"><?= number_format($finIncome, 0, ',', '.') ?> ₺</div></div>
+                <div style="padding:11px 13px;background:var(--surface-2);border-radius:11px"><div class="cell-bottom">Bu Ay Çekim Maliyeti</div><div class="bold" style="color:var(--danger)"><?= number_format($finShoot, 0, ',', '.') ?> ₺</div></div>
             </div>
-        </form>
+        </details>
         <?php endif; ?>
     </div>
 </div>
-<script>
-async function aiDraft(clientId, period) {
-    const btn = document.getElementById('aiDraftBtn'), st = document.getElementById('aiDraftStatus');
-    btn.disabled = true; st.textContent = 'Panel verileri derleniyor, taslak yazılıyor... (~20 sn)';
-    const j = await api('ai_report_draft', { client_id: clientId, period });
-    btn.disabled = false;
-    if (!j.ok) { st.textContent = ''; toast(j.error || 'Taslak üretilemedi', 'error'); return; }
-    const f = document.getElementById('reportForm');
-    for (const [field, value] of Object.entries(j.draft)) {
-        const el = f.querySelector(`[name="${field}"]`);
-        if (el && value) el.value = value;
-    }
-    st.textContent = 'Taslak dolduruldu — kontrol edip kaydedin.';
-    toast('AI taslağı hazır. Düzenleyip kaydetmeyi unutmayın.', 'success');
-}
-</script>
+
+<?php if ($clientRow): ?>
 <div class="modal-overlay" id="modalReportMail">
-    <div class="modal modal-wide"><div class="modal-top"><div class="modal-title">📧 Müşteri Rapor Maili</div><button class="modal-close" data-modal-close>✕</button></div>
+    <div class="modal"><div class="modal-top"><div class="modal-title">📧 Raporu Gönder</div><button class="modal-close" data-modal-close>✕</button></div>
     <div class="modal-body">
+        <div class="form-group"><label class="form-label">Alıcılar</label>
+            <div class="chip-field" id="rm_to_field" onclick="document.getElementById('rm_to_input').focus()">
+                <input id="rm_to_input" placeholder="adres yazıp Enter'a basın..." autocomplete="off">
+            </div>
+            <div class="row-flex wrap mt-1" style="gap:6px" id="rm_people"></div>
+        </div>
         <div class="form-row">
-            <div class="form-group"><label class="form-label">Alıcılar</label>
-                <div class="chip-field" id="rm_to_field" onclick="document.getElementById('rm_to_input').focus()">
-                    <input id="rm_to_input" placeholder="adres yazıp Enter'a basın..." autocomplete="off">
-                </div>
-                <div class="row-flex wrap mt-1" style="gap:6px" id="rm_people"></div>
-            </div>
             <div class="form-group"><label class="form-label">Gönderen</label><select class="select native-select" id="rm_from"></select></div>
+            <div class="form-group"><label class="form-label">Konu</label><input class="input" id="rm_subject"></div>
         </div>
-        <div class="form-group"><label class="form-label">Konu</label><input class="input" id="rm_subject"></div>
-        <details class="mb-2" id="rm_design">
-            <summary class="small bold" style="cursor:pointer;padding:6px 0">🎨 Tasarımı Düzenle — kapak görseli, favori içerik, istatistikler</summary>
-            <div class="mt-2" style="padding:14px;background:var(--surface-2);border-radius:12px">
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Kapak Görseli <span class="text-muted" style="font-weight:400" id="rm_hero_status"></span></label>
-                        <input type="file" class="input" id="rm_hero" accept="image/*">
-                        <label class="small row-flex mt-1" style="gap:6px"><input type="checkbox" id="rm_hero_remove"> Mevcut görseli kaldır</label></div>
-                    <div class="form-group"><label class="form-label">Favori Görseli <span class="text-muted" style="font-weight:400" id="rm_fav_img_status"></span></label>
-                        <input type="file" class="input" id="rm_fav_img" accept="image/*">
-                        <label class="small row-flex mt-1" style="gap:6px"><input type="checkbox" id="rm_fav_img_remove"> Mevcut görseli kaldır</label></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Favori Başlığı</label><input class="input" id="rm_fav_title" placeholder="Bu Ayın Favorisi"></div>
-                    <div class="form-group"><label class="form-label">Öne Çıkan Sayı</label><input class="input" id="rm_fav_stat" placeholder="113B izlenme"></div>
-                </div>
-                <div class="form-group"><label class="form-label">Favori Açıklaması</label><textarea class="text-area" id="rm_fav_text" rows="2" placeholder="Ürettiğimiz bu içerik markanızı çok daha ileriye taşıdı!"></textarea></div>
-                <label class="form-label">Metinler <span class="text-muted" style="font-weight:400">(boş bırakılan varsayılanı kullanır)</span></label>
-                <div class="grid grid-2 mb-2" style="gap:6px">
-                    <input class="input rm-text" data-text="title" placeholder="Başlık: Aylık Durum Raporu">
-                    <input class="input rm-text" data-text="greeting" placeholder="Selamlama: Selam ... ekibi 👋">
-                    <input class="input rm-text" data-text="production_title" placeholder="Bölüm: Markanız İçin Ürettik">
-                    <input class="input rm-text" data-text="stat_title" placeholder="Bölüm: Biz Susalım, Sayılar Konuşsun">
-                    <input class="input rm-text" data-text="stat_intro" placeholder="İstatistik giriş cümlesi (isteğe bağlı)">
-                    <input class="input rm-text" data-text="plan_title" placeholder="Bölüm: Önümüzdeki Ay">
-                    <input class="input rm-text" data-text="closing" placeholder="Kapanış: Önümüzdeki ay görüşmek üzere...">
-                    <input class="input rm-text" data-text="thanks" placeholder="Alt başlık: Teşekkür Ederiz!">
-                </div>
-                <label class="form-label">İstatistik Kartları <span class="text-muted" style="font-weight:400">(etiket · değer · değişim — boş bırakılan satır atlanır)</span></label>
-                <div class="vertical" style="gap:6px" id="rm_stats">
-                    <?php for ($si = 0; $si < 4; $si++): ?>
-                    <div class="row-flex" style="gap:6px">
-                        <input class="input rm-stat-label" placeholder="<?= ['Erişilen Hesaplar','Görüntüleme','Takipçi Sayısı','Etkileşim'][$si] ?>" style="flex:2">
-                        <input class="input rm-stat-value" placeholder="<?= ['340,8K','1.3M','43,3K','86K'][$si] ?>" style="flex:1">
-                        <input class="input rm-stat-change" placeholder="+%12" style="flex:1">
-                    </div>
-                    <?php endfor; ?>
-                </div>
-                <button type="button" class="btn btn-sm mt-2" onclick="reportMailDesignSave()">Kaydet & Önizlemeyi Yenile</button>
-            </div>
-        </details>
-        <div class="form-group"><label class="form-label">Önizleme</label>
-            <iframe id="rm_preview" style="width:100%;height:420px;border:1px solid var(--border);border-radius:12px;background:#eef1f6"></iframe>
-        </div>
+        <div class="form-hint">Sayfadaki mail, kaydedilen haliyle gider.</div>
     </div>
     <div class="modal-alt">
         <span class="small text-muted" id="rm_sent_info" style="margin-right:auto"></span>
@@ -208,8 +158,188 @@ async function aiDraft(clientId, period) {
     </div>
 </div>
 <script>
-let rmClient = 0, rmPeriod = '';
-let rmRecipients = [];
+const RP = { client: <?= $selectClient ?>, period: <?= json_encode($selectPeriod) ?>, saved: <?= $current ? 'true' : 'false' ?>, status: <?= json_encode($current['status'] ?? 'draft') ?> };
+let rpState = <?= json_encode(['summary' => $reportState['summary'], 'work_done' => $reportState['work_done'], 'metrics' => $reportState['metrics'], 'plan' => $reportState['plan'],
+    'mail_data' => (object)(json_decode($reportState['mail_data'], true) ?: [])], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+let rpMode = 'edit', rpDirty = false, rpImgSlot = '';
+const rpFrame = document.getElementById('rp_frame');
+const rpDoc = () => rpFrame.contentDocument;
+
+function rpSetDirty(v) { rpDirty = v; document.getElementById('rp_dirty').hidden = !v; }
+window.addEventListener('beforeunload', e => { if (rpDirty) { e.preventDefault(); e.returnValue = ''; } });
+
+// What was typed in an editable part: innerText keeps the line breaks of multi-line parts, textContent skips the
+// CSS uppercase of labels
+const rpText = el => el ? ((el.dataset.multi ? el.innerText : el.textContent) || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim() : '';
+
+/** The edited mail → rpState (only the editor has editable parts) */
+function rpCollect() {
+    const d = rpDoc();
+    if (rpMode !== 'edit' || !d || !d.querySelector('[contenteditable]')) return;
+    const md = rpState.mail_data;
+    // an empty part arrives as [] from PHP; values set on an array would not survive JSON
+    if (!md.text || Array.isArray(md.text)) md.text = {};
+    if (!md.fav || Array.isArray(md.fav)) md.fav = {};
+    d.querySelectorAll('[data-edit]').forEach(el => {
+        const [a, b] = el.dataset.edit.split('.');
+        const v = rpText(el);
+        if (b === undefined) rpState[a] = v;
+        else if (a === 'text') md.text[b] = v;
+        else if (a === 'fav') md.fav[b] = v;
+    });
+    d.querySelectorAll('table[data-list]').forEach(list => {
+        rpState[list.dataset.list] = [...list.querySelectorAll('[data-item]')].map(rpText).filter(Boolean).join('\n');
+    });
+    md.stats = [...d.querySelectorAll('[data-stat]')].map(t => ({
+        label: rpText(t.querySelector('[data-k=label]')), value: rpText(t.querySelector('[data-k=value]')), change: rpText(t.querySelector('[data-k=change]')),
+    }));
+}
+
+/** Draw the mail again from rpState: the editor, or what the client will see */
+async function rpRender() {
+    const y = window.scrollY;
+    const j = await api('report_mail_render', { client_id: RP.client, period: RP.period, edit: rpMode === 'edit' ? '1' : '0', state: JSON.stringify(rpState) });
+    if (!j.ok) return;
+    rpFrame.addEventListener('load', () => window.scrollTo(0, y), { once: true });
+    rpFrame.srcdoc = j.html;
+}
+
+// The frame is as tall as the mail: the page scrolls, not the frame
+const rpFit = () => { const d = rpDoc(); if (d && d.body) rpFrame.style.height = Math.ceil(d.body.getBoundingClientRect().height) + 'px'; };
+
+function rpFocusEnd(el) {
+    if (!el) return;
+    const d = rpDoc();
+    el.focus();
+    const r = d.createRange(); r.selectNodeContents(el); r.collapse(false);
+    const s = d.getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+function rpItemAdd(afterRow, text) {
+    const row = afterRow.cloneNode(true);
+    const cell = row.querySelector('[data-item]');
+    cell.textContent = text;
+    afterRow.after(row);
+    rpFocusEnd(cell); rpSetDirty(true); rpFit();
+    return row;
+}
+
+rpFrame.addEventListener('load', () => {
+    const d = rpDoc();
+    rpFit();
+    new d.defaultView.ResizeObserver(rpFit).observe(d.body);
+    d.querySelectorAll('img').forEach(i => i.addEventListener('load', rpFit));
+    if (rpMode !== 'edit') return;
+    d.addEventListener('input', e => {
+        rpSetDirty(true);
+        const el = e.target.closest && e.target.closest('[contenteditable]');
+        if (el && rpText(el) === '') el.innerHTML = ''; // the hint comes back
+    });
+    d.addEventListener('keydown', e => {
+        const el = e.target.closest && e.target.closest('[contenteditable]');
+        if (!el) return;
+        // Enter: a new line in a paragraph, the next line of a list, nothing in a title
+        if (e.key === 'Enter' && !el.dataset.multi) {
+            e.preventDefault();
+            if (el.dataset.item) rpItemAdd(el.closest('tr'), '');
+            return;
+        }
+        if (e.key === 'Backspace' && el.dataset.item && rpText(el) === '') {
+            const row = el.closest('tr');
+            if (row.parentElement.querySelectorAll('[data-item]').length < 2) return;
+            e.preventDefault();
+            const next = row.previousElementSibling || row.nextElementSibling;
+            row.remove(); rpFocusEnd(next.querySelector('[data-item]')); rpSetDirty(true); rpFit();
+        }
+    });
+    // Pasted text arrives plain; several lines pasted into a list become several lines of it
+    d.addEventListener('paste', e => {
+        const el = e.target.closest && e.target.closest('[contenteditable]');
+        if (!el) return;
+        e.preventDefault();
+        const text = (e.clipboardData.getData('text/plain') || '').replace(/\r/g, '');
+        if (el.dataset.item) {
+            const [first, ...rest] = text.split('\n').map(s => s.trim().replace(/^[-•*]\s*/, '')).filter(Boolean);
+            d.execCommand('insertText', false, first || '');
+            let row = el.closest('tr');
+            rest.forEach(t => { row = rpItemAdd(row, t); });
+            return;
+        }
+        d.execCommand('insertText', false, el.dataset.multi ? text : text.replace(/\s*\n\s*/g, ' '));
+    });
+    d.addEventListener('click', e => {
+        const op = e.target.closest && e.target.closest('[data-op]');
+        if (!op) return;
+        e.preventDefault();
+        if (op.dataset.op === 'item-add') {
+            const rows = d.querySelectorAll(`table[data-list="${op.dataset.for}"] tr[data-row]`);
+            rpItemAdd(rows[rows.length - 1], '');
+            return;
+        }
+        if (op.dataset.op === 'img-pick') { rpImgSlot = op.dataset.img; document.getElementById('rp_file').click(); return; }
+        rpCollect();
+        const md = rpState.mail_data;
+        if (op.dataset.op === 'stat-add') md.stats.push({ label: '', value: '', change: '' });
+        if (op.dataset.op === 'stat-del') md.stats.splice([...d.querySelectorAll('[data-stat]')].indexOf(op.closest('[data-stat]')), 1);
+        if (op.dataset.op === 'img-remove') rpImgSet(op.dataset.img, null);
+        rpSetDirty(true); rpRender();
+    });
+});
+
+function rpImgSet(slot, path) {
+    const md = rpState.mail_data;
+    if (slot === 'hero') { if (path) md.hero = path; else delete md.hero; }
+    if (slot === 'fav') { md.fav = md.fav || {}; if (path) md.fav.img = path; else delete md.fav.img; }
+}
+document.getElementById('rp_file').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    toast('Görsel yükleniyor…', 'info', 1500);
+    const j = await api('report_image_upload', { image: file });
+    if (!j.ok) return;
+    rpCollect(); rpImgSet(rpImgSlot, j.path); rpSetDirty(true); rpRender();
+});
+
+document.querySelectorAll('.rp-mode-btn').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.mode === rpMode) return;
+    rpCollect();
+    rpMode = b.dataset.mode;
+    document.querySelectorAll('.rp-mode-btn').forEach(x => x.classList.toggle('active', x === b));
+    document.querySelector('.rp-card').classList.toggle('rp-previewing', rpMode !== 'edit');
+    rpRender();
+}));
+
+const RP_BADGES = { draft: '<span class="badge r-in_progress">Taslak</span>', completed: '<span class="badge r-completed">Tamamlandı</span>' };
+async function rpSave(status = RP.status) {
+    rpCollect();
+    const j = await api('monthly_report_save', { client_id: RP.client, period: RP.period, status,
+        summary: rpState.summary, work_done: rpState.work_done, metrics: rpState.metrics, plan: rpState.plan, mail_data: JSON.stringify(rpState.mail_data) });
+    if (!j.ok) return false;
+    toast(j.message, 'success', 2200);
+    rpSetDirty(false);
+    RP.saved = true; RP.status = j.status;
+    document.getElementById('rp_status').innerHTML = RP_BADGES[j.status];
+    document.getElementById('rp_saved').textContent = 'Kaydedildi · ' + j.saved_at;
+    document.getElementById('rp_complete').textContent = j.status === 'completed' ? 'Taslağa çevir' : 'Tamamla ✓';
+    return true;
+}
+const rpComplete = () => rpSave(RP.status === 'completed' ? 'draft' : 'completed');
+
+async function rpAi() {
+    if (!confirm('AI ayın verilerinden özet, yapılanlar, rakam yorumu ve gelecek ay planı yazacak; bu bölümlerdeki metin değişir. Devam edilsin mi?')) return;
+    const btn = document.getElementById('rp_ai');
+    btn.disabled = true; btn.textContent = 'Yazılıyor… (~20 sn)';
+    const j = await api('ai_report_draft', { client_id: RP.client, period: RP.period });
+    btn.disabled = false; btn.textContent = '🪄 AI ile yaz';
+    if (!j.ok) return;
+    rpCollect();
+    Object.entries(j.draft).forEach(([k, v]) => { if (v) rpState[k] = v; });
+    rpSetDirty(true); rpRender();
+    toast('AI taslağı yerleşti — okuyup düzenleyin.', 'success');
+}
+
+/* ---- Sending: recipients as chips, the file's contacts one click away ---- */
+let rmRecipients = [], rmPersonList = [];
 const rmIsEmail = a => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a);
 function rmChipDraw() {
     const field = document.getElementById('rm_to_field');
@@ -224,100 +354,56 @@ function rmChipDraw() {
     });
 }
 function rmChipAdd(raw) {
-    raw.split(/[;,\s]+/).map(a => a.trim().toLowerCase()).filter(Boolean).forEach(a => {
-        if (!rmRecipients.includes(a)) rmRecipients.push(a);
-    });
+    raw.split(/[;,\s]+/).map(a => a.trim().toLowerCase()).filter(Boolean).forEach(a => { if (!rmRecipients.includes(a)) rmRecipients.push(a); });
     rmChipDraw(); rmPersonDraw();
 }
-let rmPersonList = [];
 function rmPersonDraw() {
     const container = document.getElementById('rm_people');
     const remaining = rmPersonList.filter(k => !rmRecipients.includes(k.email.toLowerCase()));
-    container.innerHTML = remaining.map((k, i) =>
-        `<button type="button" class="mini-btn" onclick="rmChipAdd(rmPersonList.find(x => x.email === '${esc(k.email)}').email)" title="${esc(k.email)}">+ ${esc(k.name)}${k.title ? ' · ' + esc(k.title) : ''}</button>`
-    ).join('') + (remaining.length > 1 ? ` <button type="button" class="mini-btn" style="border-color:var(--brand);color:var(--brand)" onclick="rmChipAdd(rmPersonList.map(k => k.email).join(','))">Hepsini ekle</button>` : '');
+    container.innerHTML = remaining.map(k =>
+        `<button type="button" class="mini-btn" data-email="${esc(k.email)}" title="${esc(k.email)}">+ ${esc(k.name)}${k.title ? ' · ' + esc(k.title) : ''}</button>`
+    ).join('') + (remaining.length > 1 ? ' <button type="button" class="mini-btn" data-email-all="1" style="border-color:var(--brand);color:var(--brand)">Hepsini ekle</button>' : '');
 }
-document.addEventListener('DOMContentLoaded', () => {
+document.getElementById('rm_people').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    rmChipAdd(b.dataset.emailAll ? rmPersonList.map(k => k.email).join(',') : b.dataset.email);
+});
+(() => {
     const input = document.getElementById('rm_to_input');
-    if (!input) return;
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); rmChipAdd(input.value); input.value = ''; }
         else if (e.key === 'Backspace' && input.value === '' && rmRecipients.length) { rmRecipients.pop(); rmChipDraw(); rmPersonDraw(); }
     });
     input.addEventListener('blur', () => { if (input.value.trim()) { rmChipAdd(input.value); input.value = ''; } });
-});
-async function reportMailOpen(clientId, period) {
-    rmClient = clientId; rmPeriod = period;
-    const j = await api('report_mail_preview', { client_id: clientId, period });
+})();
+async function reportMailOpen() {
+    // The mail goes as saved: save what is on the page first
+    if ((rpDirty || !RP.saved) && !(await rpSave())) return;
+    const j = await api('report_mail_preview', { client_id: RP.client, period: RP.period });
     if (!j.ok) return;
     rmRecipients = (j.to || '').split(/[;,]+/).map(a => a.trim().toLowerCase()).filter(Boolean);
     rmPersonList = j.contacts || [];
     rmChipDraw(); rmPersonDraw();
     document.getElementById('rm_subject').value = j.subject;
     document.getElementById('rm_from').innerHTML = j.senders.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
-    document.getElementById('rm_preview').srcdoc = j.html;
     document.getElementById('rm_sent_info').textContent = j.sent_at ? 'Daha önce gönderildi: ' + j.sent_at : '';
-    // fill the design editor with the current data
-    const v = j.mail_data || {};
-    document.getElementById('rm_hero_status').textContent = v.hero ? '(yüklü ✓)' : '';
-    document.getElementById('rm_fav_img_status').textContent = (v.fav && v.fav.img) ? '(yüklü ✓)' : '';
-    document.getElementById('rm_fav_title').value = (v.fav && v.fav.title) || '';
-    document.getElementById('rm_fav_stat').value = (v.fav && v.fav.stat) || '';
-    document.getElementById('rm_fav_text').value = (v.fav && v.fav.text) || '';
-    const rows = document.querySelectorAll('#rm_stats .row-flex');
-    rows.forEach((s, i) => {
-        const st = (v.stats || [])[i] || {};
-        s.querySelector('.rm-stat-label').value = st.label || '';
-        s.querySelector('.rm-stat-value').value = st.value || '';
-        s.querySelector('.rm-stat-change').value = st.change || '';
-    });
-    document.querySelectorAll('.rm-text').forEach(i => i.value = (v.text && v.text[i.dataset.text]) || '');
-    ['rm_hero', 'rm_fav_img'].forEach(id => document.getElementById(id).value = '');
-    ['rm_hero_remove', 'rm_fav_img_remove'].forEach(id => document.getElementById(id).checked = false);
     modalOpen('modalReportMail');
-}
-async function reportMailDesignSave() {
-    const stats = [...document.querySelectorAll('#rm_stats .row-flex')].map(s => ({
-        label: s.querySelector('.rm-stat-label').value.trim(),
-        value: s.querySelector('.rm-stat-value').value.trim(),
-        change: s.querySelector('.rm-stat-change').value.trim()
-    })).filter(s => s.label || s.value);
-    const data = {
-        client_id: rmClient, period: rmPeriod,
-        fav_title: document.getElementById('rm_fav_title').value,
-        fav_stat: document.getElementById('rm_fav_stat').value,
-        fav_text: document.getElementById('rm_fav_text').value,
-        stats: stats,
-        ...Object.fromEntries([...document.querySelectorAll('.rm-text')].map(i => ['text_' + i.dataset.text, i.value])),
-        hero_remove: document.getElementById('rm_hero_remove').checked ? '1' : '0',
-        fav_img_remove: document.getElementById('rm_fav_img_remove').checked ? '1' : '0'
-    };
-    const hero = document.getElementById('rm_hero').files[0];
-    const favImg = document.getElementById('rm_fav_img').files[0];
-    if (hero) data.hero_img = hero;
-    if (favImg) data.fav_img = favImg;
-    const j = await api('report_mail_data_save', data);
-    if (!j.ok) return;
-    toast('Tasarım kaydedildi', 'success', 1600);
-    // refresh the preview (refills the fields)
-    reportMailOpen(rmClient, rmPeriod);
-    document.getElementById('rm_design').open = true;
 }
 async function reportMailSend() {
     const btn = document.getElementById('rm_send');
-    const inputRemaining = document.getElementById('rm_to_input').value.trim();
-    if (inputRemaining) { rmChipAdd(inputRemaining); document.getElementById('rm_to_input').value = ''; }
+    const typed = document.getElementById('rm_to_input').value.trim();
+    if (typed) { rmChipAdd(typed); document.getElementById('rm_to_input').value = ''; }
     if (!rmRecipients.length) { toast('En az bir alıcı ekleyin.', 'error'); return; }
     if (!confirm('Rapor maili şu adreslere gönderilsin mi?\n\n' + rmRecipients.join('\n'))) return;
     btn.disabled = true; btn.textContent = 'Gönderiliyor...';
-    const j = await api('report_mail_send', {
-        client_id: rmClient, period: rmPeriod,
-        to: rmRecipients.join(', '),
-        from: document.getElementById('rm_from').value,
-        subject: document.getElementById('rm_subject').value
-    });
+    const j = await api('report_mail_send', { client_id: RP.client, period: RP.period, to: rmRecipients.join(', '),
+        from: document.getElementById('rm_from').value, subject: document.getElementById('rm_subject').value });
     btn.disabled = false; btn.textContent = 'Gönder';
     if (j.ok) { toast(j.message, 'success'); modalClose(document.getElementById('modalReportMail')); setTimeout(() => location.reload(), 700); }
 }
+
+rpFrame.srcdoc = <?= json_encode(report_mail_html($reportState, $clientRow, $selectPeriod, true), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 </script>
+<?php endif; ?>
 <?php page_end(); ?>

@@ -25,6 +25,15 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 6. **Sadeleştirme** — 7.6 ✅: menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm** — 7.7 ✅: açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
 
+## Ek — Rapor, marka kiti, bağlantılar, iş türü klasörleri (8.1)
+
+- **Aylık rapor maili = editör:** `report_mail_html($report, $client, $period, $edit)` aynı tablo/satır içi stil işaretlemesini hem mail hem editör için üretir; `$edit` iken metinler `contenteditable` (`data-edit`, listeler `data-list` + `data-item`, rakam kutuları `data-stat` + `data-k`), görsel yuvaları ve kutu ekle/çıkar düğmeleri gelir, boş bölümler ipucuyla görünür. Sayfa (`monthly-reports.php`) belgeyi geri okur; yapısal değişiklikte (kutu, görsel) `report_mail_render` ile yeniden çizer. Kayıt tek eylem: `monthly_report_save` dört metin alanını ve `mail_data`'yı birlikte yazar (`report_state_clean` temizler). Mail boş bölümleri atlar.
+- **Hazır taslak:** kayıt yoksa `report_draft` ayın verilerinden doldurur — yayınlanan işler (platform dağılımıyla), biten işler, çekimler, hesapların ay sonu takipçisi ve önceki aya göre değişim (`+%3,2`), gelecek ayın planlı içerik sayısı ve çekimleri.
+- **Marka kiti:** `clients.brand_data` (JSON: renkler, logolar, yazı tipleri, ses tonu, yap/yapma, klasör); eski `brand_kit` metni kitin notlarıdır. `brand.php` bölüm bölüm düzenlenir (`brand_save`, `brand_logo_add`, `brand_logo_delete`); dosyada ve işte `brand_kit_compact` görünür. Raporun başlığında kitin ilk görsel logosu (yoksa dosya logosu) çıkar.
+- **Bağlantılar:** `client_links` (tür, ad, adres). `PLATFORMS`'taki `web` yayın platformu olarak kalır ama hesap eklenemez (`NON_ACCOUNT_PLATFORMS`); 8.1 geçişi `web` hesaplarını bağlantıya taşıdı, metriklerini sildi (öncesinde yedek).
+- **İş türleri:** `task_types.folder` ve `task_types.client_id`. `task_type_options` seçenekleri `<optgroup>` ile gruplar (önce dosyaya özel, sonra klasörler, sonra Genel); proje seçilen formda başka dosyaların türleri seçilen projeye göre çıkarılır. Proje şablonları yalnız genel türleri kullanır.
+- **Sohbetler:** proje kaydı artık kanal açmaz (`project_channel` kaldırıldı); 8.1 geçişi hiç mesaj yazılmamış proje/müşteri kanallarını sildi.
+
 ## Ek — Çalışma Defteri (8.0)
 
 - **Kayıt:** `work_logs` — kişi, tarih, kategori (`meeting` Toplantı, `office` Ofis, `remote` Uzaktan, `event` Etkinlik), başlangıç ve bitiş saati, dakika (bitiş başlangıçtan önceyse ertesi güne sarkar; en fazla 18 saat), isteğe bağlı dosya ya da proje, notlar ve çıktılar. Tarih bugün ya da geçmiş.

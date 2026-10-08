@@ -438,6 +438,10 @@ const PROJECT_STATUSES = ['active' => 'Aktif', 'on_hold' => 'Beklemede', 'comple
 const APPROVAL_STATUSES = ['pending' => 'Bekliyor', 'approved' => 'Onaylandı', 'revision' => 'Revize İstendi', 'rejected' => 'Reddedildi'];
 const REQUEST_STATUSES = ['new' => 'Yeni', 'reviewing' => 'İnceleniyor', 'task_created' => 'İşe Dönüştürüldü', 'completed' => 'Tamamlandı', 'rejected' => 'Reddedildi'];
 const PLATFORMS = ['instagram' => 'Instagram', 'facebook' => 'Facebook', 'x' => 'X (Twitter)', 'linkedin' => 'LinkedIn', 'youtube' => 'YouTube', 'tiktok' => 'TikTok', 'web' => 'Web Sitesi', 'other' => 'Diğer'];
+// Where content is published but not an account with followers ('web' stays a publishing platform)
+const NON_ACCOUNT_PLATFORMS = ['web', 'other'];
+// A file's links: web site, shop, link page… — just a name and an address
+const LINK_KINDS = ['website' => 'Web sitesi', 'shop' => 'Online mağaza', 'linkpage' => 'Link sayfası', 'maps' => 'Google İşletme / Harita', 'app' => 'Uygulama', 'other' => 'Diğer'];
 const EVENT_TYPES = ['shoot' => 'Çekim', 'meeting' => 'Toplantı', 'delivery' => 'Teslim', 'other' => 'Diğer'];
 const ROLES = ['admin' => 'Yönetici', 'pm' => 'Proje Yöneticisi', 'team' => 'Ekip Üyesi', 'finance' => 'Finans', 'intern' => 'Stajyer', 'customer' => 'Müşteri'];
 const REPEAT_OPTIONS = ['none' => 'Tekrarlamaz', 'weekly' => 'Her Hafta', 'monthly' => 'Her Ay'];
@@ -457,8 +461,16 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '8.0';
+const APP_VERSION = '8.1';
 const VERSION_NOTES = [
+    '8.1' => [
+        'Aylık rapor artık müşteriye gidecek mailin üzerinde yazılıyor: metne tıklayıp yazın, görsele tıklayıp değiştirin, rakam kutusu ekleyip çıkarın. "Müşterinin göreceği" ile son hali görün; boş bıraktığınız bölümler maile girmez. Mail şablonu da yenilendi',
+        'Yeni rapor taslak olarak ayın verileriyle dolu açılır: yayınlanan ve biten işler, çekimler, hesapların takipçi sayısı ve geçen aya göre değişimi, gelecek ayın planı',
+        'Marka kiti kendi sayfasında (dosyada "Marka Kiti → Aç"): renkler (tıklayınca kodu kopyalanır), logolar (açık, koyu, şeffaf zeminde görülür, tek tıkla iner), yazı tipleri, ses tonu ve yap / yapma kuralları, marka klasörü ve notlar. Dosyada ve dosyanın işlerinde görsel olarak görünür; eski marka kiti metni notlara taşındı',
+        'Dosyalarda "Bağlantılar": web sitesi, online mağaza, link sayfası, Google İşletme gibi adresler artık sosyal medya hesabı sayılmaz. Hesap olarak eklenmiş web siteleri buraya taşındı',
+        'İş türleri klasörlere ayrılabilir ve bir dosyaya özel yapılabilir. Yeni iş açarken türler klasörlerine göre gruplanır; dosyaya özel türler yalnızca o dosyanın işlerinde çıkar',
+        'Projeler açılınca artık kendiliğinden sohbet oluşmuyor; sohbeti Mesajlar\'dan siz başlatırsınız. Bu şekilde açılmış ve hiç yazılmamış sohbetler kaldırıldı',
+    ],
     '8.0' => [
         'Çalışma Defteri (menüde Bugün\'ün altında): herkes geldiği günü, kategoriyi (Toplantı, Ofis, Uzaktan, Etkinlik), başlangıç ve bitiş saatini, isteğe bağlı dosya / projeyi ve o sürede ne yaptığını yazar. Toplam süre ve durum (Katıldım, Tam gün, Yarım gün) kendiliğinden hesaplanır; gece yarısını geçen kayıtlar da olur',
         'Aylar sekme sekme; ayın toplamı ve kategori dağılımı üstte. Herkes kendi defterini görür; yöneticiler herkesinkini, "Herkes — ay özeti" ile kişi başı toplamları ve CSV\'yi',
@@ -1673,25 +1685,6 @@ function task_lock_reason(array $task, string $targetStatus): ?string {
         if ($missing > 0) return "Akışta $missing tamamlanmamış adım var. Önce adımları bitirin.";
     }
     return null;
-}
-
-function project_channel(int $projectId, string $type = 'project'): int {
-    $k = row("SELECT id FROM channels WHERE project_id=? AND type=?", [$projectId, $type]);
-    if ($k) return (int)$k['id'];
-    $project = row("SELECT name FROM projects WHERE id=?", [$projectId]);
-    $name = $project['name'] ?? 'Proje';
-    $channelId = insert('channels', ['name' => $name, 'type' => $type, 'project_id' => $projectId, 'created' => date('Y-m-d H:i:s')]);
-    // Auto-add team members
-    foreach (rows("SELECT id FROM users WHERE role IN ('admin','pm','team') AND is_active=1") as $u) {
-        q("INSERT IGNORE INTO channel_members (channel_id, user_id) VALUES (?,?)", [$channelId, $u['id']]);
-    }
-    if ($type === 'customer') {
-        $clientId = val("SELECT client_id FROM projects WHERE id=?", [$projectId]);
-        foreach (rows("SELECT id FROM users WHERE role='customer' AND client_id=? AND is_active=1", [$clientId]) as $u) {
-            q("INSERT IGNORE INTO channel_members (channel_id, user_id) VALUES (?,?)", [$channelId, $u['id']]);
-        }
-    }
-    return $channelId;
 }
 
 // Runs after all helpers are defined: one-time legacy schema localization

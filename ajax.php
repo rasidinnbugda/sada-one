@@ -61,8 +61,8 @@ case 'client_contact_delete':
     json_out(['ok' => true, 'message' => 'Kişi silindi.']);
 
 case 'report_mail_preview':
+    // The send window: subject, the file's addresses, the sender addresses (the mail itself is the editor on the page)
     require_permission('report');
-    require_once __DIR__ . '/includes/report-mail.php';
     $report = row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [(int)$g('client_id'), $g('period')]);
     $client = row("SELECT * FROM clients WHERE id=?", [(int)$g('client_id')]);
     if (!$report || !$client) json_out(['ok' => false, 'error' => 'Önce raporu kaydedin.']);
@@ -71,50 +71,30 @@ case 'report_mail_preview':
         array_map('trim', explode(',', (string)setting('mail_aliases')))))));
     [$py, $pa] = explode('-', $g('period'));
     json_out(['ok' => true,
-        'html' => report_mail_html($report, $client, $g('period')),
         'subject' => $client['name'] . ' — ' . MONTHS[(int)$pa] . " $py Aylık Raporu",
         'to' => $client['contact_email'] ?: '',
         'senders' => $senders,
         'sent_at' => $report['sent_at'] ? format_date($report['sent_at'], true) : null,
-        'mail_data' => json_decode((string)($report['mail_data'] ?? ''), true) ?: new stdClass(),
         'contacts' => rows("SELECT name, title, email FROM client_contacts WHERE client_id=? AND email IS NOT NULL ORDER BY name", [(int)$g('client_id')]),
     ]);
 
-case 'report_mail_data_save':
-    // The mail modal's design editor: cover image, favourite block, stat tiles
-    require_permission('report');
-    $report = row("SELECT * FROM monthly_reports WHERE client_id=? AND period=?", [(int)$g('client_id'), $g('period')]);
-    if (!$report) json_out(['ok' => false, 'error' => 'Önce raporu kaydedin.']);
-    $data = json_decode((string)($report['mail_data'] ?? ''), true) ?: [];
-    // Images: picture files only
-    foreach (['hero_img' => 'hero', 'fav_img' => 'fav_img'] as $fieldName => $key) {
-        if (!empty($_FILES[$fieldName]['tmp_name'])) {
-            $uploaded = file_upload($fieldName);
-            if (!$uploaded || !in_array($uploaded['extension'], ['jpg', 'jpeg', 'png', 'gif', 'webp']))
-                json_out(['ok' => false, 'error' => 'Görsel yüklenemedi (JPG/PNG/WebP kullanın).']);
-            if ($key === 'hero') $data['hero'] = 'uploads/' . $uploaded['path'];
-            else { $data['fav']['img'] = 'uploads/' . $uploaded['path']; }
-        }
-    }
-    if ($g('hero_remove') === '1') unset($data['hero']);
-    if ($g('fav_img_remove') === '1') unset($data['fav']['img']);
-    $data['fav']['title'] = mb_substr(trim($g('fav_title')), 0, 120);
-    $data['fav']['text'] = mb_substr(trim($g('fav_text')), 0, 600);
-    $data['fav']['stat'] = mb_substr(trim($g('fav_stat')), 0, 60);
-    // Editable title / greeting / closing texts (empty = default)
-    $data['text'] = [];
-    foreach (['title', 'greeting', 'production_title', 'stat_title', 'stat_intro', 'plan_title', 'closing', 'thanks'] as $mk) {
-        $data['text'][$mk] = mb_substr(trim($g('text_' . $mk)), 0, 200);
-    }
-    $stats = json_decode($g('stats', '[]'), true) ?: [];
-    $data['stats'] = [];
-    foreach (array_slice($stats, 0, 4) as $s) {
-        $data['stats'][] = ['label' => mb_substr(trim((string)($s['label'] ?? '')), 0, 60),
-            'value' => mb_substr(trim((string)($s['value'] ?? '')), 0, 30),
-            'change' => mb_substr(trim((string)($s['change'] ?? '')), 0, 20)];
-    }
-    update_row('monthly_reports', ['mail_data' => json_encode($data, JSON_UNESCAPED_UNICODE)], 'id=?', [$report['id']]);
-    json_out(['ok' => true, 'message' => 'Tasarım kaydedildi.']);
+case 'report_mail_render':
+    // The report mail drawn from what is on the page (not saved yet): the editor after a structural change, or the client's view
+    if (is_intern() || is_customer()) deny();
+    require_once __DIR__ . '/includes/report-mail.php';
+    $client = row("SELECT * FROM clients WHERE id=?", [(int)$g('client_id')]);
+    if (!$client || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $g('period'))) json_out(['ok' => false, 'error' => 'Dosya ve dönem gerekli.']);
+    $edit = $g('edit') === '1';
+    $state = report_state_clean(json_decode($g('state', '{}'), true) ?: [], $edit);
+    json_out(['ok' => true, 'html' => report_mail_html($state, $client, $g('period'), $edit)]);
+
+case 'report_image_upload':
+    // A picture clicked in the report mail: the cover or the favourite of the month
+    if (is_intern() || is_customer()) deny();
+    $uploaded = file_upload('image');
+    if (!$uploaded || !in_array($uploaded['extension'], ['jpg', 'jpeg', 'png', 'gif', 'webp'], true))
+        json_out(['ok' => false, 'error' => 'Görsel yüklenemedi (JPG, PNG, WebP veya GIF kullanın).']);
+    json_out(['ok' => true, 'path' => 'uploads/' . $uploaded['path']]);
 
 case 'report_mail_send':
     require_permission('report');
@@ -338,14 +318,18 @@ case 'idea_delete':
 
 case 'monthly_report_save':
     if (is_intern() || is_customer()) deny();
+    require_once __DIR__ . '/includes/report-mail.php';
     $clientId = (int)$g('client_id'); $period = $g('period');
-    if (!$clientId || !preg_match('/^\d{4}-\d{2}$/', $period)) json_out(['ok' => false, 'error' => 'Dosya ve dönem (YYYY-AA) zorunludur.']);
-    $data = ['summary' => trim($g('summary')), 'work_done' => trim($g('work_done')), 'metrics' => trim($g('metrics')), 'plan' => trim($g('plan')),
-        'status' => $g('status') === 'completed' ? 'completed' : 'draft', 'updated' => $now];
-    $var = row("SELECT id FROM monthly_reports WHERE client_id=? AND period=?", [$clientId, $period]);
+    if (!$clientId || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $period)) json_out(['ok' => false, 'error' => 'Dosya ve dönem (YYYY-AA) zorunludur.']);
+    if (!val("SELECT id FROM clients WHERE id=?", [$clientId])) json_out(['ok' => false, 'error' => 'Dosya bulunamadı.']);
+    $var = row("SELECT id, mail_data FROM monthly_reports WHERE client_id=? AND period=?", [$clientId, $period]);
+    // The editor posts the whole mail; without it (older form) the stored design is kept
+    $clean = report_state_clean(['summary' => $g('summary'), 'work_done' => $g('work_done'), 'metrics' => $g('metrics'), 'plan' => $g('plan'),
+        'mail_data' => array_key_exists('mail_data', $_POST) ? $g('mail_data') : ($var['mail_data'] ?? '')]);
+    $data = $clean + ['status' => $g('status') === 'completed' ? 'completed' : 'draft', 'updated' => $now];
     if ($var) update_row('monthly_reports', $data, 'id=?', [$var['id']]);
     else insert('monthly_reports', $data + ['client_id' => $clientId, 'period' => $period, 'author_id' => $u['id'], 'created' => $now]);
-    json_out(['ok' => true, 'message' => 'Aylık rapor kaydedildi.', 'refresh' => true]);
+    json_out(['ok' => true, 'message' => $data['status'] === 'completed' ? 'Rapor tamamlandı olarak kaydedildi.' : 'Taslak kaydedildi.', 'status' => $data['status'], 'saved_at' => date('H:i')]);
 
 case 'mnote_save':
     if (!is_admin() && $u['role'] !== 'pm') deny();
@@ -517,11 +501,84 @@ case 'client_strategy_save':
     $typeIds = json_decode($g('no_approval_types', '[]'), true);
     $typeIds = is_array($typeIds) ? array_values(array_unique(array_filter(array_map('intval', $typeIds)))) : [];
     update_row('clients', [
-        'strategy' => trim($g('strategy')) ?: null, 'brand_kit' => trim($g('brand_kit')) ?: null,
+        'strategy' => trim($g('strategy')) ?: null,
         'plan_approval' => $g('plan_approval') ? 1 : 0, 'no_approval_types' => $typeIds ? implode(',', $typeIds) : null,
     ], 'id=?', [$id]);
-    log_activity('Strateji ve marka bilgilerini güncelledi', 'client', $id);
-    json_out(['ok' => true, 'message' => 'Strateji ve marka bilgileri kaydedildi.']);
+    log_activity('Strateji ve onay kurallarını güncelledi', 'client', $id);
+    json_out(['ok' => true, 'message' => 'Strateji ve onay kuralları kaydedildi.']);
+
+case 'brand_save':
+    // One part of the brand kit: colours, typefaces, tone & rules, or folder & notes (logos have their own actions)
+    require_permission('client_manage');
+    require_once __DIR__ . '/includes/brand.php';
+    $client = row("SELECT * FROM clients WHERE id=?", [(int)$g('client_id')]);
+    if (!$client || !client_access((int)$client['id'])) json_out(['ok' => false, 'error' => 'Dosya bulunamadı.']);
+    $b = brand_data($client);
+    $items = json_decode($g('items', '[]'), true);
+    $items = is_array($items) ? array_values(array_filter($items, 'is_array')) : [];
+    $cut = fn($v, int $n) => mb_substr(trim((string)$v), 0, $n);
+    $link = function ($v) {
+        $v = trim((string)$v);
+        if ($v === '') return '';
+        if (!preg_match('#^https?://#i', $v)) $v = 'https://' . $v;
+        return filter_var($v, FILTER_VALIDATE_URL) ? mb_substr($v, 0, 500) : null;
+    };
+    $part = $g('part');
+    if ($part === 'colors') {
+        $b['colors'] = [];
+        foreach (array_slice($items, 0, 16) as $c) {
+            if (trim((string)($c['hex'] ?? '')) === '' && trim((string)($c['name'] ?? '')) === '') continue;
+            $hex = brand_hex((string)($c['hex'] ?? ''));
+            if (!$hex) json_out(['ok' => false, 'error' => 'Geçersiz renk kodu: ' . $cut($c['hex'] ?? '', 20) . ' (ör. #182F5D)']);
+            $b['colors'][] = ['name' => $cut($c['name'] ?? '', 60), 'hex' => $hex];
+        }
+    } elseif ($part === 'fonts') {
+        $b['fonts'] = [];
+        foreach (array_slice($items, 0, 10) as $f) {
+            if ($cut($f['name'] ?? '', 80) === '') continue;
+            $url = $link($f['url'] ?? '');
+            if ($url === null) json_out(['ok' => false, 'error' => 'Yazı tipi linki geçersiz: ' . $cut($f['url'] ?? '', 60)]);
+            $b['fonts'][] = ['name' => $cut($f['name'], 80), 'usage' => $cut($f['usage'] ?? '', 80), 'url' => $url];
+        }
+    } elseif ($part === 'voice') {
+        $lines = fn(string $k) => array_slice(array_values(array_filter(array_map(fn($s) => mb_substr(preg_replace('/^[\s\-•*✓✕]+/u', '', trim($s)), 0, 200), explode("\n", $g($k))), fn($s) => $s !== '')), 0, 20);
+        $b['voice'] = $cut($g('voice'), 3000);
+        $b['do'] = $lines('do');
+        $b['dont'] = $lines('dont');
+    } elseif ($part === 'notes') {
+        $folder = $link($g('folder'));
+        if ($folder === null) json_out(['ok' => false, 'error' => 'Klasör linki geçersiz.']);
+        $b['folder'] = $folder;
+        $b['notes'] = $cut($g('notes'), 5000);
+    } else json_out(['ok' => false, 'error' => 'Bilinmeyen bölüm.']);
+    brand_store((int)$client['id'], $b);
+    log_activity('Marka kitini güncelledi', 'client', (int)$client['id']);
+    json_out(['ok' => true, 'message' => 'Marka kiti kaydedildi.']);
+
+case 'brand_logo_add':
+    require_permission('client_manage');
+    require_once __DIR__ . '/includes/brand.php';
+    $client = row("SELECT * FROM clients WHERE id=?", [(int)$g('client_id')]);
+    if (!$client || !client_access((int)$client['id'])) json_out(['ok' => false, 'error' => 'Dosya bulunamadı.']);
+    $b = brand_data($client);
+    if (count($b['logos']) >= 16) json_out(['ok' => false, 'error' => 'Bir kitte en fazla 16 logo olabilir.']);
+    $uploaded = file_upload('logo');
+    if (!$uploaded || !in_array($uploaded['extension'], BRAND_LOGO_TYPES, true))
+        json_out(['ok' => false, 'error' => 'Logo yüklenemedi: PNG, JPG, WebP, GIF, PDF, AI veya PSD dosyası seçin.']);
+    $b['logos'][] = ['id' => bin2hex(random_bytes(4)), 'name' => mb_substr(trim($g('name')), 0, 60) ?: pathinfo($uploaded['name'], PATHINFO_FILENAME),
+        'path' => 'uploads/' . $uploaded['path'], 'ext' => $uploaded['extension']];
+    brand_store((int)$client['id'], $b);
+    json_out(['ok' => true, 'message' => 'Logo eklendi.']);
+
+case 'brand_logo_delete':
+    require_permission('client_manage');
+    require_once __DIR__ . '/includes/brand.php';
+    $client = row("SELECT * FROM clients WHERE id=?", [(int)$g('client_id')]);
+    if (!$client || !client_access((int)$client['id'])) json_out(['ok' => false, 'error' => 'Dosya bulunamadı.']);
+    $b = brand_data($client);
+    $b['logos'] = array_values(array_filter($b['logos'], fn($l) => ($l['id'] ?? '') !== $g('logo')));
+    brand_store((int)$client['id'], $b);
+    json_out(['ok' => true, 'message' => 'Logo kaldırıldı.']);
 
 case 'client_delete':
     require_admin();
@@ -553,8 +610,7 @@ case 'project_save':
         $id = insert('projects', $data);
         // A monthly project starts with this month in planning
         if ($data['type'] === 'monthly') get_or_create_period($id, (int)date('Y'), (int)date('n'), 'planning');
-        project_channel($id, 'project');
-        project_channel($id, 'customer');
+        // No chat is opened for the project: people start one on the Messages page when they need it
         project_members_save($id, $g('members'));
         // Set up tasks from the project template
         if ($g('ptemplate_id')) {
@@ -1218,6 +1274,7 @@ case 'social_account_add':
     if (!$clientId || $username === '') json_out(['ok' => false, 'error' => 'Dosya ve kullanıcı adı gerekli.']);
     $url = trim($g('url'));
     if ($url && !preg_match('#^https?://#i', $url)) $url = 'https://' . $url;
+    if (in_array($g('platform'), NON_ACCOUNT_PLATFORMS, true)) json_out(['ok' => false, 'error' => 'Web sitesi gibi adresler Bağlantılar bölümüne eklenir.']);
     insert('social_accounts', [
         'client_id' => $clientId,
         'platform' => isset(PLATFORMS[$g('platform')]) ? $g('platform') : 'instagram',
@@ -1230,6 +1287,24 @@ case 'social_account_delete':
     q("DELETE FROM social_metrics WHERE account_id=?", [(int)$g('id')]);
     q("DELETE FROM social_accounts WHERE id=?", [(int)$g('id')]);
     json_out(['ok' => true, 'message' => 'Hesap ve metrik geçmişi silindi.']);
+
+case 'client_link_save':
+    // The file's web site, shop, link page…: a name and an address, no followers
+    require_permission('content_manage');
+    $clientId = (int)$g('client_id');
+    if (!val("SELECT id FROM clients WHERE id=?", [$clientId])) json_out(['ok' => false, 'error' => 'Dosya bulunamadı.']);
+    $url = trim($g('url'));
+    if ($url !== '' && !preg_match('#^https?://#i', $url)) $url = 'https://' . $url;
+    if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) json_out(['ok' => false, 'error' => 'Geçerli bir adres girin (ör. markaadi.com).']);
+    $data = ['kind' => isset(LINK_KINDS[$g('kind')]) ? $g('kind') : 'website', 'label' => mb_substr(trim($g('label')), 0, 120) ?: null, 'url' => mb_substr($url, 0, 500)];
+    if ($linkId = (int)$g('id')) update_row('client_links', $data, 'id=? AND client_id=?', [$linkId, $clientId]);
+    else insert('client_links', $data + ['client_id' => $clientId, 'sort_order' => (int)val("SELECT COALESCE(MAX(sort_order),0)+1 FROM client_links WHERE client_id=?", [$clientId]), 'created' => $now]);
+    json_out(['ok' => true, 'message' => 'Bağlantı kaydedildi.']);
+
+case 'client_link_delete':
+    require_permission('content_manage');
+    q("DELETE FROM client_links WHERE id=?", [(int)$g('id')]);
+    json_out(['ok' => true, 'message' => 'Bağlantı silindi.']);
 
 case 'social_metric_add':
     require_staff();
@@ -2291,7 +2366,11 @@ case 'task_type_save':
         'optional' => empty($s['optional']) ? 0 : 1,
     ], $steps), fn($s) => $s['name'] !== ''));
     if ($name === '') json_out(['ok' => false, 'error' => 'İş türünün adı gerekli.']);
-    $data = ['name' => $name, 'description' => $g('description'), 'kind' => isset(TASK_KINDS[$g('kind')]) ? $g('kind') : 'client'];
+    // Folder: groups types on the page and in the new-work picker; a file-only type is offered on that file's work alone
+    $typeClient = (int)$g('client_id') ?: null;
+    if ($typeClient && !val("SELECT id FROM clients WHERE id=?", [$typeClient])) json_out(['ok' => false, 'error' => 'Dosya bulunamadı.']);
+    $data = ['name' => $name, 'description' => $g('description'), 'kind' => isset(TASK_KINDS[$g('kind')]) ? $g('kind') : 'client',
+        'folder' => mb_substr(trim(preg_replace('/\s+/u', ' ', $g('folder'))), 0, 80) ?: null, 'client_id' => $typeClient];
     if ($g('id')) {
         $typeId = (int)$g('id');
         update_row('task_types', $data, 'id=?', [$typeId]);
