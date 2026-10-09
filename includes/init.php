@@ -461,8 +461,11 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '8.3';
+const APP_VERSION = '8.3.1';
 const VERSION_NOTES = [
+    '8.3.1' => [
+        'Mesajlar: sohbet uzayınca yazma kutusu aşağı kaymıyor; mesajlar kendi alanında kayar, yazma kutusu altta sabit kalır',
+    ],
     '8.3' => [
         'Mesajlarda tarih: konuşmaya bir saatten uzun ara verilince ya da yeni günde ortada "Bugün 14:32", "Dün 09:10", "Pazartesi 18:20", "12 Eki 14:32" gibi bir zaman başlığı çıkar; mesajın saatinin üzerine gelince tam tarih görünür',
         'Gönderdiğiniz mesaj hemen ekrana düşer (saat simgesiyle "gidiyor"), sunucuya ulaşınca ✓ gönderildi, karşı taraf görünce ✓✓ görüldü olur. Grupta biri görünce gri, herkes görünce renkli çift tik; tike gelince ya da dokununca kimlerin gördüğü yazar',
