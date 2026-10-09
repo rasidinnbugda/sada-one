@@ -1846,7 +1846,7 @@ body { background-image: radial-gradient(ellipse 70% 45% at 85% -12%, var(--brig
 .rp-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .rp-hint { font-size: 12.5px; color: var(--text-2); padding: 9px 12px; margin-bottom: 12px; border-left: 3px solid var(--marker, var(--brand)); background: var(--surface-2); border-radius: 0 10px 10px 0; }
 .rp-previewing .rp-hint { display: none; }
-.rp-frame { display: block; width: 100%; min-height: 600px; border: 0; border-radius: 16px; background: #eef1f5; }
+.rp-frame { display: block; width: 100%; min-height: 600px; border: 0; border-radius: 16px; background: #f2f3f6; }
 .rp-finance { margin-top: 16px; }
 .rp-finance summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-2); padding: 6px 0; }
 @media (max-width: 1180px) { .rp-layout { grid-template-columns: 1fr; } }

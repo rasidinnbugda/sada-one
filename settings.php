@@ -104,7 +104,10 @@ if (isset($_GET['drive_err'])) echo '<script>addEventListener("DOMContentLoaded"
             </div>
             <div class="form-group"><label class="form-label">Kullanıcı (E-posta)</label><input name="smtp_user" class="input" autocomplete="off" value="<?= e(setting('smtp_user')) ?>" placeholder="panel@sizindomain.com"></div>
             <div class="form-group"><label class="form-label">Şifre</label><input type="password" name="smtp_password" autocomplete="new-password" class="input" placeholder="<?= setting('smtp_password') ? '••••••••' : 'E-posta şifresi' ?>"><div class="form-hint">Değiştirmek istemiyorsanız boş bırakın. Gmail için <b>uygulama şifresi</b> kullanın (normal şifre çalışmaz); boşluklarıyla yapıştırabilirsiniz, panel temizler.</div></div>
-            <div class="form-group"><label class="form-label">Gönderen Adresi</label><input name="smtp_sender" class="input" value="<?= e(setting('smtp_sender')) ?>" placeholder="panel@sizindomain.com"></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Gönderen Adresi</label><input name="smtp_sender" class="input" value="<?= e(setting('smtp_sender')) ?>" placeholder="panel@sizindomain.com"></div>
+                <div class="form-group"><label class="form-label">Gönderen Adı</label><input name="mail_from_name" class="input" maxlength="60" value="<?= e(setting('mail_from_name')) ?>" placeholder="SADA"><div class="form-hint">Alıcının gelen kutusunda görünen ad. Boşsa "SADA".</div></div>
+            </div>
             <div class="form-group"><label class="form-label">Ek Gönderen Adresleri <span class="text-muted" style="font-weight:400">(virgülle ayırın — isteğe bağlı)</span></label>
                 <input name="mail_aliases" class="input" value="<?= e(setting('mail_aliases')) ?>" placeholder="rapor@ajans.com, info@ajans.com">
                 <div class="form-hint">Rapor mailleri bu adreslerden gönderilebilir. Şart: her adres, Gmail'de bağlı hesabın <b>Ayarlar → Hesaplar → Şu adres olarak gönder</b> listesine eklenmiş olmalı; yoksa Google göndereni ana adrese çevirir.</div>

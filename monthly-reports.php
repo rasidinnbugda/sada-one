@@ -193,6 +193,8 @@ function rpCollect() {
     md.stats = [...d.querySelectorAll('[data-stat]')].map(t => ({
         label: rpText(t.querySelector('[data-k=label]')), value: rpText(t.querySelector('[data-k=value]')), change: rpText(t.querySelector('[data-k=change]')),
     }));
+    // the picture grid: each tile keeps the original upload path (the frame shows a square crop)
+    md.gallery = [...d.querySelectorAll('[data-gal]')].map(t => ({ img: t.dataset.path, caption: rpText(t.querySelector('[data-k=caption]')) }));
 }
 
 /** Draw the mail again from rpState: the editor, or what the client will see */
@@ -281,6 +283,7 @@ rpFrame.addEventListener('load', () => {
         if (op.dataset.op === 'stat-add') md.stats.push({ label: '', value: '', change: '' });
         if (op.dataset.op === 'stat-del') md.stats.splice([...d.querySelectorAll('[data-stat]')].indexOf(op.closest('[data-stat]')), 1);
         if (op.dataset.op === 'img-remove') rpImgSet(op.dataset.img, null);
+        if (op.dataset.op === 'gal-del') md.gallery.splice([...d.querySelectorAll('[data-gal]')].indexOf(op.closest('[data-gal]')), 1);
         rpSetDirty(true); rpRender();
     });
 });
@@ -289,6 +292,9 @@ function rpImgSet(slot, path) {
     const md = rpState.mail_data;
     if (slot === 'hero') { if (path) md.hero = path; else delete md.hero; }
     if (slot === 'fav') { md.fav = md.fav || {}; if (path) md.fav.img = path; else delete md.fav.img; }
+    md.gallery = md.gallery || [];
+    if (slot === 'gal-new' && path) md.gallery.push({ img: path, caption: '' });
+    if (slot.startsWith('gal:') && path && md.gallery[+slot.slice(4)]) md.gallery[+slot.slice(4)].img = path;
 }
 document.getElementById('rp_file').addEventListener('change', async e => {
     const file = e.target.files[0];

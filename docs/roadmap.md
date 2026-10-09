@@ -25,6 +25,13 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 6. **Sadeleştirme** — 7.6 ✅: menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm** — 7.7 ✅: açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
 
+## Ek — Rapor maili tasarımı ve gönderen (8.2)
+
+- **Düzen:** beyaz kart, gri kağıt; Georgia başlık, Helvetica metin; lacivert mürekkep, limon yalnızca rakamların altında ve "Aylık rapor" etiketinde. Sütunlar `inline-block` + `min-width` ile telefonda kendiliğinden ikişer dizilir; medya sorgusu destekleyen istemcide favori bölümü alt alta geçer (`.stack`); Outlook için sütunlar koşullu yorumlardaki tablolarla, görseller `width` niteliğiyle.
+- **Logo:** başta Ayarlar'daki `site_logo` (yoksa "SADA" yazısı), sağda dosyanın marka kiti / dosya logosu; altta küçük logo. "SADA One" adı maillerde geçmez.
+- **Görsel ızgara:** `mail_data.gallery` [{img, caption}], en fazla 6. Taslakta ayın yayınlanan işlerinin `archive` içindeki son görseli gelir; mailde `report_thumb` ile `uploads/thumbs/` altında 360px kare kırpım kullanılır (GD yoksa asıl görsel).
+- **Gönderen adı:** `mail_from_name()` — Ayarlar'daki `mail_from_name`, boşsa "SADA"; başlıkta UTF-8 kodlanır, satır sonu ve köşeli ayraç atılır. Bildirim mailleri `notification_email_html` ile aynı görünümde.
+
 ## Ek — Rapor, marka kiti, bağlantılar, iş türü klasörleri (8.1)
 
 - **Aylık rapor maili = editör:** `report_mail_html($report, $client, $period, $edit)` aynı tablo/satır içi stil işaretlemesini hem mail hem editör için üretir; `$edit` iken metinler `contenteditable` (`data-edit`, listeler `data-list` + `data-item`, rakam kutuları `data-stat` + `data-k`), görsel yuvaları ve kutu ekle/çıkar düğmeleri gelir, boş bölümler ipucuyla görünür. Sayfa (`monthly-reports.php`) belgeyi geri okur; yapısal değişiklikte (kutu, görsel) `report_mail_render` ile yeniden çizer. Kayıt tek eylem: `monthly_report_save` dört metin alanını ve `mail_data`'yı birlikte yazar (`report_state_clean` temizler). Mail boş bölümleri atlar.

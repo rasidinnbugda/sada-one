@@ -12,25 +12,41 @@
 
 const SMTP_IO_TIMEOUT = 20; // seconds a single SMTP response may take
 
+/** The name recipients see as the sender: Settings → SMTP → Gönderen adı, "SADA" when empty */
+function mail_from_name(): string {
+    // No line breaks or brackets: the name goes into a mail header
+    return mb_substr(trim(preg_replace('/[\r\n<>"]+/', '', (string)setting('mail_from_name'))), 0, 60) ?: 'SADA';
+}
+
+/** A notification mail: the report mail's look — white card on grey paper, the SADA logo from Settings (else the word), a quiet footer */
+function notification_email_html(string $topic, string $text): string {
+    $logo = setting('site_logo');
+    return '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>'
+        . '<body style="margin:0;padding:0;background:#f2f3f6;font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f3f6"><tr><td align="center" style="padding:28px 12px">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e6e8ee;border-radius:16px">'
+        . '<tr><td style="padding:26px 32px 0">' . ($logo
+            ? '<img src="' . htmlspecialchars(full_url('uploads/' . ltrim($logo, '/'))) . '" alt="SADA" height="26" style="height:26px;width:auto;display:block;border:0">'
+            : '<span style="font-size:16px;font-weight:800;letter-spacing:4px;color:#0f1d3a">SADA</span>') . '</td></tr>'
+        . '<tr><td style="padding:22px 32px 30px;color:#475069;font-size:15px;line-height:1.7">'
+        . '<div style="color:#0f1d3a;font-size:18px;font-weight:700;margin:0 0 12px">' . htmlspecialchars($topic) . '</div>'
+        . nl2br(htmlspecialchars($text))
+        . '</td></tr></table>'
+        . '<div style="max-width:560px;padding:16px 12px;color:#8a90a0;font-size:12px">SADA · bu e-posta otomatik gönderilmiştir.</div>'
+        . '</td></tr></table></body></html>';
+}
+
 function send_email(string $recipient, string $topic, string $text): bool {
     // Security: reject malformed addresses (also blocks CRLF header injection)
     if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) return false;
-    $siteName = setting('site_name', 'SADA One');
+    $siteName = mail_from_name();
     $sender = setting('smtp_sender') ?: setting('smtp_user');
-
-    $html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a0f1e;border-radius:16px;overflow:hidden">'
-        . '<div style="padding:24px 28px;border-bottom:1px solid rgba(248,242,203,.1)">'
-        . '<span style="font-size:20px;font-weight:800;letter-spacing:2px;color:#f2f4f8">SADA<span style="color:#b1fb01">.</span></span></div>'
-        . '<div style="padding:28px;color:#c9cede;font-size:14px;line-height:1.7">'
-        . '<h2 style="color:#f2f4f8;font-size:17px;margin:0 0 12px">' . htmlspecialchars($topic) . '</h2>'
-        . nl2br(htmlspecialchars($text))
-        . '</div><div style="padding:16px 28px;border-top:1px solid rgba(248,242,203,.1);color:#8b93ab;font-size:12px">'
-        . htmlspecialchars($siteName) . ' Yönetim Sistemi — bu e-posta otomatik gönderilmiştir.</div></div>';
+    $html = notification_email_html($topic, $text);
 
     if (setting('smtp_enabled') !== '1' || !setting('smtp_host') || !$sender) {
         // Try with mail()
         $titles = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n";
-        if ($sender) $titles .= "From: $siteName <$sender>\r\n";
+        if ($sender) $titles .= "From: =?UTF-8?B?" . base64_encode($siteName) . "?= <$sender>\r\n";
         return @mail($recipient, '=?UTF-8?B?' . base64_encode($topic) . '?=', $html, $titles);
     }
 
@@ -46,9 +62,9 @@ function send_email(string $recipient, string $topic, string $text): bool {
 function send_email_html(string $to, string $subject, string $html, ?string $from = null): bool {
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
     $sender = $from && filter_var($from, FILTER_VALIDATE_EMAIL) ? $from : (setting('smtp_sender') ?: setting('smtp_user'));
-    $siteName = setting('site_name', 'SADA One');
+    $siteName = mail_from_name();
     if (setting('smtp_enabled') !== '1' || !setting('smtp_host') || !$sender) {
-        $titles = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: $siteName <$sender>";
+        $titles = "MIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nFrom: =?UTF-8?B?" . base64_encode($siteName) . "?= <$sender>";
         return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $html, $titles);
     }
     return smtp_send($to, $subject, $html, $sender, $siteName);

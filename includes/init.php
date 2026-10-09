@@ -461,8 +461,15 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '8.1';
+const APP_VERSION = '8.2';
 const VERSION_NOTES = [
+    '8.2' => [
+        'Rapor maili yenilendi: daha sade ve ferah bir düzen, büyük başlık, üç sütunlu rakamlar, sakin bölüm başlıkları ve kağıt üzerinde sessiz bir alt bilgi',
+        'Maillerde artık "SADA One" yazmıyor: başta Ayarlar\'daki SADA logosu (yüklenmemişse "SADA" yazısı) çıkar; bildirim mailleri de aynı görünüme geçti',
+        'Ayın işleri görsellerle: yayınlanan işlerin son görselleri raporda kare kırpılmış bir ızgara olarak kendiliğinden gelir; görsel değiştirilebilir, kaldırılabilir, yenisi eklenebilir, altındaki yazı düzenlenebilir',
+        'Telefonda rakamlar ve görseller ikişer ikişer dizilir, ayın favorisi alt alta geçer; Outlook\'ta da sütunlar ve görseller düzgün durur',
+        'Gönderen adı alıcının gelen kutusunda "SADA" görünür; Ayarlar → SMTP → Gönderen Adı\'ndan değiştirilebilir',
+    ],
     '8.1' => [
         'Aylık rapor artık müşteriye gidecek mailin üzerinde yazılıyor: metne tıklayıp yazın, görsele tıklayıp değiştirin, rakam kutusu ekleyip çıkarın. "Müşterinin göreceği" ile son hali görün; boş bıraktığınız bölümler maile girmez. Mail şablonu da yenilendi',
         'Yeni rapor taslak olarak ayın verileriyle dolu açılır: yayınlanan ve biten işler, çekimler, hesapların takipçi sayısı ve geçen aya göre değişimi, gelecek ayın planı',

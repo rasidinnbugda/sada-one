@@ -2458,7 +2458,7 @@ case 'setting_save':
         'smtp_host' => 'smtp_host', 'smtp_port' => 'smtp_port', 'smtp_user' => 'smtp_user',
         'smtp_sender' => 'smtp_sender', 'email_notification' => 'email_notifications',
         'ai_model' => 'ai_model', 'ai_provider' => 'ai_provider', 'gemini_model' => 'gemini_model',
-        'mail_aliases' => 'mail_aliases', 'mikasa_enabled' => 'mikasa_enabled', 'mikasa_name' => 'mikasa_name'];
+        'mail_aliases' => 'mail_aliases', 'mail_from_name' => 'mail_from_name', 'mikasa_enabled' => 'mikasa_enabled', 'mikasa_name' => 'mikasa_name'];
     // Google OAuth client: id is plain, the secret only overwrites on a fresh value
     if (isset($_POST['google_client_id'])) {
         q("INSERT INTO settings (setting_key,setting_value) VALUES ('google_client_id',?) ON DUPLICATE KEY UPDATE setting_value=?", [trim($_POST['google_client_id']), trim($_POST['google_client_id'])]);
