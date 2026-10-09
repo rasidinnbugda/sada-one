@@ -177,6 +177,9 @@ function migration_commands(): array {
         "ALTER TABLE clients ADD COLUMN brand_data TEXT",
         "ALTER TABLE task_types ADD COLUMN folder VARCHAR(80) DEFAULT NULL",
         "ALTER TABLE task_types ADD COLUMN client_id INT DEFAULT NULL",
+        // 8.3: the last message each member has seen — sent / seen ticks; existing chats start from when each member last opened them
+        "ALTER TABLE channel_members ADD COLUMN last_seen_id INT NOT NULL DEFAULT 0",
+        "UPDATE channel_members cm SET last_seen_id=COALESCE((SELECT MAX(m.id) FROM messages m WHERE m.channel_id=cm.channel_id AND m.created<=cm.last_read), 0) WHERE cm.last_seen_id=0 AND cm.last_read IS NOT NULL",
     ];
 }
 

@@ -461,8 +461,13 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '8.2';
+const APP_VERSION = '8.3';
 const VERSION_NOTES = [
+    '8.3' => [
+        'Mesajlarda tarih: konuşmaya bir saatten uzun ara verilince ya da yeni günde ortada "Bugün 14:32", "Dün 09:10", "Pazartesi 18:20", "12 Eki 14:32" gibi bir zaman başlığı çıkar; mesajın saatinin üzerine gelince tam tarih görünür',
+        'Gönderdiğiniz mesaj hemen ekrana düşer (saat simgesiyle "gidiyor"), sunucuya ulaşınca ✓ gönderildi, karşı taraf görünce ✓✓ görüldü olur. Grupta biri görünce gri, herkes görünce renkli çift tik; tike gelince ya da dokununca kimlerin gördüğü yazar',
+        'Gönderilemeyen mesaj "Gönderilemedi · Tekrar dene" ile ekranda kalır; tek dokunuşla yeniden gönderilir',
+    ],
     '8.2' => [
         'Rapor maili yenilendi: daha sade ve ferah bir düzen, büyük başlık, üç sütunlu rakamlar, sakin bölüm başlıkları ve kağıt üzerinde sessiz bir alt bilgi',
         'Maillerde artık "SADA One" yazmıyor: başta Ayarlar\'daki SADA logosu (yüklenmemişse "SADA" yazısı) çıkar; bildirim mailleri de aynı görünüme geçti',
@@ -1109,6 +1114,24 @@ function highlight_mentions(string $escapedText): string {
         $escapedText = str_ireplace('@' . $escaped, '<span class="mention">@' . $escaped . '</span>', $escapedText);
     }
     return $escapedText;
+}
+
+/** A chat message for the page: who, when (Y-m-d H:i:s, the page writes "Bugün 14:32"…), the text as safe HTML */
+function chat_message_out(array $m, int $me): array {
+    return ['id' => (int)$m['id'], 'user_id' => (int)$m['user_id'], 'name' => $m['name'], 'at' => $m['created'],
+        'html' => highlight_mentions(nl2br(e($m['message']))), 'mine' => (int)$m['user_id'] === $me];
+}
+
+/** The other members of a chat and the last message each has seen — what the ticks are drawn from */
+function chat_reads(int $channelId, int $me): array {
+    return array_map(fn($r) => ['id' => (int)$r['id'], 'name' => $r['name'], 'seen' => (int)$r['last_seen_id']],
+        rows("SELECT u.id, u.name, cm.last_seen_id FROM channel_members cm JOIN users u ON u.id=cm.user_id WHERE cm.channel_id=? AND cm.user_id!=? ORDER BY u.name", [$channelId, $me]));
+}
+
+/** Marks a chat as read up to its newest message for this member */
+function chat_mark_seen(int $channelId, int $userId): void {
+    q("UPDATE channel_members SET last_read=?, last_seen_id=GREATEST(last_seen_id, COALESCE((SELECT MAX(id) FROM messages WHERE channel_id=?), 0)) WHERE channel_id=? AND user_id=?",
+        [date('Y-m-d H:i:s'), $channelId, $channelId, $userId]);
 }
 
 /** Converts comma-separated task tags into colored chips */

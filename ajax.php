@@ -1433,24 +1433,24 @@ case 'message_send':
     if (!val("SELECT COUNT(*) FROM channel_members WHERE channel_id=? AND user_id=?", [$channelId, $u['id']]))
         json_out(['ok' => false, 'error' => 'Bu kanala erişiminiz yok.']);
     $id = insert('messages', ['channel_id' => $channelId, 'user_id' => $u['id'], 'message' => $message, 'created' => $now]);
-    update_row('channel_members', ['last_read' => $now], 'channel_id=? AND user_id=?', [$channelId, $u['id']]);
+    chat_mark_seen($channelId, (int)$u['id']);
     // Notify other members
     foreach (rows("SELECT user_id FROM channel_members WHERE channel_id=? AND user_id!=?", [$channelId, $u['id']]) as $member) {
         notify($member['user_id'], $u['name'] . ' mesaj gönderdi', mb_substr($message, 0, 80), 'messages.php?channel=' . $channelId, 'message', false);
     }
     // Also notify mentioned users (including email)
     notify_mentions($g('mention_ids', ''), $u['name'] . ' sizi bir sohbette etiketledi', mb_substr($message, 0, 90), 'messages.php?channel=' . $channelId);
-    json_out(['ok' => true, 'id' => $id, 'created' => format_date($now, true)]);
+    json_out(['ok' => true, 'id' => $id, 'message' => chat_message_out(['id' => $id, 'user_id' => $u['id'], 'name' => $u['name'], 'created' => $now, 'message' => $message], (int)$u['id'])]);
 
 case 'message_fetch':
     require_login();
     $channelId = (int)$g('channel_id');
     $lastId = (int)$g('last_id');
-    $new = rows("SELECT m.*, u.name, u.color FROM messages m JOIN users u ON u.id=m.user_id WHERE m.channel_id=? AND m.id>? ORDER BY m.id", [$channelId, $lastId]);
-    update_row('channel_members', ['last_read' => $now], 'channel_id=? AND user_id=?', [$channelId, $u['id']]);
-    foreach ($new as &$m) { $m['mine'] = ($m['user_id'] == $u['id']); $m['time'] = date('H:i', strtotime($m['created'])); $m['initial'] = initials($m['name']); }
-    json_out(['ok' => true, 'messages' => $new]);
-
+    if (!val("SELECT COUNT(*) FROM channel_members WHERE channel_id=? AND user_id=?", [$channelId, $u['id']]))
+        json_out(['ok' => false, 'error' => 'Bu kanala erişiminiz yok.']);
+    $new = rows("SELECT m.*, u.name FROM messages m JOIN users u ON u.id=m.user_id WHERE m.channel_id=? AND m.id>? ORDER BY m.id", [$channelId, $lastId]);
+    chat_mark_seen($channelId, (int)$u['id']);
+    json_out(['ok' => true, 'messages' => array_map(fn($m) => chat_message_out($m, (int)$u['id']), $new), 'reads' => chat_reads($channelId, (int)$u['id'])]);
 case 'channel_create':
     require_permission('channel_create');
     $name = trim($g('name'));

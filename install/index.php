@@ -684,6 +684,7 @@ CREATE TABLE IF NOT EXISTS channel_members (
     user_id INT NOT NULL,
     last_read DATETIME DEFAULT NULL,
     archive TINYINT(1) NOT NULL DEFAULT 0,
+    last_seen_id INT NOT NULL DEFAULT 0,
     PRIMARY KEY (channel_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_turkish_ci;
 

@@ -30,7 +30,7 @@ if (!$activeChannel && $channels) { $activeChannel = $channels[0]; $activeChanne
 // Last 300 messages only — a long-lived channel's full history is not rendered on every open
 $messages = $activeChannel ? rows("SELECT * FROM (SELECT m.*, us.name, us.color FROM messages m JOIN users us ON us.id=m.user_id
     WHERE m.channel_id=? ORDER BY m.id DESC LIMIT 300) son ORDER BY id", [$activeChannelId]) : [];
-if ($activeChannel) update_row('channel_members', ['last_read' => date('Y-m-d H:i:s')], 'channel_id=? AND user_id=?', [$activeChannelId, $u['id']]);
+if ($activeChannel) chat_mark_seen($activeChannelId, (int)$u['id']);
 $lastMessageId = $messages ? end($messages)['id'] : 0;
 
 $teamMembers = is_staff() ? rows("SELECT id, name FROM users WHERE id!=? AND role IN ('admin','pm','team','finance') AND is_active=1 ORDER BY name", [$u['id']]) : [];
@@ -107,15 +107,8 @@ page_start('Mesajlar', 'messages');
                 </div>
             </div>
         </div>
-        <div class="chat-body" id="chatBody">
-            <?php foreach ($messages as $m): ?>
-            <div class="message-bubble <?= $m['user_id'] == $u['id'] ? 'mine' : '' ?>">
-                <div class="message-sender"><?= e($m['name']) ?></div>
-                <div><?= highlight_mentions(nl2br(e($m['message']))) ?></div>
-                <div class="message-time"><?= date('H:i', strtotime($m['created'])) ?></div>
-            </div>
-            <?php endforeach; ?>
-        </div>
+        <!-- Messages are drawn by the script below: time stamps between them, ticks on your own -->
+        <div class="chat-body" id="chatBody"></div>
         <form class="chat-write mention-wrap" id="messageForm">
             <input type="hidden" class="mention-ids" id="messageMention">
             <textarea class="text-area" id="messageInput" data-mention placeholder="Mesaj yazın... (@ ile etiketleyin, Enter ile gönderin)" required></textarea>
@@ -213,40 +206,132 @@ const channelId = <?= $activeChannelId ?>;
 let lastId = <?= $lastMessageId ?>;
 const body = document.getElementById('chatBody');
 const mineId = <?= $u['id'] ?>;
+// The other members and the last message each has seen
+let READS = <?= json_encode($activeChannel ? chat_reads($activeChannelId, (int)$u['id']) : [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
 
-function bubbleAdd(m) {
+/* ---- When: "Bugün 14:32", "Dün 09:10", "Pazartesi 18:20", "12 Eki 14:32", "3 Mar 2025 11:05" ---- */
+const chatMonths = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const chatDays = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+const chatDate = s => { const [d, t] = s.split(' '); const [y, mo, da] = d.split('-').map(Number); const [h, mi, se] = t.split(':').map(Number); return new Date(y, mo - 1, da, h, mi, se || 0); };
+const hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+const nowStamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
+function stampLabel(d) {
+    const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+    const ago = Math.round((day(new Date()) - day(d)) / 864e5);
+    if (ago === 0) return 'Bugün ' + hm(d);
+    if (ago === 1) return 'Dün ' + hm(d);
+    if (ago > 1 && ago < 7) return chatDays[d.getDay()] + ' ' + hm(d);
+    return d.getDate() + ' ' + chatMonths[d.getMonth()].slice(0, 3) + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '') + ' ' + hm(d);
+}
+const fullDate = d => `${d.getDate()} ${chatMonths[d.getMonth()]} ${d.getFullYear()} ${chatDays[d.getDay()]}, ${hm(d)}`;
+
+/* ---- Ticks: sending (clock) → sent (✓) → seen by some (✓✓) → seen by everyone (coloured ✓✓) ---- */
+const TICK = {
+    sending: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 4.8V8l2.2 1.5"/></svg>',
+    sent: '<svg viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5l3 3 7-7"/></svg>',
+    seen: '<svg viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 6.5l3 3 7-7M8.5 9.5l7-7"/></svg>',
+};
+TICK['seen-all'] = TICK.seen;
+const TICK_TITLE = { sending: 'Gönderiliyor…', sent: 'Gönderildi' };
+function setTick(el, state, title) {
+    const t = el.querySelector('.msg-ticks');
+    if (!t || t.dataset.state === state && t.title === title) return;
+    t.dataset.state = state;
+    t.title = title || TICK_TITLE[state] || '';
+    t.innerHTML = TICK[state] || '';
+}
+// Who has seen each of my messages — redrawn after every poll
+function ticksUpdate() {
+    body.querySelectorAll('.message-bubble.mine[data-id]').forEach(el => {
+        const id = +el.dataset.id;
+        const seenBy = READS.filter(r => r.seen >= id);
+        if (!seenBy.length) setTick(el, 'sent');
+        else setTick(el, seenBy.length === READS.length ? 'seen-all' : 'seen', 'Görenler: ' + seenBy.map(r => r.name).join(', '));
+    });
+}
+
+let lastAt = null;
+function bubbleAdd(m, state) {
+    const at = chatDate(m.at);
+    // a time stamp when the conversation picks up again after an hour or more, and on every new day
+    if (!lastAt || Math.abs(at - lastAt) >= 3600e3 || at.toDateString() !== lastAt.toDateString()) {
+        const s = document.createElement('div');
+        s.className = 'chat-stamp';
+        s.textContent = stampLabel(at);
+        body.appendChild(s);
+    }
+    lastAt = at;
     const d = document.createElement('div');
     d.className = 'message-bubble' + (m.mine ? ' mine' : '');
-    d.innerHTML = `<div class="message-sender">${esc(m.name)}</div><div>${m.message.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div><div class="message-time">${m.time}</div>`;
+    if (m.id) d.dataset.id = m.id;
+    d.innerHTML = `<div class="message-sender">${esc(m.name)}</div><div class="message-text">${m.html}</div>`
+        + `<div class="message-time" title="${fullDate(at)}">${hm(at)}${m.mine ? '<span class="msg-ticks"></span>' : ''}</div>`;
     body.appendChild(d);
+    if (m.mine) setTick(d, state || 'sent');
     body.scrollTop = body.scrollHeight;
+    return d;
+}
+
+// Sending: the message is on screen at once (clock), gets its tick when the server has it; a failed one can be sent again
+async function messageSend(message, mentions, el) {
+    if (!el) el = bubbleAdd({ mine: true, name: 'Siz', at: nowStamp(), html: esc(message).replace(/\n/g, '<br>') }, 'sending');
+    el.classList.add('sending'); el.classList.remove('failed');
+    el.querySelector('.msg-retry')?.remove();
+    setTick(el, 'sending');
+    const j = await api('message_send', { channel_id: channelId, message, mention_ids: mentions });
+    el.classList.remove('sending');
+    if (!j.ok) {
+        el.classList.add('failed');
+        setTick(el, 'failed', 'Gönderilemedi');
+        const r = document.createElement('button');
+        r.type = 'button'; r.className = 'msg-retry'; r.textContent = 'Gönderilemedi · Tekrar dene';
+        r.onclick = () => messageSend(message, mentions, el);
+        el.appendChild(r);
+        return;
+    }
+    el.dataset.id = j.message.id;
+    el.querySelector('.message-text').innerHTML = j.message.html;
+    lastId = Math.max(lastId, j.message.id);
+    ticksUpdate();
 }
 
 const form = document.getElementById('messageForm');
 const input = document.getElementById('messageInput');
 if (form) {
-    form.addEventListener('submit', async e => {
+    // drawn once app.js (esc, toast) has loaded at the end of the page
+    addEventListener('DOMContentLoaded', () => {
+        <?= json_encode(array_map(fn($m) => chat_message_out($m, (int)$u['id']), $messages), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>.forEach(m => bubbleAdd(m));
+        ticksUpdate();
+    });
+    form.addEventListener('submit', e => {
         e.preventDefault();
         const message = input.value.trim(); if (!message) return;
         const mentionField = document.getElementById('messageMention');
         const mentions = mentionField.value || '[]';
         input.value = ''; mentionField.value = '';
-        const j = await api('message_send', { channel_id: channelId, message, mention_ids: mentions });
-        if (j.ok) { bubbleAdd({ name: 'Siz', message, time: new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}), mine: true }); lastId = j.id; }
+        messageSend(message, mentions);
     });
+    // Tapping the ticks says who has seen the message (phones have no hover)
+    body.addEventListener('click', e => { const t = e.target.closest('.msg-ticks'); if (t && t.title) toast(t.title, 'info', 2200); });
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey && !document.querySelector('.mention-dropdown')) { e.preventDefault(); form.requestSubmit(); }
     });
 }
 
-// Fetch new messages (polling — next round only after the previous answer, see sadaPoll).
+// New messages and who has seen what (polling — next round only after the previous answer, see sadaPoll).
 // app.js defines sadaPoll and loads at the end of the body, so wait for it.
 if (channelId) addEventListener('DOMContentLoaded', () => sadaPoll(4000, async () => {
     const j = await api('message_fetch', { channel_id: channelId, last_id: lastId });
     if (!j.ok) throw new Error('poll');
-    if (j.messages.length) {
-        j.messages.forEach(m => { if (!m.mine) bubbleAdd(m); lastId = Math.max(lastId, m.id); });
-    }
+    j.messages.forEach(m => {
+        lastId = Math.max(lastId, m.id);
+        if (body.querySelector(`.message-bubble[data-id="${m.id}"]`)) return;
+        // my own message still on its way: the send answer finishes that bubble
+        if (m.mine && body.querySelector('.message-bubble.sending')) return;
+        bubbleAdd(m);
+    });
+    READS = j.reads;
+    ticksUpdate();
 }));
 
 // Channel member selection

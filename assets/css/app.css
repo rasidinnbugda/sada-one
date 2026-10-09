@@ -1851,3 +1851,22 @@ body { background-image: radial-gradient(ellipse 70% 45% at 85% -12%, var(--brig
 .rp-finance summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-2); padding: 6px 0; }
 @media (max-width: 1180px) { .rp-layout { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .rp-card { padding: 14px 10px; } .rp-bar { top: 56px; margin: 0 0 10px; } .rp-actions { margin-left: 0; } }
+
+/* ============================================================
+   8.3 — CHAT: time stamps between messages, ticks on your own
+   ============================================================ */
+.chat-stamp { align-self: center; font-size: 11.5px; font-weight: 600; color: var(--muted); letter-spacing: .01em; padding: 8px 0 0; }
+.chat-stamp + .message-bubble { margin-top: -2px; }
+.message-bubble .message-time { display: flex; align-items: center; justify-content: flex-end; gap: 4px; cursor: default; }
+.message-bubble.sending { opacity: .7; }
+.msg-ticks { display: inline-flex; align-items: center; cursor: pointer; }
+.msg-ticks svg { height: 12px; width: auto; display: block; }
+.msg-ticks[data-state="sending"] svg { height: 11px; animation: tickPulse 1.2s ease-in-out infinite; }
+.msg-ticks[data-state="seen"] { opacity: .95; }
+.message-bubble.mine .msg-ticks[data-state="seen-all"] { color: var(--marker, var(--info)); opacity: 1; }
+.message-bubble.mine .message-time:has(.msg-ticks[data-state="seen-all"]) { opacity: .9; }
+.message-bubble.failed { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--danger); }
+.msg-retry { display: block; margin: 6px 0 0 auto; padding: 0; border: 0; background: none; font-size: 11.5px; font-weight: 700; color: var(--danger); cursor: pointer; }
+.msg-retry:hover { text-decoration: underline; }
+@keyframes tickPulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .msg-ticks[data-state="sending"] svg { animation: none; } }

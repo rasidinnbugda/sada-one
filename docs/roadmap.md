@@ -25,6 +25,13 @@ Her İş bir projeye bağlıdır (aylık projede bir aya). Çekim takvimde etkin
 6. **Sadeleştirme** — 7.6 ✅: menü ve takvimler toparlanır; İş'e katılan ayrı sayfalar ve eski `contents` tablosu kaldırılır.
 7. **Görünüm** — 7.7 ✅: açık tasarım sistemi, sayfa geçişleri, sunucuda yazı tipleri.
 
+## Ek — Mesajlarda tarih ve görüldü (8.3)
+
+- **Görüldü:** `channel_members.last_seen_id` — üyenin gördüğü son mesaj. Sohbeti açmak, sohbet açıkken yoklama (`message_fetch`) ve mesaj göndermek onu sohbetin en yeni mesajına çeker (`chat_mark_seen`). Güncellemede mevcut üyeler için `last_read` anına kadarki son mesajla dolduruldu.
+- **İşaretler (yalnız kendi mesajlarında):** gidiyor (saat) → ✓ gönderildi → ✓✓ bazıları gördü (gri) → ✓✓ herkes gördü (renkli); `title` / dokununca "Görenler: …". Yoklama her turda `reads` döner, işaretler canlı güncellenir. Gönderilemeyen mesaj balonda "Tekrar dene" ile kalır.
+- **Zaman başlıkları:** iki mesaj arasında bir saatten uzun ara ya da gün değişimi: "Bugün 14:32", "Dün", 6 güne kadar gün adı, sonra "12 Eki" (başka yılsa yıl da). Balonlar sayfadaki tek bir çizici ile (`bubbleAdd`) çizilir; metin sunucuda kaçışlanıp etiketler işaretlenir (`chat_message_out`).
+- `message_fetch` artık yalnız kanal üyesine cevap verir.
+
 ## Ek — Rapor maili tasarımı ve gönderen (8.2)
 
 - **Düzen:** beyaz kart, gri kağıt; Georgia başlık, Helvetica metin; lacivert mürekkep, limon yalnızca rakamların altında ve "Aylık rapor" etiketinde. Sütunlar `inline-block` + `min-width` ile telefonda kendiliğinden ikişer dizilir; medya sorgusu destekleyen istemcide favori bölümü alt alta geçer (`.stack`); Outlook için sütunlar koşullu yorumlardaki tablolarla, görseller `width` niteliğiyle.
