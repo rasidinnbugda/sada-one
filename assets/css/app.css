@@ -1472,6 +1472,8 @@ input[type="datetime-local"].input:hover::-webkit-calendar-picker-indicator { op
    YORUMLAR v2 — mention, tepki, thread
    ============================================================ */
 .mention { color: var(--brand); font-weight: 600; background: var(--bright); padding: 1px 5px; border-radius: 6px; }
+/* In your own bubble (brand colour) the tag takes the bubble's text colour on a light tint, so it does not melt into it */
+.message-bubble.mine .mention { color: var(--brand-ink); background: color-mix(in srgb, var(--brand-ink) 22%, transparent); box-shadow: inset 0 -2px 0 var(--marker, var(--brand-ink)); }
 .comment-reply { margin-left: 44px; margin-top: 10px; padding-left: 12px; border-left: 2px solid var(--border-2); }
 .reaction-chip {
     display: inline-flex; align-items: center; gap: 3px; padding: 2.5px 9px; border-radius: 99px;

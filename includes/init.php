@@ -461,8 +461,11 @@ const NOTE_CATEGORIES = ['general' => 'Genel', 'brand' => 'Marka Rehberi', 'acce
 const TASK_STATUS_COLORS = ['todo' => 'var(--muted)', 'in_progress' => 'var(--info)', 'in_review' => 'var(--warning)', 'awaiting_approval' => '#a58bf0', 'completed' => 'var(--success)', 'published' => 'var(--brand)', 'cancelled' => 'var(--muted)'];
 
 /* ---------------- Version & update notes ---------------- */
-const APP_VERSION = '8.3.1';
+const APP_VERSION = '8.3.2';
 const VERSION_NOTES = [
+    '8.3.2' => [
+        'Mesajlar: kendi mesajınızdaki etiketler (@isim) artık balonun rengine karışmıyor; açık bir zemin ve alt çizgiyle okunur',
+    ],
     '8.3.1' => [
         'Mesajlar: sohbet uzayınca yazma kutusu aşağı kaymıyor; mesajlar kendi alanında kayar, yazma kutusu altta sabit kalır',
     ],
